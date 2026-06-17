@@ -655,6 +655,24 @@ function clamp(value, min, max){
   return Math.min(max, Math.max(min, value));
 }
 
+function startProgressPulse(startPercent, endPercent, label, onProg, durationMs = 1300){
+  const start = performance.now();
+  let raf = 0;
+  let done = false;
+  const tick = () => {
+    if(done) return;
+    const elapsed = Math.min(1, (performance.now()-start)/durationMs);
+    const pct = startPercent + (endPercent - startPercent) * elapsed;
+    onProg(pct, label);
+    if(elapsed < 1) raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => {
+    done = true;
+    if(raf) cancelAnimationFrame(raf);
+  };
+}
+
 function estimateTempo(signal, sampleRate){
   if(!signal || !signal.length || !sampleRate || sampleRate <= 0){
     return {bpm:BPM_FALLBACK, confidence:0, offset:0};
@@ -956,7 +974,14 @@ async function separateAudio(arrayBuf,onProg){
   onProg(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
   if(audioCtx.state==='suspended')await audioCtx.resume();
-  const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
+  const stopDecodePulse = startProgressPulse(0, 10, 'Decoding audio…', onProg, 1400);
+  let raw;
+  try{
+    raw = await audioCtx.decodeAudioData(arrayBuf.slice(0));
+  }finally{
+    stopDecodePulse();
+  }
+  if(!raw) throw new Error('Unable to decode audio data. Please use a valid audio file.');
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
   const tempo = estimateTempo(sigL, raw.sampleRate);
