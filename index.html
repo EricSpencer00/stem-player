@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stem Player</title>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
+<style>
+:root {
+  --page:       oklch(91% 0.013 82);
+  --device:     oklch(86% 0.016 76);
+  --device-hi:  oklch(89% 0.013 80);
+  --center:     oklch(82% 0.019 72);
+  --center-hi:  oklch(84% 0.016 75);
+  --text:       oklch(20% 0.010 62);
+  --text-dim:   oklch(50% 0.010 68);
+  --divider:    oklch(79% 0.012 76);
+  --dot-off:    oklch(75% 0.013 78);
+  --dot-on:     oklch(52% 0.10  62);
+  --dot-glow:   oklch(52% 0.10  62 / 0.35);
+  --vol-track:  oklch(79% 0.012 76);
+  --vol-fill:   oklch(28% 0.012 64);
+  --wave-bg:    oklch(84% 0.014 77);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── wordmark ── */
+.wordmark {
+  font-size: clamp(9px, 1.6vw, 11px);
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-bottom: 36px;
+  text-indent: 0.5em; /* compensate letter-spacing at end */
+}
+
+/* ── device ── */
+.device-wrap {
+  position: relative;
+  width:  min(500px, 90vw);
+  height: min(500px, 90vw);
+  margin-bottom: 24px;
+}
+
+.device {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--device);
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    inset 0 2px 5px oklch(96% 0 0 / 0.45),
+    inset 0 -3px 6px oklch(0%  0 0 / 0.09),
+    0 10px 40px oklch(20% 0.01 70 / 0.17),
+    0  3px  8px oklch(20% 0.01 70 / 0.10);
+  transition: box-shadow 0.25s ease;
+}
+.device.drag-active {
+  box-shadow:
+    inset 0 2px 5px oklch(96% 0 0 / 0.5),
+    inset 0 -3px 6px oklch(0%  0 0 / 0.1),
+    0 14px 50px oklch(20% 0.01 70 / 0.22),
+    0  4px 12px oklch(20% 0.01 70 / 0.14);
+}
+
+/* ── quadrants ── */
+.quadrant {
+  position: absolute;
+  width: 50%;
+  height: 50%;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.25s ease, background 0.25s ease;
+}
+.q-drums  { top: 0; left: 0; }
+.q-vocals { top: 0; right: 0; }
+.q-bass   { bottom: 0; left: 0; }
+.q-melody { bottom: 0; right: 0; }
+
+.quadrant.muted { filter: brightness(0.84) saturate(0.4); }
+.quadrant.pressing { filter: brightness(1.04); }
+
+/* inner label + vol-bar group — offset toward outer corner */
+.q-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.q-drums  .q-inner { transform: translate(-20px, -20px); }
+.q-vocals .q-inner { transform: translate( 20px, -20px); }
+.q-bass   .q-inner { transform: translate(-20px,  20px); }
+.q-melody .q-inner { transform: translate( 20px,  20px); }
+
+.q-label {
+  font-size: 0.52rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 400;
+  text-indent: 0.28em;
+}
+
+/* thin vertical volume meter */
+.vol-bar {
+  width: 1.5px;
+  height: 38px;
+  background: var(--vol-track);
+  border-radius: 1px;
+  position: relative;
+  overflow: hidden;
+}
+.vol-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80%;
+  background: var(--vol-fill);
+  border-radius: 1px;
+  transition: height 0.06s ease-out;
+}
+
+/* ── dividers ── */
+.div-h, .div-v {
+  position: absolute;
+  background: var(--divider);
+  pointer-events: none;
+  z-index: 4;
+}
+.div-h { top: 50%; left: 8%; right: 8%; height: 1px; transform: translateY(-50%); }
+.div-v { left: 50%; top: 8%; bottom: 8%; width: 1px; transform: translateX(-50%); }
+
+/* ── dots (absolutely positioned via JS along arc) ── */
+.dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-off);
+  cursor: pointer;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 1px 2px oklch(0% 0 0 / 0.18);
+  transition: background 0.22s ease, box-shadow 0.22s ease;
+}
+.dot.active {
+  background: var(--dot-on);
+  box-shadow:
+    inset 0 1px 1px oklch(0% 0 0 / 0.08),
+    0 0 10px 3px var(--dot-glow),
+    0 0  4px 1px var(--dot-glow);
+}
+.dot:hover:not(.active) { background: oklch(70% 0.016 76); }
+
+/* ── center ── */
+.center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width:  27%;
+  height: 27%;
+  border-radius: 50%;
+  background: var(--center);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow:
+    inset 0 2px 5px oklch(96% 0 0 / 0.30),
+    inset 0 -2px 4px oklch(0%  0 0 / 0.07),
+    0 2px 10px oklch(20% 0.01 70 / 0.12);
+  transition: box-shadow 0.2s ease, transform 0.12s ease;
+}
+.center:hover {
+  box-shadow:
+    inset 0 2px 5px oklch(96% 0 0 / 0.35),
+    inset 0 -2px 4px oklch(0%  0 0 / 0.08),
+    0 4px 16px oklch(20% 0.01 70 / 0.18);
+}
+.center:active {
+  transform: translate(-50%, -50%) scale(0.97);
+  box-shadow:
+    inset 0 3px 7px oklch(0%  0 0 / 0.10),
+    inset 0 -1px 2px oklch(96% 0 0 / 0.20),
+    0 1px 4px oklch(20% 0.01 70 / 0.08);
+}
+.center.drag-over {
+  box-shadow:
+    inset 0 2px 5px oklch(96% 0 0 / 0.4),
+    inset 0 -2px 4px oklch(0%  0 0 / 0.1),
+    0 6px 24px oklch(20% 0.01 70 / 0.25);
+}
+
+.center-icon {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  line-height: 1;
+  pointer-events: none;
+}
+.center-hint {
+  font-size: 0.38rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.65;
+  text-indent: 0.2em;
+  pointer-events: none;
+}
+
+/* pulse ring when playing */
+@keyframes pulse {
+  0%   { box-shadow: inset 0 2px 5px oklch(96% 0 0 / 0.30), inset 0 -2px 4px oklch(0% 0 0 / 0.07), 0 0 0  0px oklch(20% 0.01 70 / 0.10); }
+  60%  { box-shadow: inset 0 2px 5px oklch(96% 0 0 / 0.30), inset 0 -2px 4px oklch(0% 0 0 / 0.07), 0 0 0 12px oklch(20% 0.01 70 / 0); }
+  100% { box-shadow: inset 0 2px 5px oklch(96% 0 0 / 0.30), inset 0 -2px 4px oklch(0% 0 0 / 0.07), 0 0 0  0px oklch(20% 0.01 70 / 0); }
+}
+.center.playing { animation: pulse 2.4s ease-out infinite; }
+
+/* ── processing overlay ── */
+#overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: oklch(91% 0.013 82 / 0.94);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+#overlay.active { display: flex; }
+.ov-title {
+  font-size: 0.52rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  text-indent: 0.4em;
+}
+.ov-msg {
+  font-size: 0.46rem;
+  letter-spacing: 0.08em;
+  color: oklch(54% 0.008 68);
+  max-width: 240px;
+  text-align: center;
+  line-height: 1.9;
+}
+.prog-wrap {
+  width: 200px;
+  height: 1px;
+  background: var(--divider);
+  position: relative;
+}
+.prog-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--vol-fill);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+/* ── waveforms ── */
+.wave-row {
+  width: min(500px, 90vw);
+  display: none;
+  gap: 3px;
+  margin-bottom: 14px;
+}
+.wave-row.active { display: flex; }
+canvas.wave {
+  flex: 1;
+  height: 26px;
+  background: var(--wave-bg);
+  border-radius: 1px;
+}
+
+/* ── playbar ── */
+#playbar {
+  width: min(500px, 90vw);
+  display: none;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 16px;
+}
+#playbar.active { display: flex; }
+
+.filename {
+  font-size: 0.46rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: oklch(52% 0.008 68);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-indent: 0.2em;
+}
+.timeline-wrap {
+  height: 1px;
+  background: var(--divider);
+  cursor: pointer;
+  position: relative;
+}
+.timeline-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--vol-fill);
+  width: 0%;
+  pointer-events: none;
+}
+.timeline-head {
+  position: absolute;
+  top: -3px;
+  left: 0%;
+  width: 1px;
+  height: 7px;
+  background: var(--vol-fill);
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: left 0.1s linear;
+}
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.42rem;
+  letter-spacing: 0.14em;
+  color: oklch(52% 0.008 68);
+}
+.transport {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+.tbtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.46rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+  text-indent: 0.22em;
+}
+.tbtn:hover { color: var(--text); }
+.tbtn.primary {
+  color: var(--text);
+  font-size: 0.52rem;
+  letter-spacing: 0.25em;
+}
+
+/* ── stem panel ── */
+#stems-panel {
+  width: min(500px, 90vw);
+  display: none;
+  flex-direction: column;
+}
+#stems-panel.active { display: flex; }
+
+.stem-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+  border-top: 1px solid var(--divider);
+}
+.stem-name {
+  font-size: 0.42rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  width: 40px;
+  text-indent: 0.24em;
+}
+.stem-vol-wrap {
+  flex: 1;
+  height: 1px;
+  background: var(--vol-track);
+  cursor: pointer;
+  position: relative;
+}
+.stem-vol-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--vol-fill);
+  width: 80%;
+  pointer-events: none;
+}
+.stem-mute-btn {
+  font-size: 0.4rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, text-decoration 0.15s;
+  text-indent: 0.16em;
+}
+.stem-mute-btn:hover { color: var(--text); }
+.stem-mute-btn.muted {
+  color: var(--text);
+  text-decoration: line-through;
+}
+
+/* ── footer ── */
+footer {
+  margin-top: 24px;
+  font-size: 0.4rem;
+  letter-spacing: 0.14em;
+  color: oklch(60% 0.007 72);
+  text-align: center;
+  line-height: 2;
+}
+footer a { color: inherit; text-decoration: none; }
+footer a:hover { color: var(--text-dim); }
+
+#fileInput { display: none; }
+</style>
+</head>
+<body>
+
+<input type="file" id="fileInput" accept="audio/*">
+
+<div class="wordmark">Stem Player</div>
+
+<div class="device-wrap" id="deviceWrap">
+  <div class="device" id="device">
+    <div class="div-h"></div>
+    <div class="div-v"></div>
+
+    <div class="quadrant q-drums"  id="q-drums"  data-stem="drums">
+      <div class="q-inner">
+        <div class="q-label">Drums</div>
+        <div class="vol-bar"><div class="vol-bar-fill" id="vb-drums"></div></div>
+      </div>
+    </div>
+    <div class="quadrant q-vocals" id="q-vocals" data-stem="vocals">
+      <div class="q-inner">
+        <div class="q-label">Vocals</div>
+        <div class="vol-bar"><div class="vol-bar-fill" id="vb-vocals"></div></div>
+      </div>
+    </div>
+    <div class="quadrant q-bass"   id="q-bass"   data-stem="bass">
+      <div class="q-inner">
+        <div class="q-label">Bass</div>
+        <div class="vol-bar"><div class="vol-bar-fill" id="vb-bass"></div></div>
+      </div>
+    </div>
+    <div class="quadrant q-melody" id="q-melody" data-stem="melody">
+      <div class="q-inner">
+        <div class="q-label">Melody</div>
+        <div class="vol-bar"><div class="vol-bar-fill" id="vb-melody"></div></div>
+      </div>
+    </div>
+
+    <div class="center" id="center">
+      <div class="center-icon" id="centerIcon">↓</div>
+      <div class="center-hint" id="centerHint">drop audio</div>
+    </div>
+  </div>
+</div>
+
+<div class="wave-row" id="waveRow">
+  <canvas class="wave" id="wDrums"></canvas>
+  <canvas class="wave" id="wVocals"></canvas>
+  <canvas class="wave" id="wBass"></canvas>
+  <canvas class="wave" id="wMelody"></canvas>
+</div>
+
+<div id="playbar">
+  <div class="filename" id="filename"></div>
+  <div class="timeline-wrap" id="timeline">
+    <div class="timeline-fill" id="timelineFill"></div>
+    <div class="timeline-head" id="timelineHead"></div>
+  </div>
+  <div class="time-row">
+    <span id="timeCur">0:00</span>
+    <span id="timeTot">0:00</span>
+  </div>
+  <div class="transport">
+    <button class="tbtn" id="btnRestart">↩ restart</button>
+    <button class="tbtn primary" id="btnPlay">play</button>
+    <button class="tbtn" id="btnStop">stop</button>
+  </div>
+</div>
+
+<div id="stems-panel">
+  <div class="stem-row">
+    <div class="stem-name">Drums</div>
+    <div class="stem-vol-wrap" data-stem="drums"><div class="stem-vol-fill" id="svf-drums"></div></div>
+    <button class="stem-mute-btn" data-stem="drums">mute</button>
+  </div>
+  <div class="stem-row">
+    <div class="stem-name">Bass</div>
+    <div class="stem-vol-wrap" data-stem="bass"><div class="stem-vol-fill" id="svf-bass"></div></div>
+    <button class="stem-mute-btn" data-stem="bass">mute</button>
+  </div>
+  <div class="stem-row">
+    <div class="stem-name">Vocals</div>
+    <div class="stem-vol-wrap" data-stem="vocals"><div class="stem-vol-fill" id="svf-vocals"></div></div>
+    <button class="stem-mute-btn" data-stem="vocals">mute</button>
+  </div>
+  <div class="stem-row">
+    <div class="stem-name">Melody</div>
+    <div class="stem-vol-wrap" data-stem="melody"><div class="stem-vol-fill" id="svf-melody"></div></div>
+    <button class="stem-mute-btn" data-stem="melody">mute</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="ov-title" id="ovTitle">Processing</div>
+  <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
+  <div class="ov-msg" id="ovMsg">Downloading Spleeter model (~80 MB). Cached after first use.</div>
+</div>
+
+<footer>
+  UI inspired by <a href="https://krystalgamer.github.io/stem-player-emulator/" target="_blank" rel="noopener">krystalgamer</a>
+  &nbsp;·&nbsp; ML: Spleeter / Deezer &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
+</footer>
+
+<script>
+'use strict';
+
+// ── constants ──────────────────────────────────────
+const FFT_SIZE   = 4096;
+const HOP_SIZE   = 1024;
+const SR         = 44100;
+const FREQ_BINS  = FFT_SIZE / 2 + 1;
+const SEG_FRAMES = 512;
+const LOOP_BARS  = [1, 2, 4, 8];
+const STEMS      = ['drums','vocals','bass','melody'];
+const HF_BASE    = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
+
+// dot arc angles (degrees, screen-coord: 0=right, 90=down, clockwise)
+// 4 dots per quadrant, spaced across the middle of each quadrant's outer arc
+const DOT_ANGLES = {
+  drums:  [198, 211, 224, 237],  // NW arc  (180°–270°)
+  vocals: [303, 316, 329, 342],  // NE arc  (270°–360°)
+  bass:   [108, 121, 134, 147],  // SW arc  (90°–180°)
+  melody: [ 18,  31,  44,  57],  // SE arc  (0°–90°)
+};
+const DOT_RADIUS_FRAC = 0.76;  // fraction of device radius
+
+// ── state ──────────────────────────────────────────
+const state = {
+  ready: false,
+  playing: false,
+  muted:   { drums:false, vocals:false, bass:false, melody:false },
+  volume:  { drums:0.8,   vocals:0.8,   bass:0.8,   melody:0.8  },
+  loopDot: { drums:-1,    vocals:-1,    bass:-1,    melody:-1   },
+  pauseOffset: 0,
+  startTime:   0,
+  duration:    0,
+  bpm: 120,
+  raf: null,
+};
+
+let audioCtx;
+const gains   = {};
+const sources = {};
+const buffers = {};
+
+// ── dots setup ─────────────────────────────────────
+function placeDots() {
+  const device = document.getElementById('device');
+  const R = device.offsetWidth / 2;
+
+  STEMS.forEach(stem => {
+    DOT_ANGLES[stem].forEach((angleDeg, idx) => {
+      const rad = angleDeg * Math.PI / 180;
+      const x = R + Math.cos(rad) * R * DOT_RADIUS_FRAC;
+      const y = R + Math.sin(rad) * R * DOT_RADIUS_FRAC;
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.dataset.stem = stem;
+      dot.dataset.idx  = idx;
+      dot.style.left   = x + 'px';
+      dot.style.top    = y + 'px';
+      dot.addEventListener('click', e => { e.stopPropagation(); toggleDot(stem, idx); });
+      device.appendChild(dot);
+    });
+  });
+}
+
+function toggleDot(stem, idx) {
+  if (!state.ready) return;
+  const prev = state.loopDot[stem];
+  const next = prev === idx ? -1 : idx;
+  state.loopDot[stem] = next;
+  document.querySelectorAll(`.dot[data-stem="${stem}"]`).forEach((d, i) => {
+    d.classList.toggle('active', i === next);
+  });
+  if (state.playing) { const t = currentTime() % state.duration; startPlayback(t); }
+}
+
+// ── FFT / STFT / ISTFT ─────────────────────────────
+function hannWindow(N) {
+  const w = new Float32Array(N);
+  for (let i = 0; i < N; i++) w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  return w;
+}
+
+function fftIP(re, im) {
+  const N = re.length;
+  for (let i = 1, j = 0; i < N; i++) {
+    let bit = N >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
+  }
+  for (let len = 2; len <= N; len <<= 1) {
+    const a = -2*Math.PI/len, wr0=Math.cos(a), wi0=Math.sin(a);
+    for (let i = 0; i < N; i += len) {
+      let wr=1, wi=0;
+      for (let j = 0; j < len>>1; j++) {
+        const u=i+j, v=u+(len>>1);
+        const tRe=wr*re[v]-wi*im[v], tIm=wr*im[v]+wi*re[v];
+        re[v]=re[u]-tRe; im[v]=im[u]-tIm;
+        re[u]+=tRe;      im[u]+=tIm;
+        const nr=wr*wr0-wi*wi0; wi=wr*wi0+wi*wr0; wr=nr;
+      }
+    }
+  }
+}
+
+function ifftIP(re, im) {
+  for (let i=0;i<im.length;i++) im[i]=-im[i];
+  fftIP(re,im);
+  const N=re.length;
+  for (let i=0;i<N;i++){re[i]/=N; im[i]=-im[i]/N;}
+}
+
+function stft(sig, win) {
+  const F = Math.floor((sig.length - FFT_SIZE) / HOP_SIZE) + 1;
+  const re=[],im=[],fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
+  for (let f=0;f<F;f++){
+    const s=f*HOP_SIZE;
+    for(let i=0;i<FFT_SIZE;i++){fr[i]=(s+i<sig.length?sig[s+i]:0)*win[i];fi[i]=0;}
+    fftIP(fr,fi);
+    re.push(new Float32Array(fr.subarray(0,FREQ_BINS)));
+    im.push(new Float32Array(fi.subarray(0,FREQ_BINS)));
+  }
+  return {re,im,F};
+}
+
+function istft(re,im,F,win){
+  const len=(F-1)*HOP_SIZE+FFT_SIZE, out=new Float32Array(len), nrm=new Float32Array(len);
+  const fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
+  for(let f=0;f<F;f++){
+    for(let b=0;b<FREQ_BINS;b++){fr[b]=re[f][b];fi[b]=im[f][b];}
+    for(let b=1;b<FREQ_BINS-1;b++){fr[FFT_SIZE-b]=fr[b];fi[FFT_SIZE-b]=-fi[b];}
+    ifftIP(fr,fi);
+    const s=f*HOP_SIZE;
+    for(let i=0;i<FFT_SIZE;i++){out[s+i]+=fr[i]*win[i];nrm[s+i]+=win[i]*win[i];}
+  }
+  for(let i=0;i<len;i++) if(nrm[i]>1e-8) out[i]/=nrm[i];
+  return out;
+}
+
+// ── HPSS ───────────────────────────────────────────
+function medFilter(spec, F, B, L, axis) {
+  const out=new Float32Array(F*B), col=new Float32Array(L), h=L>>1;
+  if(axis==='h'){
+    for(let b=0;b<B;b++) for(let f=0;f<F;f++){
+      for(let k=0;k<L;k++){const fi=f-h+k; col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}
+      col.sort(); out[f*B+b]=col[h];
+    }
+  } else {
+    for(let f=0;f<F;f++) for(let b=0;b<B;b++){
+      for(let k=0;k<L;k++){const bi=b-h+k; col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}
+      col.sort(); out[f*B+b]=col[h];
+    }
+  }
+  return out;
+}
+
+function hpss(re,im,F,B){
+  const mag=new Float32Array(F*B);
+  for(let f=0;f<F;f++) for(let b=0;b<B;b++) mag[f*B+b]=re[f][b]**2+im[f][b]**2;
+  const H=medFilter(mag,F,B,31,'h'), P=medFilter(mag,F,B,31,'v');
+  const hRe=re.map(()=>new Float32Array(B)), hIm=im.map(()=>new Float32Array(B));
+  const pRe=re.map(()=>new Float32Array(B)), pIm=im.map(()=>new Float32Array(B));
+  for(let f=0;f<F;f++) for(let b=0;b<B;b++){
+    const h=H[f*B+b],p=P[f*B+b],d=h+p+1e-8;
+    hRe[f][b]=re[f][b]*h/d; hIm[f][b]=im[f][b]*h/d;
+    pRe[f][b]=re[f][b]*p/d; pIm[f][b]=im[f][b]*p/d;
+  }
+  return {hRe,hIm,pRe,pIm};
+}
+
+function lowPass(re,im,F,B,hz){
+  const cut=Math.round(hz/(SR/FFT_SIZE));
+  const lRe=re.map(r=>new Float32Array(r)), lIm=im.map(r=>new Float32Array(r));
+  const hRe=re.map(r=>new Float32Array(r)), hIm=im.map(r=>new Float32Array(r));
+  for(let f=0;f<F;f++){
+    for(let b=cut;b<B;b++){lRe[f][b]=0;lIm[f][b]=0;}
+    for(let b=0;b<cut;b++){hRe[f][b]=0;hIm[f][b]=0;}
+  }
+  return {lRe,lIm,hRe,hIm};
+}
+
+// ── ONNX model ─────────────────────────────────────
+let vocSess=null, accSess=null;
+
+async function loadModels(onProg) {
+  ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/';
+  async function fetch_model(url, s0, s1) {
+    const resp=await fetch(url);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const total=+resp.headers.get('content-length')||0;
+    const reader=resp.body.getReader(); const chunks=[]; let loaded=0;
+    while(true){
+      const {done,value}=await reader.read(); if(done) break;
+      chunks.push(value); loaded+=value.length;
+      if(total) onProg(s0+(s1-s0)*loaded/total,'Downloading…');
+    }
+    const buf=new Uint8Array(loaded); let off=0;
+    for(const c of chunks){buf.set(c,off);off+=c.length;}
+    return buf.buffer;
+  }
+  onProg(0,'Downloading vocals model (39 MB)…');
+  vocSess=await ort.InferenceSession.create(await fetch_model(HF_BASE+'vocals.onnx',0,45),{executionProviders:['wasm']});
+  onProg(50,'Downloading accompaniment model (39 MB)…');
+  accSess=await ort.InferenceSession.create(await fetch_model(HF_BASE+'accompaniment.onnx',50,95),{executionProviders:['wasm']});
+  onProg(100,'Ready');
+}
+
+async function runModel(sess,magL,magR,T,B){
+  const data=new Float32Array(T*B*2);
+  for(let t=0;t<T;t++) for(let b=0;b<B;b++){
+    data[t*B*2+b*2  ]=(magL[t]?magL[t][b]:0);
+    data[t*B*2+b*2+1]=(magR[t]?magR[t][b]:0);
+  }
+  const tensor=new ort.Tensor('float32',data,[1,T,B,2]);
+  const out=await sess.run({[sess.inputNames[0]]:tensor});
+  return out[sess.outputNames[0]].data;
+}
+
+// ── main pipeline ──────────────────────────────────
+async function separateAudio(arrayBuf, onProg) {
+  onProg(0,'Decoding audio…');
+  audioCtx = audioCtx || new AudioContext({sampleRate:SR});
+  if(audioCtx.state==='suspended') await audioCtx.resume();
+  const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
+  const nCh=raw.numberOfChannels;
+  const sigL=raw.getChannelData(0);
+  const sigR=nCh>1?raw.getChannelData(1):sigL;
+
+  onProg(5,'Computing spectrograms…');
+  const win=hannWindow(FFT_SIZE);
+  const stL=stft(sigL,win), stR=stft(sigR,win);
+  const F=stL.F, B=FREQ_BINS;
+
+  const magL=stL.re.map((r,f)=>r.map((v,b)=>Math.sqrt(v*v+stL.im[f][b]**2)));
+  const magR=stR.re.map((r,f)=>r.map((v,b)=>Math.sqrt(v*v+stR.im[f][b]**2)));
+
+  let vmask, amask;
+  if(vocSess&&accSess){
+    onProg(12,'Running Spleeter…');
+    const segs=Math.ceil(F/SEG_FRAMES);
+    const vFlat=new Float32Array(F*B*2), aFlat=new Float32Array(F*B*2);
+    for(let sg=0;sg<segs;sg++){
+      const t0=sg*SEG_FRAMES,t1=Math.min(t0+SEG_FRAMES,F),T=t1-t0;
+      const vm=await runModel(vocSess,magL.slice(t0,t1),magR.slice(t0,t1),T,B);
+      const am=await runModel(accSess,magL.slice(t0,t1),magR.slice(t0,t1),T,B);
+      vFlat.set(vm.slice(0,T*B*2),t0*B*2);
+      aFlat.set(am.slice(0,T*B*2),t0*B*2);
+      onProg(12+55*(sg+1)/segs,`Separating… ${sg+1}/${segs}`);
+    }
+    vmask=(f,b)=>vFlat[(f*B+b)*2];
+    amask=(f,b)=>aFlat[(f*B+b)*2];
+  } else {
+    onProg(67,'DSP separation…');
+    vmask=(f,b)=>{const l=magL[f]?magL[f][b]:0,r=magR[f]?magR[f][b]:0; return Math.min(l,r)/(0.5*(l+r)+1e-8);};
+    amask=(f,b)=>1-vmask(f,b);
+  }
+
+  onProg(68,'Applying masks…');
+  const vRe=stL.re.map(()=>new Float32Array(B));
+  const vIm=stL.im.map(()=>new Float32Array(B));
+  const aRe=stL.re.map(()=>new Float32Array(B));
+  const aIm=stL.im.map(()=>new Float32Array(B));
+  for(let f=0;f<F;f++) for(let b=0;b<B;b++){
+    const vm=vmask(f,b),am=amask(f,b);
+    const mRe=(stL.re[f][b]+stR.re[f][b])*0.5, mIm=(stL.im[f][b]+stR.im[f][b])*0.5;
+    vRe[f][b]=mRe*vm; vIm[f][b]=mIm*vm;
+    aRe[f][b]=mRe*am; aIm[f][b]=mIm*am;
+  }
+
+  onProg(72,'HPSS…');
+  const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,B);
+  onProg(78,'Extracting bass…');
+  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,B,300);
+
+  onProg(83,'Synthesizing…');
+  const dur=raw.duration;
+  function toAB(re,im){
+    const sig=istft(re,im,F,win);
+    const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);
+    ab.copyToChannel(sig.subarray(0,ab.length),0); return ab;
+  }
+  buffers.drums  = toAB(pRe,pIm);
+  buffers.vocals = toAB(vRe,vIm);
+  buffers.bass   = toAB(bsRe,bsIm);
+  buffers.melody = toAB(mlRe,mlIm);
+
+  onProg(95,'Drawing waveforms…');
+  STEMS.forEach(s=>drawWave(s));
+  onProg(100,'Done');
+  return dur;
+}
+
+// ── waveform ───────────────────────────────────────
+function drawWave(stem){
+  const ids={drums:'wDrums',vocals:'wVocals',bass:'wBass',melody:'wMelody'};
+  const c=document.getElementById(ids[stem]);
+  const ctx=c.getContext('2d');
+  c.width=c.offsetWidth||100; c.height=26;
+  ctx.clearRect(0,0,c.width,c.height);
+  const data=buffers[stem].getChannelData(0);
+  const step=Math.ceil(data.length/c.width);
+  const cs=getComputedStyle(document.documentElement);
+  ctx.fillStyle=cs.getPropertyValue('--vol-fill').trim()||'#333';
+  for(let x=0;x<c.width;x++){
+    let mx=0;
+    for(let i=0;i<step;i++){const v=Math.abs(data[x*step+i]||0);if(v>mx)mx=v;}
+    const h=mx*c.height;
+    ctx.fillRect(x,(c.height-h)/2,1,Math.max(1,h));
+  }
+}
+
+// ── playback ───────────────────────────────────────
+function buildGains(){
+  STEMS.forEach(s=>{
+    gains[s]=audioCtx.createGain();
+    gains[s].gain.value=state.muted[s]?0:state.volume[s];
+    gains[s].connect(audioCtx.destination);
+  });
+}
+
+function startPlayback(off=0){
+  stopPlayback();
+  buildGains();
+  state.startTime=audioCtx.currentTime-off;
+  state.playing=true;
+  STEMS.forEach(s=>{
+    const src=audioCtx.createBufferSource();
+    src.buffer=buffers[s];
+    src.connect(gains[s]);
+    const d=state.loopDot[s];
+    if(d>=0){
+      const bl=(60/state.bpm)*4*LOOP_BARS[d];
+      src.loop=true; src.loopStart=0; src.loopEnd=Math.min(bl,buffers[s].duration);
+    }
+    src.start(0,off);
+    sources[s]=src;
+  });
+  document.getElementById('center').classList.add('playing');
+  document.getElementById('btnPlay').textContent='pause';
+  tick();
+}
+
+function stopPlayback(){
+  if(state.raf){cancelAnimationFrame(state.raf);state.raf=null;}
+  state.playing=false;
+  STEMS.forEach(s=>{try{sources[s]&&sources[s].stop();}catch(e){}sources[s]=null;});
+  STEMS.forEach(s=>{try{gains[s]&&gains[s].disconnect();}catch(e){}});
+  document.getElementById('center').classList.remove('playing');
+  document.getElementById('btnPlay').textContent='play';
+}
+
+function currentTime(){
+  if(!state.playing) return state.pauseOffset;
+  return audioCtx.currentTime-state.startTime;
+}
+
+function tick(){
+  const t=currentTime(), dur=state.duration;
+  if(t>=dur&&state.playing){stopPlayback();state.pauseOffset=0;updateUI(0);return;}
+  updateUI(t);
+  state.raf=requestAnimationFrame(tick);
+}
+
+function updateUI(t){
+  const pct=t/state.duration*100;
+  document.getElementById('timelineFill').style.width=pct+'%';
+  document.getElementById('timelineHead').style.left=pct+'%';
+  document.getElementById('timeCur').textContent=fmt(t);
+  document.getElementById('timeTot').textContent=fmt(state.duration);
+}
+
+function fmt(s){const m=Math.floor(s/60),ss=Math.floor(s%60);return`${m}:${ss.toString().padStart(2,'0')}`;}
+
+// ── volume control ─────────────────────────────────
+function setVolume(stem, v){
+  v=Math.max(0,Math.min(1,v));
+  state.volume[stem]=v;
+  if(gains[stem]) gains[stem].gain.value=state.muted[stem]?0:v;
+  document.getElementById('vb-'+stem).style.height=(v*100)+'%';
+  document.getElementById('svf-'+stem).style.width=(v*100)+'%';
+}
+
+function toggleMute(stem){
+  if(!state.ready) return;
+  state.muted[stem]=!state.muted[stem];
+  if(gains[stem]) gains[stem].gain.value=state.muted[stem]?0:state.volume[stem];
+  document.getElementById('q-'+stem).classList.toggle('muted',state.muted[stem]);
+  document.querySelectorAll(`.stem-mute-btn[data-stem="${stem}"]`).forEach(b=>{
+    b.classList.toggle('muted',state.muted[stem]);
+  });
+}
+
+// ── quadrant drag interaction ──────────────────────
+STEMS.forEach(stem=>{
+  const q=document.getElementById('q-'+stem);
+  let dragY=null, dragV=null, moved=false, pressTimer=null;
+
+  function onStart(y){
+    dragY=y; dragV=state.volume[stem]; moved=false;
+    q.classList.add('pressing');
+    // hold-to-mute
+    pressTimer=setTimeout(()=>{
+      if(!moved) toggleMute(stem);
+      pressTimer=null;
+    },600);
+  }
+  function onMove(y){
+    if(dragY===null) return;
+    const dy=(dragY-y)/100;
+    if(Math.abs(dy)>0.02) moved=true;
+    if(moved){
+      clearTimeout(pressTimer); pressTimer=null;
+      setVolume(stem,dragV+dy);
+    }
+  }
+  function onEnd(){
+    if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
+    dragY=null; q.classList.remove('pressing');
+  }
+
+  q.addEventListener('mousedown', e=>{ if(e.target.classList.contains('dot')) return; onStart(e.clientY); });
+  window.addEventListener('mousemove', e=>{ if(dragY!==null) onMove(e.clientY); });
+  window.addEventListener('mouseup', e=>{ if(dragY!==null) onEnd(); });
+
+  q.addEventListener('touchstart', e=>{ if(e.target.classList.contains('dot')) return; onStart(e.touches[0].clientY); },{passive:true});
+  q.addEventListener('touchmove',  e=>{ onMove(e.touches[0].clientY); e.preventDefault(); },{passive:false});
+  q.addEventListener('touchend',   ()=>onEnd());
+});
+
+// ── stem panel volume sliders ──────────────────────
+document.querySelectorAll('.stem-vol-wrap').forEach(sl=>{
+  sl.addEventListener('click',e=>{
+    const r=sl.getBoundingClientRect();
+    setVolume(sl.dataset.stem,Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)));
+  });
+});
+
+// ── mute buttons ──────────────────────────────────
+document.querySelectorAll('.stem-mute-btn').forEach(b=>{
+  b.addEventListener('click',()=>toggleMute(b.dataset.stem));
+});
+
+// ── transport ─────────────────────────────────────
+document.getElementById('btnPlay').addEventListener('click',()=>{
+  if(!state.ready) return;
+  if(!audioCtx){audioCtx=new AudioContext({sampleRate:SR});}
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(state.playing){state.pauseOffset=currentTime();stopPlayback();}
+  else startPlayback(state.pauseOffset);
+});
+document.getElementById('btnRestart').addEventListener('click',()=>{
+  if(!state.ready) return;
+  state.pauseOffset=0;
+  if(state.playing) startPlayback(0); else updateUI(0);
+});
+document.getElementById('btnStop').addEventListener('click',()=>{
+  if(!state.ready) return;
+  stopPlayback(); state.pauseOffset=0; updateUI(0);
+});
+document.getElementById('timeline').addEventListener('click',e=>{
+  if(!state.ready) return;
+  const r=document.getElementById('timeline').getBoundingClientRect();
+  const t=(e.clientX-r.left)/r.width*state.duration;
+  state.pauseOffset=t;
+  if(state.playing) startPlayback(t); else updateUI(t);
+});
+
+// center click
+document.getElementById('center').addEventListener('click',()=>{
+  if(state.ready) document.getElementById('btnPlay').click();
+  else document.getElementById('fileInput').click();
+});
+
+// ── overlay helpers ────────────────────────────────
+function showOverlay(title,msg,pct){
+  const ov=document.getElementById('overlay');
+  ov.classList.add('active');
+  document.getElementById('ovTitle').textContent=title;
+  document.getElementById('ovMsg').textContent=msg;
+  document.getElementById('progFill').style.width=pct+'%';
+}
+function hideOverlay(){ document.getElementById('overlay').classList.remove('active'); }
+function prog(pct,msg){
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('ovMsg').textContent=msg;
+}
+
+// ── file handling ─────────────────────────────────
+async function handleFile(file){
+  if(!file||!file.type.startsWith('audio/')){alert('Drop an audio file');return;}
+  stopPlayback(); state.ready=false; state.pauseOffset=0;
+  document.getElementById('filename').textContent=file.name;
+  STEMS.forEach(s=>{
+    state.loopDot[s]=-1;
+    document.querySelectorAll(`.dot[data-stem="${s}"]`).forEach(d=>d.classList.remove('active'));
+  });
+
+  try {
+    if(!vocSess||!accSess){
+      showOverlay('Loading Model','Downloading Spleeter (~80 MB). Cached after first use.',0);
+      try {
+        await loadModels((pct,msg)=>{prog(pct,msg);});
+      } catch(e){
+        console.warn('Model load failed, using DSP:',e);
+        vocSess=null; accSess=null;
+      }
+    }
+    showOverlay('Separating Stems','Processing…',0);
+    const dur=await separateAudio(await file.arrayBuffer(),(pct,msg)=>prog(pct,msg));
+    state.duration=dur; state.ready=true;
+    hideOverlay();
+    document.getElementById('playbar').classList.add('active');
+    document.getElementById('stems-panel').classList.add('active');
+    document.getElementById('waveRow').classList.add('active');
+    document.getElementById('centerIcon').textContent='▷';
+    document.getElementById('centerHint').textContent='play';
+    updateUI(0);
+  } catch(e){
+    console.error(e); hideOverlay(); alert('Error: '+e.message);
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0]) handleFile(e.target.files[0]);});
+
+// drag-and-drop
+const wrap=document.getElementById('deviceWrap');
+const center=document.getElementById('center');
+const device=document.getElementById('device');
+['dragenter','dragover'].forEach(ev=>
+  document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.add('drag-over');device.classList.add('drag-active');})
+);
+['dragleave','drop'].forEach(ev=>
+  document.body.addEventListener(ev,e=>{
+    e.preventDefault();
+    center.classList.remove('drag-over');device.classList.remove('drag-active');
+    if(ev==='drop'&&e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  })
+);
+
+// ── init ──────────────────────────────────────────
+window.addEventListener('load',()=>{
+  placeDots();
+  // init vol bars to reflect initial volume
+  STEMS.forEach(s=>{
+    document.getElementById('vb-'+s).style.height=(state.volume[s]*100)+'%';
+    document.getElementById('svf-'+s).style.width=(state.volume[s]*100)+'%';
+  });
+});
+
+window.addEventListener('resize',()=>{
+  // redraw dots on resize
+  document.querySelectorAll('.dot').forEach(d=>d.remove());
+  placeDots();
+  if(state.ready) STEMS.forEach(s=>drawWave(s));
+});
+</script>
+</body>
+</html>
