@@ -39,11 +39,19 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+.topbar {
+  width: min(480px, 88vw);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  gap: 16px;
+}
 .wordmark {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 34px;
+  margin-bottom: 0;
 }
 .wordmark span {
   font-size: 10px;
@@ -57,6 +65,30 @@ body {
   height: 1px;
   background: var(--ink-faint);
 }
+
+.model-settings {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.model-select {
+  appearance: none;
+  background: var(--page);
+  color: var(--ink);
+  border: 1px solid var(--track);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: inherit;
+}
+
 
 /* ── device ── */
 .device-wrap {
@@ -377,6 +409,7 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 footer { margin-top: 26px; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); text-align: center; line-height: 2.1; }
 footer a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
 footer a:hover { border-color: var(--ink-faint); }
+#benchStats { display: block; margin-top: 8px; color: var(--ink-soft); }
 
 #fileInput { display: none; }
 
@@ -404,7 +437,16 @@ footer a:hover { border-color: var(--ink-faint); }
 
 <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac">
 
-<div class="wordmark"><div class="rule"></div><span>Stem Player</span><div class="rule"></div></div>
+<div class="topbar">
+  <div class="wordmark"><div class="rule"></div><span>Stem Player</span><div class="rule"></div></div>
+  <label class="model-settings" for="modelMode">
+    Separator:
+    <select class="model-select" id="modelMode">
+      <option value="fast">Faster · worse quality</option>
+      <option value="better" selected>Better · slower quality</option>
+    </select>
+  </label>
+</div>
 
 <div class="device-wrap" id="deviceWrap">
   <div class="device" id="device"></div>
@@ -447,7 +489,6 @@ footer a:hover { border-color: var(--ink-faint); }
 </div>
 
 <p class="hint" id="hint">Drop a track to begin</p>
-<div class="sample-rows" id="sampleRows"></div>
 
 <div class="wave-row" id="waveRow">
   <div class="wave-cell"><div class="wave-cap">Drums</div><canvas class="wave" id="wDrums"></canvas></div>
@@ -518,16 +559,18 @@ footer a:hover { border-color: var(--ink-faint); }
   </div>
 </div>
 
+<div class="sample-rows" id="sampleRows"></div>
+
 <div id="overlay">
   <div class="ov-title" id="ovTitle">Processing</div>
   <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
-  <div class="ov-msg" id="ovMsg">Downloading separator model. Cached after first use.</div>
+  <div class="ov-msg" id="ovMsg">Select separator mode and load as needed.</div>
 </div>
 
 <footer>
   UI inspired by <a href="https://krystalgamer.github.io/stem-player-emulator/" target="_blank" rel="noopener">krystalgamer</a>
-  &nbsp;·&nbsp; ML: HT-Demucs ONNX (web) &nbsp;·&nbsp; ONNX Runtime Web
-  <div id="benchStats" style="margin-top:6px;font-size:10px;opacity:0.85;line-height:1.4"></div>
+  &nbsp;·&nbsp; ML: Spleeter / Deezer &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
+  <span id="benchStats" aria-live="polite"></span>
 </footer>
 
 <script>
@@ -538,18 +581,41 @@ const FFT_SIZE  = 4096;
 const HOP_SIZE  = 1024;
 const SR        = 44100;
 const TOT_BINS  = FFT_SIZE / 2 + 1;   // 2049
-const MODEL_SEGMENT = 343980;          // HT-Demucs expects 7.8s @44.1k per segment
-const MODEL_HOP = Math.floor(MODEL_SEGMENT / 2);
-const MODEL_FILE = 'htdemucs_fp16weights.onnx';
+const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
+const SEG_FRAMES = 512;               // spleeter time-frames per segment
 const LOOP_BARS = [1, 2, 4, 8];
+const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
 const SAMPLE_TRACKS = [
-  {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
-  {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
-  {name:'Pyramid — 7OOP3D feat. Mr Yesterday', url:'./samples/stem-sample-3.mp3'},
+  {name:'No-copyright loop 1', artist:'royalty-free', url:'./samples/stem-sample-1.mp3'},
+  {name:'No-copyright loop 2', artist:'royalty-free', url:'./samples/stem-sample-2.mp3'},
+  {name:'No-copyright loop 3', artist:'royalty-free', url:'./samples/stem-sample-3.mp3'},
 ];
 const STEMS = ['drums','vocals','bass','melody'];
-const DEMUCS_TO_UI_STEM = ['drums', 'bass', 'melody', 'vocals'];
-const HF = 'https://huggingface.co/StemSplitio/htdemucs-onnx/resolve/main/';
+const MODEL_PRESETS = {
+  fast: {
+    id: 'fast',
+    label: 'Faster · worse quality',
+    needsModel: false,
+    modelUrls: null,
+    loadLabel: 'Using DSP-only path (no ML models).',
+  },
+  better: {
+    id: 'better',
+    label: 'Better · slower quality',
+    needsModel: true,
+    modelUrls: {
+      vocals: 'vocals.onnx',
+      accompaniment: 'accompaniment.onnx',
+    },
+    loadLabel: 'Loading 2-stem ML separator (~78MB).',
+  },
+};
+
+let selectedModelMode = 'better';
+const bench = {
+  fast: { loadMs: 0, separateMs: 0 },
+  better: { loadMs: 0, separateMs: 0 },
+};
 
 // quadrant angular ranges (screen deg, 0=east, 90=south, clockwise)
 const Q_RANGE = {
@@ -568,6 +634,7 @@ const state = {
   loopStart:{drums:0,vocals:0,bass:0,melody:0},
   loopEnd:{drums:0,vocals:0,bass:0,melody:0},
   loopBase:0,
+  modelMode:'better',
   pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
 };
 let audioCtx;
@@ -725,150 +792,230 @@ function lowPass(re,im,F,B,hz){
   return {lRe,lIm,hRe,hIm};
 }
 
-// ── ONNX ──
-let sepSess=null;
-let modelLoadPromise=null;
-const bench = {modelDownloadMs:0, modelSessionMs:0, modelLoadMs:0, separationMs:0};
+// ── model architecture ──
+let betterVocalsSession = null;
+let betterAccompanimentSession = null;
+const modelLoadPromises = {};
 
-function fmtMs(ms){
-  return ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms/1000).toFixed(2)}s`;
+function getModelModeFromUi(){
+  const selected = document.getElementById('modelMode')?.value || selectedModelMode;
+  return selected === 'fast' ? 'fast' : 'better';
+}
+function setModelMode(mode){
+  selectedModelMode = mode === 'fast' ? 'fast' : 'better';
+  state.modelMode = selectedModelMode;
+  const el = document.getElementById('modelMode');
+  if (el) el.value = selectedModelMode;
 }
 
 function getErrorMessage(err){
-  if (err instanceof Error) return err.message || 'Unknown error';
-  if (typeof err === 'string' && err.trim()) return err.trim();
-  if (typeof err === 'number' && Number.isFinite(err)) return String(err);
-  if (err && typeof err.message === 'string' && err.message.trim()) return err.message;
-  if (err === null || typeof err === 'undefined') return 'Unknown error';
-  try { return JSON.stringify(err); } catch (_) {}
-  return String(err);
+  if (err == null) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (typeof err === 'number') return `Error code ${err}`;
+  if (err instanceof Error) return err.message || String(err);
+  if (err.message) return err.message;
+  try { return JSON.stringify(err); } catch (_) { return String(err); }
 }
 
-function updateBenchUi(){
+function msToString(v){
+  if (!Number.isFinite(v) || v <= 0) return 'n/a';
+  if (v < 1000) return `${v.toFixed(0)} ms`;
+  return `${(v / 1000).toFixed(2)} s`;
+}
+
+function setBenchline(){
+  const bits = [
+    `Fast model: load ${msToString(bench.fast.loadMs)} · separate ${msToString(bench.fast.separateMs)}`,
+    `Better model: load ${msToString(bench.better.loadMs)} · separate ${msToString(bench.better.separateMs)}`,
+  ];
   const el = document.getElementById('benchStats');
-  if(!el) return;
-  const bits = [];
-  if (bench.modelLoadMs > 0) bits.push(`Model load: ${fmtMs(bench.modelLoadMs)} (download ${fmtMs(bench.modelDownloadMs)} + session ${fmtMs(bench.modelSessionMs)})`);
-  if (bench.separationMs > 0) bits.push(`Last split: ${fmtMs(bench.separationMs)}`);
-  el.textContent = bits.join(' · ');
-}
-async function loadModels(onProg){
-  if (typeof ort === 'undefined' || !ort.InferenceSession) {
-    throw new Error('ONNX Runtime Web failed to load. Check network access to jsdelivr + reload.');
+  if (el) {
+    el.textContent = `Benchmarks · ${bits[0]} · ${bits[1]}`;
   }
-  ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/';
-  async function dl(url, label){
-    onProg(5, label);
-    const r=await fetch(url); if(!r.ok)throw new Error('HTTP '+r.status);
-    const total=+r.headers.get('content-length')||0;
-    const rd=r.body.getReader();const ch=[];let ld=0;
-    while(true){const{done,value}=await rd.read();if(done)break;ch.push(value);ld+=value.length;if(total)onProg(5 + (50*ld/total),'Downloading separator model…');}
-    const b=new Uint8Array(ld);let o=0;for(const c of ch){b.set(c,o);o+=c.length;}return b.buffer;
-  }
-  const t0=performance.now();
-  onProg(0,'Downloading separator model…');
-  const t1=performance.now();
-  sepSess = null;
-  const modelBuf = await dl(HF+MODEL_FILE,'Downloading separator model…');
-  bench.modelDownloadMs = performance.now()-t1;
-  onProg(60,'Creating ONNX session…');
-  const t2=performance.now();
-  sepSess=await ort.InferenceSession.create(modelBuf,{executionProviders:['wasm']});
-  bench.modelSessionMs = performance.now()-t2;
-  bench.modelLoadMs = performance.now()-t0;
-  updateBenchUi();
-  onProg(100,'Model ready');
 }
 
-async function ensureModelLoaded(onProg=(p,m)=>{}){
-  if(sepSess && typeof sepSess.run === 'function') return;
-  if(modelLoadPromise) return modelLoadPromise;
-  modelLoadPromise = loadModels(onProg)
-    .catch((err)=>{sepSess=null; throw err;});
-  try{
-    await modelLoadPromise;
-  } finally{
-    modelLoadPromise = null;
+function isBetterModelReady(){
+  return !!(betterVocalsSession && betterAccompanimentSession);
+}
+
+async function dl(url, onProg, s0, s1){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const total = +r.headers.get('content-length') || 0;
+  const body = r.body;
+  if (!body || typeof body.getReader !== 'function') {
+    const blob = await r.arrayBuffer();
+    return blob;
   }
-  if(!sepSess || typeof sepSess.run !== 'function'){
-    throw new Error('Separator session failed to initialize.');
+  const rd = body.getReader();
+  const ch = [];
+  let ld = 0;
+  while(true){
+    const { done, value } = await rd.read();
+    if (done) break;
+    ch.push(value);
+    ld += value.length;
+    if (onProg && total) onProg(s0 + (s1 - s0) * (ld / total), 'Downloading model…');
   }
+  const b = new Uint8Array(ld);
+  let o = 0;
+  for (const c of ch){ b.set(c, o); o += c.length; }
+  return b.buffer;
+}
+
+async function loadBetterModel(onProg){
+  if (isBetterModelReady()) return;
+  if (modelLoadPromises.better) return modelLoadPromises.better;
+
+  const preset = MODEL_PRESETS.better;
+  modelLoadPromises.better = (async () => {
+    const loadStart = performance.now();
+    ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/';
+    if (onProg) onProg(0, 'Downloading vocals model (39 MB)...');
+    try {
+      betterVocalsSession = await ort.InferenceSession.create(
+        await dl(HF + preset.modelUrls.vocals, onProg, 0, 46),
+        { executionProviders:['wasm'] }
+      );
+      if (onProg) onProg(50, 'Downloading accompaniment model (39 MB)...');
+      betterAccompanimentSession = await ort.InferenceSession.create(
+        await dl(HF + preset.modelUrls.accompaniment, onProg, 50, 100),
+        { executionProviders:['wasm'] }
+      );
+      if (onProg) onProg(100, 'Models ready');
+      bench.better.loadMs = performance.now() - loadStart;
+      setBenchline();
+    } catch (err){
+      betterVocalsSession = null;
+      betterAccompanimentSession = null;
+      bench.better.loadMs = 0;
+      setBenchline();
+      throw err;
+    } finally {
+      delete modelLoadPromises.better;
+    }
+  })();
+
+  return modelLoadPromises.better;
+}
+
+function ensureModelReady(mode, onProg){
+  if (mode === 'fast') return Promise.resolve();
+  return loadBetterModel(onProg);
+}
+
+function smoothMask(src, frames, bins){
+  const out = new Float32Array(src.length);
+  const radiusT = 1;
+  const radiusB = 1;
+  for (let f=0; f<frames; f++){
+    const row = f * bins;
+    const f0 = Math.max(0, f - radiusT);
+    const f1 = Math.min(frames - 1, f + radiusT);
+    for (let b=0; b<bins; b++){
+      const b0 = Math.max(0, b - radiusB);
+      const b1 = Math.min(bins - 1, b + radiusB);
+      let s = 0;
+      let c = 0;
+      for (let fi = f0; fi <= f1; fi++){
+        const base = fi * bins;
+        for (let bi = b0; bi <= b1; bi++){
+          s += src[base + bi];
+          c++;
+        }
+      }
+      out[row + b] = s / c;
+    }
+  }
+  return out;
 }
 
 // ── pipeline ──
-async function separateAudio(arrayBuf,onProg){
+async function separateAudio(arrayBuf,onProg,mode='better'){
   onProg(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
   if(audioCtx.state==='suspended')await audioCtx.resume();
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
-  if(!sepSess || !sepSess.run) await ensureModelLoaded(onProg);
-  if(!sepSess || !sepSess.run) throw new Error('Separator model not loaded');
 
-  const n=Math.min(sigL.length,sigR.length);
-  const segWindow=hann(MODEL_SEGMENT);
-  const nSeg=Math.max(1,Math.ceil(Math.max(0,n - MODEL_SEGMENT)/MODEL_HOP)+1);
+  onProg(5,'Computing spectrograms…');
+  const win=hann(FFT_SIZE);
+  const stL=stft(sigL,win), stR=stft(sigR,win);
+  const F=stL.F;
 
-  const accum={
-    drums:new Float32Array(n),
-    vocals:new Float32Array(n),
-    bass:new Float32Array(n),
-    melody:new Float32Array(n),
-  };
-  const norm=new Float32Array(n);
+  // magnitudes (low MODEL_BINS only needed for model)
+  const magL=stL.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stL.im[f][b]);return m;});
+  const magR=stR.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stR.im[f][b]);return m;});
 
-  onProg(5,'Running separator…');
-  const t0=performance.now();
-  for(let seg=0,start=0; start<n; seg++,start+=MODEL_HOP){
-    const mix=new Float32Array(2*MODEL_SEGMENT);
-    for(let i=0;i<MODEL_SEGMENT;i++){
-      const idx=start+i;
-      if(idx>=n) break;
-      mix[i]=sigL[idx];
-      mix[MODEL_SEGMENT+i]=sigR[idx];
-    }
-    const out=(await sepSess.run({mix:new ort.Tensor('float32',mix,[1,2,MODEL_SEGMENT])})).stems.data;
+  const useModel = MODEL_PRESETS[mode]?.needsModel === true;
+  const useBetterModel = useModel && isBetterModelReady();
+  let vMask = new Float32Array(F*MODEL_BINS);  // vocal soft mask per (frame,bin)
+  if(mode === 'fast') {
+    onProg(12, 'Preparing fast mode…');
+  }
 
-    for(let s=0;s<4;s++){
-      const key = DEMUCS_TO_UI_STEM[s];
-      if(!key) continue;
-      const lBase=s*2*MODEL_SEGMENT, rBase=lBase+MODEL_SEGMENT;
-      const dst=accum[key];
-      for(let i=0;i<MODEL_SEGMENT && start+i<n;i++){
-        const w=segWindow[i];
-        const sample=(out[lBase+i]+out[rBase+i])*0.5*w;
-        const p=start+i;
-        dst[p]+=sample;
-        norm[p]+=w;
+  if(useBetterModel){
+    const nSeg=Math.ceil(F/SEG_FRAMES);
+    const segData=new Float32Array(2*SEG_FRAMES*MODEL_BINS);
+    for(let seg=0;seg<nSeg;seg++){
+      segData.fill(0);
+      for(let fr=0;fr<SEG_FRAMES;fr++){
+        const f=seg*SEG_FRAMES+fr; if(f>=F)break;
+        const baseL=(0*SEG_FRAMES+fr)*MODEL_BINS, baseR=(1*SEG_FRAMES+fr)*MODEL_BINS;
+        for(let b=0;b<MODEL_BINS;b++){segData[baseL+b]=magL[f][b];segData[baseR+b]=magR[f][b];}
       }
+      const ve=(await betterVocalsSession.run({x:new ort.Tensor('float32',segData,[2,1,SEG_FRAMES,MODEL_BINS])})).y.data;
+      const ae=(await betterAccompanimentSession.run({x:new ort.Tensor('float32',segData.slice(),[2,1,SEG_FRAMES,MODEL_BINS])})).y.data;
+      for(let fr=0;fr<SEG_FRAMES;fr++){
+        const f=seg*SEG_FRAMES+fr; if(f>=F)break;
+        const bL=(0*SEG_FRAMES+fr)*MODEL_BINS, bR=(1*SEG_FRAMES+fr)*MODEL_BINS;
+        for(let b=0;b<MODEL_BINS;b++){
+          const vp=ve[bL+b]**2+ve[bR+b]**2, ap=ae[bL+b]**2+ae[bR+b]**2;
+          vMask[f*MODEL_BINS+b]=vp/(vp+ap+1e-10);
+        }
+      }
+      onProg(12+56*(seg+1)/nSeg,`Separating vocals… ${seg+1}/${nSeg}`);
     }
-    onProg(10 + Math.min(84,70*seg/nSeg),`Separating… segment ${seg+1}/${nSeg}`);
-  }
-  onProg(82,'Normalizing overlap-add…');
-  for(const stem of STEMS){
-    const dst=accum[stem];
-    for(let i=0;i<n;i++){
-      const d=norm[i];
-      if(d>1e-8) dst[i]/=d;
+  } else {
+    onProg(40,'DSP separation (model unavailable)…');
+    for(let f=0;f<F;f++)for(let b=0;b<MODEL_BINS;b++){
+      const l=magL[f][b],r=magR[f][b];
+      vMask[f*MODEL_BINS+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
     }
   }
 
-  onProg(86,'Building stems…');
-  const toAB=(sig)=>{const ab=audioCtx.createBuffer(1,n,SR);ab.copyToChannel(sig.subarray(0,n),0);return ab;};
-  buffers.drums=toAB(accum.drums);
-  onProg(89,'…');
-  buffers.vocals=toAB(accum.vocals);
-  onProg(92,'…');
-  buffers.bass=toAB(accum.bass);
-  onProg(95,'…');
-  buffers.melody=toAB(accum.melody);
-  bench.separationMs = performance.now()-t0;
-  updateBenchUi();
+  if (mode === 'better'){
+    onProg(62, 'Refining mask (better mode)…');
+    vMask = smoothMask(vMask, F, MODEL_BINS);
+  }
+
+  onProg(70,'Applying masks…');
+  const vRe=stL.re.map(()=>new Float32Array(TOT_BINS)), vIm=stL.im.map(()=>new Float32Array(TOT_BINS));
+  const aRe=stL.re.map(()=>new Float32Array(TOT_BINS)), aIm=stL.im.map(()=>new Float32Array(TOT_BINS));
+  for(let f=0;f<F;f++)for(let b=0;b<TOT_BINS;b++){
+    const mRe=(stL.re[f][b]+stR.re[f][b])*0.5, mIm=(stL.im[f][b]+stR.im[f][b])*0.5;
+    const vm = b<MODEL_BINS ? vMask[f*MODEL_BINS+b] : 0;  // high bins -> accompaniment
+    vRe[f][b]=mRe*vm; vIm[f][b]=mIm*vm;
+    aRe[f][b]=mRe*(1-vm); aIm[f][b]=mIm*(1-vm);
+  }
+
+  onProg(74,'Splitting drums & melody (HPSS)…');
+  const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,TOT_BINS);
+  onProg(82,'Extracting bass…');
+  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,TOT_BINS,300);
+
+  onProg(86,'Synthesizing stems…');
+  const dur=raw.duration;
+  const toAB=(re,im)=>{const sig=istft(re,im,F,win);const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
+  buffers.drums=toAB(pRe,pIm);  onProg(89,'…');
+  buffers.vocals=toAB(vRe,vIm); onProg(92,'…');
+  buffers.bass=toAB(bsRe,bsIm); onProg(95,'…');
+  buffers.melody=toAB(mlRe,mlIm);
   onProg(98,'Drawing waveforms…');
   STEMS.forEach(s=>drawWave(s));
   onProg(100,'Done');
-  return raw.duration;
+  return dur;
 }
 
 // ── waveform ──
@@ -1093,7 +1240,7 @@ function buildSampleButtons(){
   SAMPLE_TRACKS.forEach(track=>{
     const btn=document.createElement('button');
     btn.type='button';
-    btn.textContent=track.name;
+    btn.textContent = track.artist ? `${track.name} — ${track.artist}` : track.name;
     btn.addEventListener('click',()=>useSampleTrack(track, btn));
     container.appendChild(btn);
   });
@@ -1111,32 +1258,51 @@ async function handleFile(file){
   document.getElementById('filename').textContent=file.name;
   STEMS.forEach(s=>{
     state.loopDot[s]=-1;
-  state.loopStart[s]=0;
-  state.loopEnd[s]=0;
-  state.loopBase=0;
-  document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
+    state.loopStart[s]=0;
+    state.loopEnd[s]=0;
+    document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
     document.getElementById('varc-'+s).classList.remove('looping');
   });
+  state.loopBase = 0;
   try{
-    if(!sepSess || !sepSess.run){
-      showOverlay('Loading Model','Downloading separator model… Cached after first use.',0);
-      await ensureModelLoaded((p,m)=>prog(p,m));
+    const requestedMode = getModelModeFromUi();
+    setModelMode(requestedMode);
+
+    const runSeparation = async (mode) => {
+      const start = performance.now();
+      const dur = await separateAudio(await file.arrayBuffer(), (p,m) => prog(p,m), mode);
+      bench[mode].separateMs = performance.now() - start;
+      setBenchline();
+      return dur;
+    };
+
+    if (requestedMode === 'better') {
+      showOverlay('Loading Model', MODEL_PRESETS.better.loadLabel, 0);
+      try {
+        await ensureModelReady('better', (p,m) => prog(p,m));
+      } catch (e) {
+        console.warn('Model load failed, using fast mode:', e);
+        showOverlay('Model fallback','ML model failed to load; using fast mode',5);
+      }
     }
-    showOverlay('Separating Stems','Processing…',0);
+
+    const runMode = requestedMode === 'better' && !isBetterModelReady() ? 'fast' : requestedMode;
+    setModelMode(runMode);
+    showOverlay('Separating Stems',`Running ${MODEL_PRESETS[runMode]?.label || runMode} mode`,0);
     let dur;
-  try{
-    dur = await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
-  } catch(e){
-      const errMsg = getErrorMessage(e);
-      if(errMsg.includes('Separator model not loaded')){
-        console.warn('Retrying after missing session...');
-        sepSess = null;
-        await ensureModelLoaded((p,m)=>prog(p,m));
-        dur = await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
+    try {
+      dur = await runSeparation(runMode);
+    } catch (e) {
+      if (requestedMode === 'better' && runMode !== 'fast') {
+        console.warn('Better mode failed, using fast mode:', e);
+        showOverlay('Fallback','Fallback to fast separation…',0);
+        dur = await runSeparation('fast');
+        setModelMode('fast');
       } else {
         throw e;
       }
     }
+
     state.duration=dur;state.ready=true;hideOverlay();
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
@@ -1154,8 +1320,13 @@ const center=document.getElementById('center'), device=document.getElementById('
 ['dragleave','drop'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.remove('drag-over');device.classList.remove('drag-active');if(ev==='drop'&&e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);}));
 
 // init
+setBenchline();
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically
 buildSampleButtons();
+document.getElementById('modelMode').addEventListener('change', () => {
+  setModelMode(getModelModeFromUi());
+});
+setModelMode(state.modelMode);
 let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(state.ready)STEMS.forEach(s=>drawWave(s));},150);});
 </script>
 </body>
