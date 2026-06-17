@@ -655,16 +655,26 @@ function clamp(value, min, max){
   return Math.min(max, Math.max(min, value));
 }
 
-function startProgressPulse(startPercent, endPercent, label, onProg, durationMs = 1300){
-  const start = performance.now();
+function startDecodeProgress(onProg){
+  const startTs = performance.now();
   let raf = 0;
   let done = false;
   const tick = () => {
     if(done) return;
-    const elapsed = Math.min(1, (performance.now()-start)/durationMs);
-    const pct = startPercent + (endPercent - startPercent) * elapsed;
-    onProg(pct, label);
-    if(elapsed < 1) raf = requestAnimationFrame(tick);
+    const elapsedMs = performance.now() - startTs;
+    let pct;
+    if(elapsedMs <= 3000){
+      pct = (elapsedMs / 3000) * 70;
+    }else if(elapsedMs <= 18000){
+      pct = 70 + ((elapsedMs - 3000) / 15000) * 20;
+    }else{
+      const tailMs = elapsedMs - 18000;
+      const crawl = 1 - Math.exp(-tailMs / 12000);
+      pct = 90 + (9 * crawl);
+      if(pct > 99) pct = 99;
+    }
+    onProg(Math.min(99, pct), 'Decoding audio…');
+    raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
   return () => {
@@ -971,10 +981,16 @@ async function loadModels(onProg){
 
 // ── pipeline ──
 async function separateAudio(arrayBuf,onProg){
-  onProg(0,'Decoding audio…');
+  let lastProgress = 0;
+  const setProgress=(v, msg) => {
+    lastProgress = Math.max(lastProgress, Math.min(100, v));
+    onProg(lastProgress, msg);
+  };
+
+  setProgress(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
   if(audioCtx.state==='suspended')await audioCtx.resume();
-  const stopDecodePulse = startProgressPulse(0, 10, 'Decoding audio…', onProg, 1400);
+  const stopDecodePulse = startDecodeProgress(setProgress);
   let raw;
   try{
     raw = await audioCtx.decodeAudioData(arrayBuf.slice(0));
@@ -994,7 +1010,7 @@ async function separateAudio(arrayBuf,onProg){
   state.tempoConfidence = tempo.confidence;
   state.beatOffset = clamp(tempo.offset || 0, 0, Math.max(0, measureLength() - 1e-6));
 
-  onProg(5,'Computing spectrograms…');
+  setProgress(5,'Computing spectrograms…');
   const win=hann(FFT_SIZE);
   const stL=stft(sigL,win), stR=stft(sigR,win);
   const F=stL.F;
@@ -1025,17 +1041,17 @@ async function separateAudio(arrayBuf,onProg){
           vMask[f*MODEL_BINS+b]=vp/(vp+ap+1e-10);
         }
       }
-      onProg(12+56*(seg+1)/nSeg,`Separating vocals… ${seg+1}/${nSeg}`);
+      setProgress(12+56*(seg+1)/nSeg,`Separating vocals… ${seg+1}/${nSeg}`);
     }
   } else {
-    onProg(40,'DSP separation (model unavailable)…');
+    setProgress(40,'DSP separation (model unavailable)…');
     for(let f=0;f<F;f++)for(let b=0;b<MODEL_BINS;b++){
       const l=magL[f][b],r=magR[f][b];
       vMask[f*MODEL_BINS+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
     }
   }
 
-  onProg(70,'Applying masks…');
+  setProgress(70,'Applying masks…');
   const vRe=stL.re.map(()=>new Float32Array(TOT_BINS)), vIm=stL.im.map(()=>new Float32Array(TOT_BINS));
   const aRe=stL.re.map(()=>new Float32Array(TOT_BINS)), aIm=stL.im.map(()=>new Float32Array(TOT_BINS));
   for(let f=0;f<F;f++)for(let b=0;b<TOT_BINS;b++){
@@ -1045,21 +1061,21 @@ async function separateAudio(arrayBuf,onProg){
     aRe[f][b]=mRe*(1-vm); aIm[f][b]=mIm*(1-vm);
   }
 
-  onProg(74,'Splitting drums & melody (HPSS)…');
+  setProgress(74,'Splitting drums & melody (HPSS)…');
   const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,TOT_BINS);
-  onProg(82,'Extracting bass…');
+  setProgress(82,'Extracting bass…');
   const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,TOT_BINS,300);
 
-  onProg(86,'Synthesizing stems…');
+  setProgress(86,'Synthesizing stems…');
   const dur=raw.duration;
   const toAB=(re,im)=>{const sig=istft(re,im,F,win);const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
-  buffers.drums=toAB(pRe,pIm);  onProg(89,'…');
-  buffers.vocals=toAB(vRe,vIm); onProg(92,'…');
-  buffers.bass=toAB(bsRe,bsIm); onProg(95,'…');
+  buffers.drums=toAB(pRe,pIm);  setProgress(89,'…');
+  buffers.vocals=toAB(vRe,vIm); setProgress(92,'…');
+  buffers.bass=toAB(bsRe,bsIm); setProgress(95,'…');
   buffers.melody=toAB(mlRe,mlIm);
-  onProg(98,'Drawing waveforms…');
+  setProgress(98,'Drawing waveforms…');
   STEMS.forEach(s=>drawWave(s));
-  onProg(100,'Done');
+  setProgress(100,'Done');
   return dur;
 }
 
