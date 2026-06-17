@@ -707,7 +707,7 @@ function setLoop(stem, idx){
 
   if(idx < 0){
     document.getElementById(`varc-${stem}`).classList.remove('looping');
-    if(state.playing)startPlayback(currentTime()%state.duration);
+    if(state.playing)applyLoopToStem(stem);
     return;
   }
 
@@ -720,13 +720,15 @@ function setLoop(stem, idx){
     alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
     state.loopDot[stem] = -1;
     buttons.forEach((button)=>button.classList.toggle('on', false));
+    document.getElementById(`varc-${stem}`).classList.remove('looping');
+    if(state.playing)applyLoopToStem(stem);
     return;
   }
 
   state.loopStart[stem] = start;
   state.loopEnd[stem] = end;
   document.getElementById(`varc-${stem}`).classList.add('looping');
-  if(state.playing){startPlayback(state.loopStart[stem]);}
+  if(state.playing){applyLoopToStem(stem);}
 }
 
 // ── FFT ──
@@ -1035,6 +1037,70 @@ function drawWave(stem){
 
 // ── playback ──
 function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();gains[s].gain.value=state.muted[s]?0:state.volume[s];gains[s].connect(audioCtx.destination);});}
+function hasActiveLoop(){
+  return STEMS.some(s=>state.loopDot[s] >= 0);
+}
+function loopAwareTime(t){
+  if(!state.duration || !hasActiveLoop()) return t;
+  return t % state.duration;
+}
+function pauseTime(){
+  return loopAwareTime(currentTime());
+}
+function rebuildStemSource(stem, startOffset=0){
+  if(!buffers[stem] || !gains[stem]) return;
+
+  const d = state.loopDot[stem];
+  const loopStart = state.loopStart[stem];
+  const loopEnd = state.loopEnd[stem];
+
+  if (sources[stem]) {
+    try { sources[stem].stop(); } catch (_) {}
+    try { sources[stem].disconnect(); } catch (_) {}
+    sources[stem] = null;
+  }
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffers[stem];
+  src.connect(gains[stem]);
+
+  if (d >= 0 && loopEnd > loopStart) {
+    src.loop = true;
+    src.loopStart = loopStart;
+    src.loopEnd = loopEnd;
+  } else {
+    src.loop = false;
+  }
+
+  src.start(0, startOffset);
+  sources[stem] = src;
+}
+function applyLoopToStem(stem){
+  if (!state.playing || !sources[stem]) return;
+
+  const d = state.loopDot[stem];
+  if (d < 0) {
+    sources[stem].loop = false;
+    return;
+  }
+
+  const loopStart = state.loopStart[stem];
+  const loopEnd = state.loopEnd[stem];
+  if (!(loopEnd > loopStart)) {
+    sources[stem].loop = false;
+    return;
+  }
+
+  const t = loopAwareTime(currentTime());
+  if (t >= loopEnd) {
+    rebuildStemSource(stem, loopStart);
+    return;
+  }
+
+  sources[stem].loop = true;
+  sources[stem].loopStart = loopStart;
+  sources[stem].loopEnd = loopEnd;
+}
 function startPlayback(off=0){
   stopPlayback(); buildGains();
   state.startTime=audioCtx.currentTime-off; state.playing=true;
@@ -1069,7 +1135,18 @@ function stopPlayback(){
   if(state.ready){setGlyph('play');document.getElementById('btnPlay').textContent='play';document.getElementById('centerHint').textContent='play';}
 }
 function currentTime(){return state.playing?audioCtx.currentTime-state.startTime:state.pauseOffset;}
-function tick(){const t=currentTime();if(t>=state.duration&&state.playing){stopPlayback();state.pauseOffset=0;updateUI(0);return;}updateUI(t);state.raf=requestAnimationFrame(tick);}
+function tick(){
+  const t = currentTime();
+  const vis = loopAwareTime(t);
+  if(t>=state.duration&&state.playing&&!hasActiveLoop()){
+    stopPlayback();
+    state.pauseOffset=0;
+    updateUI(0);
+    return;
+  }
+  updateUI(vis);
+  state.raf=requestAnimationFrame(tick);
+}
 function updateUI(t){
   const pct=Math.max(0,Math.min(1,t/state.duration));
   document.getElementById('timelineFill').style.width=(pct*100)+'%';
@@ -1160,12 +1237,16 @@ document.querySelectorAll('.loop-btn').forEach(btn=>{
 });
 
 // transport
-document.getElementById('btnPlay').addEventListener('click',()=>{
+  document.getElementById('btnPlay').addEventListener('click',()=>{
   if(!state.ready)return;
   if(!audioCtx)audioCtx=new AudioContext({sampleRate:SR});
   if(audioCtx.state==='suspended')audioCtx.resume();
-  if(state.playing){state.pauseOffset=currentTime();stopPlayback();}
-  else startPlayback(state.pauseOffset);
+  if(state.playing){
+    state.pauseOffset=pauseTime();
+    stopPlayback();
+  } else {
+    startPlayback(state.pauseOffset);
+  }
 });
 document.getElementById('btnRestart').addEventListener('click',()=>{if(!state.ready)return;state.pauseOffset=0;if(state.playing)startPlayback(0);else updateUI(0);});
 document.getElementById('btnStop').addEventListener('click',()=>{if(!state.ready)return;stopPlayback();state.pauseOffset=0;updateUI(0);});
