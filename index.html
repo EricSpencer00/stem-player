@@ -541,9 +541,9 @@ const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
 const SEG_FRAMES = 512;               // spleeter time-frames per segment
 const LOOP_BARS = [1, 2, 4, 8];
 const SAMPLE_TRACKS = [
-  {name:'SoundHelix — Acoustic', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'},
-  {name:'SoundHelix — New Life', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'},
-  {name:'SoundHelix — Relaxing', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'},
+  {name:'No-copyright sample loop 1', url:'./samples/stem-sample-1.mp3'},
+  {name:'No-copyright sample loop 2', url:'./samples/stem-sample-2.mp3'},
+  {name:'No-copyright sample loop 3', url:'./samples/stem-sample-3.mp3'},
 ];
 const STEMS = ['drums','vocals','bass','melody'];
 const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
@@ -979,17 +979,37 @@ function showOverlay(t,m,p){const o=document.getElementById('overlay');o.classLi
 function hideOverlay(){document.getElementById('overlay').classList.remove('active');}
 function prog(p,m){document.getElementById('progFill').style.width=p+'%';if(m)document.getElementById('ovMsg').textContent=m;}
 
-async function useSampleTrack(track){
+async function useSampleTrack(track, button){
+  const label = button?.textContent || track.name;
+  if (button) {
+    button.disabled = true;
+    button.textContent = `${track.name} (loading)`;
+  }
   try{
     showOverlay('Loading Sample',`Downloading ${track.name}…`,10);
     const resp=await fetch(track.url);
+    const ctype = resp.headers.get('content-type') || '';
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (ctype && !ctype.startsWith('audio/') && !ctype.includes('octet-stream')) {
+      throw new Error(`Track is not an audio file (${ctype || 'unknown type'})`);
+    }
     const blob=await resp.blob();
+    if (!blob || !blob.size) {
+      throw new Error('Sample file is empty.');
+    }
     const file=new File([blob], track.name.replace(/[^\w.-]+/g,'_')+'.mp3', { type: blob.type || 'audio/mpeg' });
     await handleFile(file);
   }catch(e){
     hideOverlay();
+    if (button) button.textContent = `${track.name} (failed)`;
     alert('Unable to load sample track: '+e.message);
+  } finally {
+    if (button) {
+      if (!button.textContent.includes('(failed)')) {
+        button.textContent = label;
+      }
+      button.disabled = false;
+    }
   }
 }
 
@@ -1001,7 +1021,7 @@ function buildSampleButtons(){
     const btn=document.createElement('button');
     btn.type='button';
     btn.textContent=track.name;
-    btn.addEventListener('click',()=>useSampleTrack(track));
+    btn.addEventListener('click',()=>useSampleTrack(track, btn));
     container.appendChild(btn);
   });
 }
