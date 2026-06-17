@@ -620,7 +620,14 @@ function measureLength(){
 function snapLoopStart(currentSec){
   const len = measureLength();
   if(!len || !Number.isFinite(currentSec) || !state.duration) return 0;
-  return Math.floor(currentSec / len) * len;
+  const boundary = Math.floor(currentSec / len) * len;
+  const nextBoundary = boundary + len;
+  const epsilon = 0.03;
+
+  if (Math.abs(currentSec - boundary) < epsilon) {
+    return boundary;
+  }
+  return nextBoundary;
 }
 
 function setLoop(stem, idx){
@@ -649,7 +656,7 @@ function setLoop(stem, idx){
   state.loopStart[stem] = start;
   state.loopEnd[stem] = end;
   document.getElementById(`varc-${stem}`).classList.add('looping');
-  if(state.playing){startPlayback(currentTime()%state.duration);}
+  if(state.playing){startPlayback(state.loopStart[stem]);}
 }
 
 // ── FFT ──
