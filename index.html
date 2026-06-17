@@ -985,9 +985,22 @@ async function useSampleTrack(track, button){
     button.disabled = true;
     button.textContent = `${track.name} (loading)`;
   }
+
+  const trackUrl = new URL(track.url, location.href);
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    if (trackUrl.origin !== location.origin) {
+      hideOverlay();
+      if (button) button.textContent = `${track.name} (blocked)`;
+      alert(`Sample blocked by CORS policy. Please use a same-origin sample URL: ${track.url}`);
+      button.disabled = false;
+      if (button?.textContent.includes('(blocked)')) button.textContent = label;
+      return;
+    }
+  }
+
   try{
     showOverlay('Loading Sample',`Downloading ${track.name}…`,10);
-    const resp=await fetch(track.url);
+    const resp=await fetch(trackUrl.href);
     const ctype = resp.headers.get('content-type') || '';
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     if (ctype && !ctype.startsWith('audio/') && !ctype.includes('octet-stream')) {
