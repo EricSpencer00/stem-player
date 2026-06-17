@@ -734,6 +734,16 @@ function fmtMs(ms){
   return ms < 1000 ? `${ms.toFixed(0)}ms` : `${(ms/1000).toFixed(2)}s`;
 }
 
+function getErrorMessage(err){
+  if (err instanceof Error) return err.message || 'Unknown error';
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  if (typeof err === 'number' && Number.isFinite(err)) return String(err);
+  if (err && typeof err.message === 'string' && err.message.trim()) return err.message;
+  if (err === null || typeof err === 'undefined') return 'Unknown error';
+  try { return JSON.stringify(err); } catch (_) {}
+  return String(err);
+}
+
 function updateBenchUi(){
   const el = document.getElementById('benchStats');
   if(!el) return;
@@ -1065,7 +1075,7 @@ async function useSampleTrack(track, button){
   }catch(e){
     hideOverlay();
     if (button) button.textContent = `${track.name} (failed)`;
-    alert('Unable to load sample track: '+e.message);
+    alert('Unable to load sample track: '+getErrorMessage(e));
   } finally {
     if (button) {
       if (!button.textContent.includes('(failed)')) {
@@ -1114,10 +1124,11 @@ async function handleFile(file){
     }
     showOverlay('Separating Stems','Processing…',0);
     let dur;
-    try{
-      dur = await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
-    } catch(e){
-      if(String(e.message || '').includes('Separator model not loaded')){
+  try{
+    dur = await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
+  } catch(e){
+      const errMsg = getErrorMessage(e);
+      if(errMsg.includes('Separator model not loaded')){
         console.warn('Retrying after missing session...');
         sepSess = null;
         await ensureModelLoaded((p,m)=>prog(p,m));
@@ -1133,7 +1144,7 @@ async function handleFile(file){
     setGlyph('play');document.getElementById('centerHint').textContent='play';
     document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
     updateUI(0);
-  }catch(e){console.error(e);hideOverlay();alert('Error processing file: '+e.message);}
+  }catch(e){console.error(e);hideOverlay();alert('Error processing file: '+getErrorMessage(e));}
 }
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
