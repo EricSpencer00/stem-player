@@ -7,170 +7,159 @@
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
 <style>
 :root {
-  --page:       oklch(91% 0.013 82);
-  --device:     oklch(86% 0.016 76);
-  --device-hi:  oklch(89% 0.013 80);
-  --center:     oklch(82% 0.019 72);
-  --center-hi:  oklch(84% 0.016 75);
-  --text:       oklch(20% 0.010 62);
-  --text-dim:   oklch(50% 0.010 68);
-  --divider:    oklch(79% 0.012 76);
-  --dot-off:    oklch(75% 0.013 78);
-  --dot-on:     oklch(52% 0.10  62);
-  --dot-glow:   oklch(52% 0.10  62 / 0.35);
-  --vol-track:  oklch(79% 0.012 76);
-  --vol-fill:   oklch(28% 0.012 64);
-  --wave-bg:    oklch(84% 0.014 77);
+  --page:       oklch(92% 0.012 84);
+  --page-2:     oklch(89% 0.014 82);
+  --device-out: oklch(84% 0.018 78);
+  --device-in:  oklch(88% 0.013 80);
+  --center:     oklch(81% 0.020 74);
+  --ink:        oklch(26% 0.012 64);
+  --ink-soft:   oklch(46% 0.011 68);
+  --ink-faint:  oklch(66% 0.009 72);
+  --track:      oklch(78% 0.012 76);
+  --amber:      oklch(64% 0.13 64);
+  --amber-glow: oklch(64% 0.13 64 / 0.4);
+  --wave-bg:    oklch(85% 0.013 78);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--page);
-  color: var(--text);
-  font-family: 'Helvetica Neue', 'Arial', sans-serif;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--page) 0%, var(--page-2) 100%);
+  color: var(--ink);
+  font-family: 'Helvetica Neue', 'Inter', Arial, sans-serif;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 28px 20px;
+  padding: 32px 20px 40px;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── wordmark ── */
 .wordmark {
-  font-size: clamp(9px, 1.6vw, 11px);
-  letter-spacing: 0.5em;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 34px;
+}
+.wordmark span {
+  font-size: 10px;
+  letter-spacing: 0.55em;
   text-transform: uppercase;
-  color: var(--text-dim);
-  font-weight: 400;
-  margin-bottom: 36px;
-  text-indent: 0.5em; /* compensate letter-spacing at end */
+  color: var(--ink-soft);
+  text-indent: 0.55em;
+}
+.wordmark .rule {
+  width: 26px;
+  height: 1px;
+  background: var(--ink-faint);
 }
 
 /* ── device ── */
 .device-wrap {
   position: relative;
-  width:  min(500px, 90vw);
-  height: min(500px, 90vw);
-  margin-bottom: 24px;
+  width:  min(480px, 88vw);
+  height: min(480px, 88vw);
+  margin-bottom: 30px;
 }
 
 .device {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  background: var(--device);
-  position: relative;
-  overflow: hidden;
+  background:
+    radial-gradient(80% 80% at 38% 32%, var(--device-in) 0%, var(--device-out) 78%);
   box-shadow:
-    inset 0 2px 5px oklch(96% 0 0 / 0.45),
-    inset 0 -3px 6px oklch(0%  0 0 / 0.09),
-    0 10px 40px oklch(20% 0.01 70 / 0.17),
-    0  3px  8px oklch(20% 0.01 70 / 0.10);
-  transition: box-shadow 0.25s ease;
+    inset 0 3px 6px oklch(98% 0 0 / 0.5),
+    inset 0 -4px 9px oklch(20% 0.01 60 / 0.10),
+    0 16px 50px oklch(24% 0.012 70 / 0.18),
+    0 4px 12px oklch(24% 0.012 70 / 0.10);
+  transition: box-shadow 0.3s cubic-bezier(0.22,1,0.36,1);
 }
 .device.drag-active {
   box-shadow:
-    inset 0 2px 5px oklch(96% 0 0 / 0.5),
-    inset 0 -3px 6px oklch(0%  0 0 / 0.1),
-    0 14px 50px oklch(20% 0.01 70 / 0.22),
-    0  4px 12px oklch(20% 0.01 70 / 0.14);
+    inset 0 3px 6px oklch(98% 0 0 / 0.55),
+    inset 0 -4px 9px oklch(20% 0.01 60 / 0.12),
+    0 22px 64px oklch(24% 0.012 70 / 0.24),
+    0 6px 16px oklch(24% 0.012 70 / 0.14);
 }
 
-/* ── quadrants ── */
+/* SVG overlay for rings + arcs */
+.svg-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+  overflow: visible;
+}
+.ring-track { fill: none; stroke: var(--track); stroke-width: 2; }
+.ring-fill  { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round;
+              transition: stroke-dashoffset 0.12s linear; }
+.vol-track  { fill: none; stroke: var(--track); stroke-width: 4; stroke-linecap: round; }
+.vol-fill   { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round;
+              transition: stroke-dasharray 0.07s ease-out; }
+.vol-fill.muted { stroke: var(--ink-faint); }
+.divider    { stroke: var(--track); stroke-width: 1; }
+
+/* ── quadrant hit areas ── */
 .quadrant {
   position: absolute;
   width: 50%;
   height: 50%;
   cursor: ns-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: filter 0.25s ease, background 0.25s ease;
+  z-index: 5;
 }
 .q-drums  { top: 0; left: 0; }
 .q-vocals { top: 0; right: 0; }
 .q-bass   { bottom: 0; left: 0; }
 .q-melody { bottom: 0; right: 0; }
 
-.quadrant.muted { filter: brightness(0.84) saturate(0.4); }
-.quadrant.pressing { filter: brightness(1.04); }
-
-/* inner label + vol-bar group — offset toward outer corner */
-.q-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  pointer-events: none;
-}
-.q-drums  .q-inner { transform: translate(-20px, -20px); }
-.q-vocals .q-inner { transform: translate( 20px, -20px); }
-.q-bass   .q-inner { transform: translate(-20px,  20px); }
-.q-melody .q-inner { transform: translate( 20px,  20px); }
-
+/* ── labels ── */
 .q-label {
-  font-size: 0.52rem;
-  letter-spacing: 0.28em;
+  position: absolute;
+  font-size: 9.5px;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: var(--text-dim);
-  font-weight: 400;
-  text-indent: 0.28em;
-}
-
-/* thin vertical volume meter */
-.vol-bar {
-  width: 1.5px;
-  height: 38px;
-  background: var(--vol-track);
-  border-radius: 1px;
-  position: relative;
-  overflow: hidden;
-}
-.vol-bar-fill {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 80%;
-  background: var(--vol-fill);
-  border-radius: 1px;
-  transition: height 0.06s ease-out;
-}
-
-/* ── dividers ── */
-.div-h, .div-v {
-  position: absolute;
-  background: var(--divider);
+  color: var(--ink-soft);
+  z-index: 6;
   pointer-events: none;
-  z-index: 4;
+  text-indent: 0.26em;
+  transition: color 0.2s, opacity 0.2s;
 }
-.div-h { top: 50%; left: 8%; right: 8%; height: 1px; transform: translateY(-50%); }
-.div-v { left: 50%; top: 8%; bottom: 8%; width: 1px; transform: translateX(-50%); }
+.q-label.muted { color: var(--ink-faint); opacity: 0.55; }
+.q-label .pct {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-top: 3px;
+  text-indent: 0.1em;
+}
 
-/* ── dots (absolutely positioned via JS along arc) ── */
+/* ── dots ── */
 .dot {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--dot-off);
+  background: oklch(74% 0.013 78);
   cursor: pointer;
-  z-index: 8;
+  z-index: 7;
   transform: translate(-50%, -50%);
-  box-shadow: inset 0 1px 2px oklch(0% 0 0 / 0.18);
-  transition: background 0.22s ease, box-shadow 0.22s ease;
+  box-shadow: inset 0 1px 2px oklch(20% 0.01 60 / 0.22),
+              0 1px 1px oklch(98% 0 0 / 0.5);
+  transition: background 0.22s, box-shadow 0.22s, transform 0.15s;
 }
+.dot:hover { transform: translate(-50%, -50%) scale(1.18); }
 .dot.active {
-  background: var(--dot-on);
+  background: var(--amber);
   box-shadow:
-    inset 0 1px 1px oklch(0% 0 0 / 0.08),
-    0 0 10px 3px var(--dot-glow),
-    0 0  4px 1px var(--dot-glow);
+    inset 0 1px 1px oklch(20% 0.01 60 / 0.1),
+    0 0 9px 2px var(--amber-glow);
 }
-.dot:hover:not(.active) { background: oklch(70% 0.016 76); }
 
 /* ── center ── */
 .center {
@@ -178,269 +167,106 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width:  27%;
-  height: 27%;
+  width: 29%;
+  height: 29%;
   border-radius: 50%;
-  background: var(--center);
+  background: radial-gradient(75% 75% at 40% 35%, oklch(83% 0.018 76), var(--center));
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   cursor: pointer;
   z-index: 10;
   box-shadow:
-    inset 0 2px 5px oklch(96% 0 0 / 0.30),
-    inset 0 -2px 4px oklch(0%  0 0 / 0.07),
-    0 2px 10px oklch(20% 0.01 70 / 0.12);
-  transition: box-shadow 0.2s ease, transform 0.12s ease;
+    inset 0 2px 5px oklch(98% 0 0 / 0.34),
+    inset 0 -3px 6px oklch(20% 0.01 60 / 0.08),
+    0 3px 12px oklch(24% 0.012 70 / 0.14);
+  transition: box-shadow 0.2s, transform 0.12s cubic-bezier(0.22,1,0.36,1);
 }
 .center:hover {
   box-shadow:
-    inset 0 2px 5px oklch(96% 0 0 / 0.35),
-    inset 0 -2px 4px oklch(0%  0 0 / 0.08),
-    0 4px 16px oklch(20% 0.01 70 / 0.18);
+    inset 0 2px 5px oklch(98% 0 0 / 0.4),
+    inset 0 -3px 6px oklch(20% 0.01 60 / 0.09),
+    0 6px 20px oklch(24% 0.012 70 / 0.2);
 }
-.center:active {
-  transform: translate(-50%, -50%) scale(0.97);
-  box-shadow:
-    inset 0 3px 7px oklch(0%  0 0 / 0.10),
-    inset 0 -1px 2px oklch(96% 0 0 / 0.20),
-    0 1px 4px oklch(20% 0.01 70 / 0.08);
-}
+.center:active { transform: translate(-50%, -50%) scale(0.96); }
 .center.drag-over {
   box-shadow:
-    inset 0 2px 5px oklch(96% 0 0 / 0.4),
-    inset 0 -2px 4px oklch(0%  0 0 / 0.1),
-    0 6px 24px oklch(20% 0.01 70 / 0.25);
+    inset 0 0 0 2px var(--amber),
+    inset 0 2px 5px oklch(98% 0 0 / 0.4),
+    0 6px 24px oklch(24% 0.012 70 / 0.26);
 }
-
-.center-icon {
-  font-size: 0.95rem;
-  color: var(--text-dim);
-  line-height: 1;
+.center-glyph {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
   pointer-events: none;
 }
+.center-glyph svg { width: 100%; height: 100%; fill: var(--ink-soft); }
 .center-hint {
-  font-size: 0.38rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  opacity: 0.65;
-  text-indent: 0.2em;
-  pointer-events: none;
-}
-
-/* pulse ring when playing */
-@keyframes pulse {
-  0%   { box-shadow: inset 0 2px 5px oklch(96% 0 0 / 0.30), inset 0 -2px 4px oklch(0% 0 0 / 0.07), 0 0 0  0px oklch(20% 0.01 70 / 0.10); }
-  60%  { box-shadow: inset 0 2px 5px oklch(96% 0 0 / 0.30), inset 0 -2px 4px oklch(0% 0 0 / 0.07), 0 0 0 12px oklch(20% 0.01 70 / 0); }
-  100% { box-shadow: inset 0 2px 5px oklch(96% 0 0 / 0.30), inset 0 -2px 4px oklch(0% 0 0 / 0.07), 0 0 0  0px oklch(20% 0.01 70 / 0); }
-}
-.center.playing { animation: pulse 2.4s ease-out infinite; }
-
-/* ── processing overlay ── */
-#overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: oklch(91% 0.013 82 / 0.94);
-  backdrop-filter: blur(4px);
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 16px;
-}
-#overlay.active { display: flex; }
-.ov-title {
-  font-size: 0.52rem;
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  text-indent: 0.4em;
-}
-.ov-msg {
-  font-size: 0.46rem;
-  letter-spacing: 0.08em;
-  color: oklch(54% 0.008 68);
-  max-width: 240px;
-  text-align: center;
-  line-height: 1.9;
-}
-.prog-wrap {
-  width: 200px;
-  height: 1px;
-  background: var(--divider);
-  position: relative;
-}
-.prog-fill {
-  position: absolute;
-  inset: 0;
-  background: var(--vol-fill);
-  width: 0%;
-  transition: width 0.3s ease;
-}
-
-/* ── waveforms ── */
-.wave-row {
-  width: min(500px, 90vw);
-  display: none;
-  gap: 3px;
-  margin-bottom: 14px;
-}
-.wave-row.active { display: flex; }
-canvas.wave {
-  flex: 1;
-  height: 26px;
-  background: var(--wave-bg);
-  border-radius: 1px;
-}
-
-/* ── playbar ── */
-#playbar {
-  width: min(500px, 90vw);
-  display: none;
-  flex-direction: column;
-  gap: 9px;
-  margin-bottom: 16px;
-}
-#playbar.active { display: flex; }
-
-.filename {
-  font-size: 0.46rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: oklch(52% 0.008 68);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-indent: 0.2em;
-}
-.timeline-wrap {
-  height: 1px;
-  background: var(--divider);
-  cursor: pointer;
-  position: relative;
-}
-.timeline-fill {
-  position: absolute;
-  inset: 0;
-  background: var(--vol-fill);
-  width: 0%;
-  pointer-events: none;
-}
-.timeline-head {
-  position: absolute;
-  top: -3px;
-  left: 0%;
-  width: 1px;
-  height: 7px;
-  background: var(--vol-fill);
-  transform: translateX(-50%);
-  pointer-events: none;
-  transition: left 0.1s linear;
-}
-.time-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.42rem;
-  letter-spacing: 0.14em;
-  color: oklch(52% 0.008 68);
-}
-.transport {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-}
-.tbtn {
-  background: none;
-  border: none;
-  font-family: inherit;
-  font-size: 0.46rem;
+  font-size: 7.5px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--text-dim);
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.15s;
+  color: var(--ink-faint);
   text-indent: 0.22em;
-}
-.tbtn:hover { color: var(--text); }
-.tbtn.primary {
-  color: var(--text);
-  font-size: 0.52rem;
-  letter-spacing: 0.25em;
-}
-
-/* ── stem panel ── */
-#stems-panel {
-  width: min(500px, 90vw);
-  display: none;
-  flex-direction: column;
-}
-#stems-panel.active { display: flex; }
-
-.stem-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 0;
-  border-top: 1px solid var(--divider);
-}
-.stem-name {
-  font-size: 0.42rem;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  width: 40px;
-  text-indent: 0.24em;
-}
-.stem-vol-wrap {
-  flex: 1;
-  height: 1px;
-  background: var(--vol-track);
-  cursor: pointer;
-  position: relative;
-}
-.stem-vol-fill {
-  position: absolute;
-  inset: 0;
-  background: var(--vol-fill);
-  width: 80%;
   pointer-events: none;
 }
-.stem-mute-btn {
-  font-size: 0.4rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  background: none;
-  border: none;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.15s, text-decoration 0.15s;
-  text-indent: 0.16em;
+@keyframes breathe {
+  0%,100% { transform: translate(-50%,-50%) scale(1); }
+  50%     { transform: translate(-50%,-50%) scale(1.018); }
 }
-.stem-mute-btn:hover { color: var(--text); }
-.stem-mute-btn.muted {
-  color: var(--text);
-  text-decoration: line-through;
-}
+.center.playing { animation: breathe 3.4s ease-in-out infinite; }
 
-/* ── footer ── */
-footer {
-  margin-top: 24px;
-  font-size: 0.4rem;
-  letter-spacing: 0.14em;
-  color: oklch(60% 0.007 72);
-  text-align: center;
-  line-height: 2;
+/* ── overlay ── */
+#overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: oklch(92% 0.012 84 / 0.93);
+  backdrop-filter: blur(5px);
+  z-index: 100;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 18px;
 }
-footer a { color: inherit; text-decoration: none; }
-footer a:hover { color: var(--text-dim); }
+#overlay.active { display: flex; }
+.ov-title { font-size: 10px; letter-spacing: 0.42em; text-transform: uppercase; color: var(--ink-soft); text-indent: 0.42em; }
+.ov-msg   { font-size: 9px; letter-spacing: 0.06em; color: var(--ink-faint); max-width: 250px; text-align: center; line-height: 1.9; }
+.prog-wrap { width: 210px; height: 2px; background: var(--track); position: relative; border-radius: 2px; overflow: hidden; }
+.prog-fill { position: absolute; inset: 0; background: var(--ink); width: 0%; transition: width 0.3s ease; }
+
+/* ── waveforms ── */
+.wave-row { width: min(480px, 88vw); display: none; gap: 4px; margin-bottom: 16px; }
+.wave-row.active { display: flex; }
+.wave-cell { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.wave-cap { font-size: 7.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); text-align: center; text-indent: 0.2em; }
+canvas.wave { width: 100%; height: 26px; background: var(--wave-bg); border-radius: 2px; }
+
+/* ── playbar ── */
+#playbar { width: min(480px, 88vw); display: none; flex-direction: column; gap: 11px; margin-bottom: 18px; }
+#playbar.active { display: flex; }
+.filename { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-indent: 0.2em; }
+.timeline-wrap { height: 2px; background: var(--track); cursor: pointer; position: relative; border-radius: 2px; }
+.timeline-fill { position: absolute; inset: 0; background: var(--ink); width: 0%; pointer-events: none; border-radius: 2px; }
+.timeline-head { position: absolute; top: 50%; left: 0%; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); transform: translate(-50%,-50%); pointer-events: none; transition: left 0.1s linear; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.3); }
+.time-row { display: flex; justify-content: space-between; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); }
+.transport { display: flex; justify-content: center; align-items: center; gap: 24px; }
+.tbtn { background: none; border: none; font-family: inherit; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; padding: 4px; transition: color 0.15s; text-indent: 0.2em; }
+.tbtn:hover { color: var(--ink); }
+.tbtn.primary { color: var(--ink); font-size: 10px; letter-spacing: 0.24em; }
+
+/* ── stem panel ── */
+#stems-panel { width: min(480px, 88vw); display: none; flex-direction: column; }
+#stems-panel.active { display: flex; }
+.stem-row { display: flex; align-items: center; gap: 16px; padding: 9px 0; border-top: 1px solid var(--track); }
+.stem-name { font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-soft); width: 44px; text-indent: 0.22em; }
+.stem-vol-wrap { flex: 1; height: 2px; background: var(--track); cursor: pointer; position: relative; border-radius: 2px; }
+.stem-vol-fill { position: absolute; inset: 0; background: var(--ink); width: 80%; pointer-events: none; border-radius: 2px; }
+.stem-mute-btn { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); background: none; border: none; font-family: inherit; cursor: pointer; padding: 2px; transition: color 0.15s; text-indent: 0.14em; width: 32px; text-align: right; }
+.stem-mute-btn:hover { color: var(--ink); }
+.stem-mute-btn.muted { color: var(--ink); text-decoration: line-through; }
+
+footer { margin-top: 26px; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); text-align: center; line-height: 2.1; }
+footer a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+footer a:hover { border-color: var(--ink-faint); }
 
 #fileInput { display: none; }
 </style>
@@ -449,50 +275,48 @@ footer a:hover { color: var(--text-dim); }
 
 <input type="file" id="fileInput" accept="audio/*">
 
-<div class="wordmark">Stem Player</div>
+<div class="wordmark"><div class="rule"></div><span>Stem Player</span><div class="rule"></div></div>
 
 <div class="device-wrap" id="deviceWrap">
-  <div class="device" id="device">
-    <div class="div-h"></div>
-    <div class="div-v"></div>
+  <div class="device" id="device"></div>
 
-    <div class="quadrant q-drums"  id="q-drums"  data-stem="drums">
-      <div class="q-inner">
-        <div class="q-label">Drums</div>
-        <div class="vol-bar"><div class="vol-bar-fill" id="vb-drums"></div></div>
-      </div>
-    </div>
-    <div class="quadrant q-vocals" id="q-vocals" data-stem="vocals">
-      <div class="q-inner">
-        <div class="q-label">Vocals</div>
-        <div class="vol-bar"><div class="vol-bar-fill" id="vb-vocals"></div></div>
-      </div>
-    </div>
-    <div class="quadrant q-bass"   id="q-bass"   data-stem="bass">
-      <div class="q-inner">
-        <div class="q-label">Bass</div>
-        <div class="vol-bar"><div class="vol-bar-fill" id="vb-bass"></div></div>
-      </div>
-    </div>
-    <div class="quadrant q-melody" id="q-melody" data-stem="melody">
-      <div class="q-inner">
-        <div class="q-label">Melody</div>
-        <div class="vol-bar"><div class="vol-bar-fill" id="vb-melody"></div></div>
-      </div>
-    </div>
+  <svg class="svg-layer" id="svg" viewBox="0 0 1000 1000" aria-hidden="true">
+    <!-- progress ring -->
+    <circle class="ring-track" cx="500" cy="500" r="476"></circle>
+    <circle class="ring-fill"  cx="500" cy="500" r="476" id="ringFill"
+            pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"
+            transform="rotate(-90 500 500)"></circle>
+    <!-- dividers -->
+    <line class="divider" x1="120" y1="500" x2="880" y2="500"></line>
+    <line class="divider" x1="500" y1="120" x2="500" y2="880"></line>
+    <!-- volume arcs injected by JS -->
+    <g id="volArcs"></g>
+  </svg>
 
-    <div class="center" id="center">
-      <div class="center-icon" id="centerIcon">↓</div>
-      <div class="center-hint" id="centerHint">drop audio</div>
+  <div class="quadrant q-drums"  data-stem="drums"></div>
+  <div class="quadrant q-vocals" data-stem="vocals"></div>
+  <div class="quadrant q-bass"   data-stem="bass"></div>
+  <div class="quadrant q-melody" data-stem="melody"></div>
+
+  <div class="q-label" id="lbl-drums">Drums<span class="pct" id="pct-drums">80</span></div>
+  <div class="q-label" id="lbl-vocals">Vocals<span class="pct" id="pct-vocals">80</span></div>
+  <div class="q-label" id="lbl-bass">Bass<span class="pct" id="pct-bass">80</span></div>
+  <div class="q-label" id="lbl-melody">Melody<span class="pct" id="pct-melody">80</span></div>
+
+  <div class="center" id="center">
+    <div class="center-glyph" id="centerGlyph">
+      <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 20h14"
+        stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
+    <div class="center-hint" id="centerHint">drop audio</div>
   </div>
 </div>
 
 <div class="wave-row" id="waveRow">
-  <canvas class="wave" id="wDrums"></canvas>
-  <canvas class="wave" id="wVocals"></canvas>
-  <canvas class="wave" id="wBass"></canvas>
-  <canvas class="wave" id="wMelody"></canvas>
+  <div class="wave-cell"><div class="wave-cap">Drums</div><canvas class="wave" id="wDrums"></canvas></div>
+  <div class="wave-cell"><div class="wave-cap">Bass</div><canvas class="wave" id="wBass"></canvas></div>
+  <div class="wave-cell"><div class="wave-cap">Vocals</div><canvas class="wave" id="wVocals"></canvas></div>
+  <div class="wave-cell"><div class="wave-cap">Melody</div><canvas class="wave" id="wMelody"></canvas></div>
 </div>
 
 <div id="playbar">
@@ -501,44 +325,25 @@ footer a:hover { color: var(--text-dim); }
     <div class="timeline-fill" id="timelineFill"></div>
     <div class="timeline-head" id="timelineHead"></div>
   </div>
-  <div class="time-row">
-    <span id="timeCur">0:00</span>
-    <span id="timeTot">0:00</span>
-  </div>
+  <div class="time-row"><span id="timeCur">0:00</span><span id="timeTot">0:00</span></div>
   <div class="transport">
-    <button class="tbtn" id="btnRestart">↩ restart</button>
+    <button class="tbtn" id="btnRestart">restart</button>
     <button class="tbtn primary" id="btnPlay">play</button>
     <button class="tbtn" id="btnStop">stop</button>
   </div>
 </div>
 
 <div id="stems-panel">
-  <div class="stem-row">
-    <div class="stem-name">Drums</div>
-    <div class="stem-vol-wrap" data-stem="drums"><div class="stem-vol-fill" id="svf-drums"></div></div>
-    <button class="stem-mute-btn" data-stem="drums">mute</button>
-  </div>
-  <div class="stem-row">
-    <div class="stem-name">Bass</div>
-    <div class="stem-vol-wrap" data-stem="bass"><div class="stem-vol-fill" id="svf-bass"></div></div>
-    <button class="stem-mute-btn" data-stem="bass">mute</button>
-  </div>
-  <div class="stem-row">
-    <div class="stem-name">Vocals</div>
-    <div class="stem-vol-wrap" data-stem="vocals"><div class="stem-vol-fill" id="svf-vocals"></div></div>
-    <button class="stem-mute-btn" data-stem="vocals">mute</button>
-  </div>
-  <div class="stem-row">
-    <div class="stem-name">Melody</div>
-    <div class="stem-vol-wrap" data-stem="melody"><div class="stem-vol-fill" id="svf-melody"></div></div>
-    <button class="stem-mute-btn" data-stem="melody">mute</button>
-  </div>
+  <div class="stem-row"><div class="stem-name">Drums</div><div class="stem-vol-wrap" data-stem="drums"><div class="stem-vol-fill" id="svf-drums"></div></div><button class="stem-mute-btn" data-stem="drums">mute</button></div>
+  <div class="stem-row"><div class="stem-name">Bass</div><div class="stem-vol-wrap" data-stem="bass"><div class="stem-vol-fill" id="svf-bass"></div></div><button class="stem-mute-btn" data-stem="bass">mute</button></div>
+  <div class="stem-row"><div class="stem-name">Vocals</div><div class="stem-vol-wrap" data-stem="vocals"><div class="stem-vol-fill" id="svf-vocals"></div></div><button class="stem-mute-btn" data-stem="vocals">mute</button></div>
+  <div class="stem-row"><div class="stem-name">Melody</div><div class="stem-vol-wrap" data-stem="melody"><div class="stem-vol-fill" id="svf-melody"></div></div><button class="stem-mute-btn" data-stem="melody">mute</button></div>
 </div>
 
 <div id="overlay">
   <div class="ov-title" id="ovTitle">Processing</div>
   <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
-  <div class="ov-msg" id="ovMsg">Downloading Spleeter model (~80 MB). Cached after first use.</div>
+  <div class="ov-msg" id="ovMsg">Downloading Spleeter model. Cached after first use.</div>
 </div>
 
 <footer>
@@ -549,558 +354,423 @@ footer a:hover { color: var(--text-dim); }
 <script>
 'use strict';
 
-// ── constants ──────────────────────────────────────
-const FFT_SIZE   = 4096;
-const HOP_SIZE   = 1024;
-const SR         = 44100;
-const FREQ_BINS  = FFT_SIZE / 2 + 1;
-const SEG_FRAMES = 512;
-const LOOP_BARS  = [1, 2, 4, 8];
-const STEMS      = ['drums','vocals','bass','melody'];
-const HF_BASE    = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
+// ── constants ──
+const FFT_SIZE  = 4096;
+const HOP_SIZE  = 1024;
+const SR        = 44100;
+const TOT_BINS  = FFT_SIZE / 2 + 1;   // 2049
+const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
+const SEG_FRAMES = 512;               // spleeter time-frames per segment
+const LOOP_BARS = [1, 2, 4, 8];
+const STEMS = ['drums','vocals','bass','melody'];
+const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
 
-// dot arc angles (degrees, screen-coord: 0=right, 90=down, clockwise)
-// 4 dots per quadrant, spaced across the middle of each quadrant's outer arc
-const DOT_ANGLES = {
-  drums:  [198, 211, 224, 237],  // NW arc  (180°–270°)
-  vocals: [303, 316, 329, 342],  // NE arc  (270°–360°)
-  bass:   [108, 121, 134, 147],  // SW arc  (90°–180°)
-  melody: [ 18,  31,  44,  57],  // SE arc  (0°–90°)
+// quadrant angular ranges (screen deg, 0=east, 90=south, clockwise)
+const Q_RANGE = {
+  drums:  [180, 270],
+  vocals: [270, 360],
+  bass:   [ 90, 180],
+  melody: [  0,  90],
 };
-const DOT_RADIUS_FRAC = 0.76;  // fraction of device radius
 
-// ── state ──────────────────────────────────────────
+// ── state ──
 const state = {
-  ready: false,
-  playing: false,
-  muted:   { drums:false, vocals:false, bass:false, melody:false },
-  volume:  { drums:0.8,   vocals:0.8,   bass:0.8,   melody:0.8  },
-  loopDot: { drums:-1,    vocals:-1,    bass:-1,    melody:-1   },
-  pauseOffset: 0,
-  startTime:   0,
-  duration:    0,
-  bpm: 120,
-  raf: null,
+  ready:false, playing:false,
+  muted:  {drums:false,vocals:false,bass:false,melody:false},
+  volume: {drums:0.8,vocals:0.8,bass:0.8,melody:0.8},
+  loopDot:{drums:-1,vocals:-1,bass:-1,melody:-1},
+  pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
 };
-
 let audioCtx;
-const gains   = {};
-const sources = {};
-const buffers = {};
+const gains={}, sources={}, buffers={};
 
-// ── dots setup ─────────────────────────────────────
-function placeDots() {
-  const device = document.getElementById('device');
-  const R = device.offsetWidth / 2;
+// ── geometry helpers ──
+function polar(angDeg, r){
+  const a = angDeg * Math.PI/180;
+  return [500 + Math.cos(a)*r, 500 + Math.sin(a)*r];
+}
+function arcPath(angle0, angle1, r){
+  const [sx,sy] = polar(angle0, r);
+  const [ex,ey] = polar(angle1, r);
+  const large = (angle1-angle0) > 180 ? 1 : 0;
+  return `M ${sx.toFixed(2)} ${sy.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${ex.toFixed(2)} ${ey.toFixed(2)}`;
+}
 
-  STEMS.forEach(stem => {
-    DOT_ANGLES[stem].forEach((angleDeg, idx) => {
-      const rad = angleDeg * Math.PI / 180;
-      const x = R + Math.cos(rad) * R * DOT_RADIUS_FRAC;
-      const y = R + Math.sin(rad) * R * DOT_RADIUS_FRAC;
-      const dot = document.createElement('div');
-      dot.className = 'dot';
-      dot.dataset.stem = stem;
-      dot.dataset.idx  = idx;
-      dot.style.left   = x + 'px';
-      dot.style.top    = y + 'px';
-      dot.addEventListener('click', e => { e.stopPropagation(); toggleDot(stem, idx); });
-      device.appendChild(dot);
-    });
+// build volume arcs + place labels & dots
+function buildDevice(){
+  const NS='http://www.w3.org/2000/svg';
+  const g = document.getElementById('volArcs');
+  g.innerHTML='';
+  const VOL_R = 318, PAD = 7;
+
+  STEMS.forEach(stem=>{
+    const [a0,a1] = Q_RANGE[stem];
+    const s = a0+PAD, e = a1-PAD;
+    const track = document.createElementNS(NS,'path');
+    track.setAttribute('class','vol-track');
+    track.setAttribute('d', arcPath(s, e, VOL_R));
+    g.appendChild(track);
+
+    const fill = document.createElementNS(NS,'path');
+    fill.setAttribute('class','vol-fill');
+    fill.setAttribute('id','varc-'+stem);
+    fill.setAttribute('d', arcPath(s, e, VOL_R));
+    fill.setAttribute('pathLength','1');
+    g.appendChild(fill);
+    setVolArc(stem, state.volume[stem]);
   });
-}
 
-function toggleDot(stem, idx) {
-  if (!state.ready) return;
-  const prev = state.loopDot[stem];
-  const next = prev === idx ? -1 : idx;
-  state.loopDot[stem] = next;
-  document.querySelectorAll(`.dot[data-stem="${stem}"]`).forEach((d, i) => {
-    d.classList.toggle('active', i === next);
+  // labels — position near outer-corner of each quadrant
+  const wrap = document.getElementById('deviceWrap');
+  const W = wrap.offsetWidth;
+  const labelPos = {
+    drums:  [0.20, 0.21], vocals: [0.80, 0.21],
+    bass:   [0.20, 0.79], melody: [0.80, 0.79],
+  };
+  STEMS.forEach(stem=>{
+    const el = document.getElementById('lbl-'+stem);
+    const [fx,fy] = labelPos[stem];
+    el.style.left = (fx*W) + 'px';
+    el.style.top  = (fy*W) + 'px';
+    el.style.transform = 'translate(-50%,-50%)';
+    el.style.textAlign = 'center';
   });
-  if (state.playing) { const t = currentTime() % state.duration; startPlayback(t); }
-}
 
-// ── FFT / STFT / ISTFT ─────────────────────────────
-function hannWindow(N) {
-  const w = new Float32Array(N);
-  for (let i = 0; i < N; i++) w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
-  return w;
-}
-
-function fftIP(re, im) {
-  const N = re.length;
-  for (let i = 1, j = 0; i < N; i++) {
-    let bit = N >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) { [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
-  }
-  for (let len = 2; len <= N; len <<= 1) {
-    const a = -2*Math.PI/len, wr0=Math.cos(a), wi0=Math.sin(a);
-    for (let i = 0; i < N; i += len) {
-      let wr=1, wi=0;
-      for (let j = 0; j < len>>1; j++) {
-        const u=i+j, v=u+(len>>1);
-        const tRe=wr*re[v]-wi*im[v], tIm=wr*im[v]+wi*re[v];
-        re[v]=re[u]-tRe; im[v]=im[u]-tIm;
-        re[u]+=tRe;      im[u]+=tIm;
-        const nr=wr*wr0-wi*wi0; wi=wr*wi0+wi*wr0; wr=nr;
-      }
+  // dots — 4 per quadrant along arc at radius 410/500 of device
+  document.querySelectorAll('.dot').forEach(d=>d.remove());
+  const DOT_R = (410/500) * (W/2);
+  STEMS.forEach(stem=>{
+    const [a0,a1] = Q_RANGE[stem];
+    for(let i=0;i<4;i++){
+      const ang = a0 + (a1-a0)*(i+1)/5;
+      const a = ang*Math.PI/180;
+      const x = W/2 + Math.cos(a)*DOT_R;
+      const y = W/2 + Math.sin(a)*DOT_R;
+      const dot=document.createElement('div');
+      dot.className='dot'; dot.dataset.stem=stem; dot.dataset.idx=i;
+      dot.style.left=x+'px'; dot.style.top=y+'px';
+      if(state.loopDot[stem]===i) dot.classList.add('active');
+      dot.addEventListener('click',ev=>{ev.stopPropagation();toggleDot(stem,i);});
+      wrap.appendChild(dot);
     }
-  }
+  });
 }
 
-function ifftIP(re, im) {
-  for (let i=0;i<im.length;i++) im[i]=-im[i];
-  fftIP(re,im);
+function setVolArc(stem, v){
+  const el = document.getElementById('varc-'+stem);
+  if(el) el.setAttribute('stroke-dasharray', `${v.toFixed(4)} 1`);
+}
+
+function toggleDot(stem, idx){
+  if(!state.ready) return;
+  const next = state.loopDot[stem]===idx ? -1 : idx;
+  state.loopDot[stem]=next;
+  document.querySelectorAll(`.dot[data-stem="${stem}"]`).forEach((d,i)=>d.classList.toggle('active',i===next));
+  if(state.playing){const t=currentTime()%state.duration; startPlayback(t);}
+}
+
+// ── FFT ──
+function hann(N){const w=new Float32Array(N);for(let i=0;i<N;i++)w[i]=0.5-0.5*Math.cos(2*Math.PI*i/N);return w;}
+function fftIP(re,im){
   const N=re.length;
-  for (let i=0;i<N;i++){re[i]/=N; im[i]=-im[i]/N;}
+  for(let i=1,j=0;i<N;i++){let bit=N>>1;for(;j&bit;bit>>=1)j^=bit;j^=bit;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];}}
+  for(let len=2;len<=N;len<<=1){const a=-2*Math.PI/len,wr0=Math.cos(a),wi0=Math.sin(a);
+    for(let i=0;i<N;i+=len){let wr=1,wi=0;for(let j=0;j<len>>1;j++){const u=i+j,v=u+(len>>1);
+      const tRe=wr*re[v]-wi*im[v],tIm=wr*im[v]+wi*re[v];
+      re[v]=re[u]-tRe;im[v]=im[u]-tIm;re[u]+=tRe;im[u]+=tIm;
+      const nr=wr*wr0-wi*wi0;wi=wr*wi0+wi*wr0;wr=nr;}}}
 }
-
-function stft(sig, win) {
-  const F = Math.floor((sig.length - FFT_SIZE) / HOP_SIZE) + 1;
+function ifftIP(re,im){for(let i=0;i<im.length;i++)im[i]=-im[i];fftIP(re,im);const N=re.length;for(let i=0;i<N;i++){re[i]/=N;im[i]=-im[i]/N;}}
+function stft(sig,win){
+  const F=Math.floor((sig.length-FFT_SIZE)/HOP_SIZE)+1;
   const re=[],im=[],fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
-  for (let f=0;f<F;f++){
-    const s=f*HOP_SIZE;
+  for(let f=0;f<F;f++){const s=f*HOP_SIZE;
     for(let i=0;i<FFT_SIZE;i++){fr[i]=(s+i<sig.length?sig[s+i]:0)*win[i];fi[i]=0;}
     fftIP(fr,fi);
-    re.push(new Float32Array(fr.subarray(0,FREQ_BINS)));
-    im.push(new Float32Array(fi.subarray(0,FREQ_BINS)));
+    re.push(new Float32Array(fr.subarray(0,TOT_BINS)));
+    im.push(new Float32Array(fi.subarray(0,TOT_BINS)));
   }
   return {re,im,F};
 }
-
 function istft(re,im,F,win){
-  const len=(F-1)*HOP_SIZE+FFT_SIZE, out=new Float32Array(len), nrm=new Float32Array(len);
+  const len=(F-1)*HOP_SIZE+FFT_SIZE,out=new Float32Array(len),nrm=new Float32Array(len);
   const fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
   for(let f=0;f<F;f++){
-    for(let b=0;b<FREQ_BINS;b++){fr[b]=re[f][b];fi[b]=im[f][b];}
-    for(let b=1;b<FREQ_BINS-1;b++){fr[FFT_SIZE-b]=fr[b];fi[FFT_SIZE-b]=-fi[b];}
+    for(let b=0;b<TOT_BINS;b++){fr[b]=re[f][b];fi[b]=im[f][b];}
+    for(let b=1;b<TOT_BINS-1;b++){fr[FFT_SIZE-b]=fr[b];fi[FFT_SIZE-b]=-fi[b];}
     ifftIP(fr,fi);
     const s=f*HOP_SIZE;
     for(let i=0;i<FFT_SIZE;i++){out[s+i]+=fr[i]*win[i];nrm[s+i]+=win[i]*win[i];}
   }
-  for(let i=0;i<len;i++) if(nrm[i]>1e-8) out[i]/=nrm[i];
+  for(let i=0;i<len;i++)if(nrm[i]>1e-8)out[i]/=nrm[i];
   return out;
 }
 
-// ── HPSS ───────────────────────────────────────────
-function medFilter(spec, F, B, L, axis) {
-  const out=new Float32Array(F*B), col=new Float32Array(L), h=L>>1;
-  if(axis==='h'){
-    for(let b=0;b<B;b++) for(let f=0;f<F;f++){
-      for(let k=0;k<L;k++){const fi=f-h+k; col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}
-      col.sort(); out[f*B+b]=col[h];
-    }
-  } else {
-    for(let f=0;f<F;f++) for(let b=0;b<B;b++){
-      for(let k=0;k<L;k++){const bi=b-h+k; col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}
-      col.sort(); out[f*B+b]=col[h];
-    }
-  }
+// ── HPSS ──
+function medFilter(spec,F,B,L,axis){
+  const out=new Float32Array(F*B),col=new Float32Array(L),h=L>>1;
+  if(axis==='h'){for(let b=0;b<B;b++)for(let f=0;f<F;f++){for(let k=0;k<L;k++){const fi=f-h+k;col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}col.sort();out[f*B+b]=col[h];}}
+  else{for(let f=0;f<F;f++)for(let b=0;b<B;b++){for(let k=0;k<L;k++){const bi=b-h+k;col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}col.sort();out[f*B+b]=col[h];}}
   return out;
 }
-
 function hpss(re,im,F,B){
   const mag=new Float32Array(F*B);
-  for(let f=0;f<F;f++) for(let b=0;b<B;b++) mag[f*B+b]=re[f][b]**2+im[f][b]**2;
-  const H=medFilter(mag,F,B,31,'h'), P=medFilter(mag,F,B,31,'v');
-  const hRe=re.map(()=>new Float32Array(B)), hIm=im.map(()=>new Float32Array(B));
-  const pRe=re.map(()=>new Float32Array(B)), pIm=im.map(()=>new Float32Array(B));
-  for(let f=0;f<F;f++) for(let b=0;b<B;b++){
-    const h=H[f*B+b],p=P[f*B+b],d=h+p+1e-8;
-    hRe[f][b]=re[f][b]*h/d; hIm[f][b]=im[f][b]*h/d;
-    pRe[f][b]=re[f][b]*p/d; pIm[f][b]=im[f][b]*p/d;
-  }
+  for(let f=0;f<F;f++)for(let b=0;b<B;b++)mag[f*B+b]=re[f][b]**2+im[f][b]**2;
+  const H=medFilter(mag,F,B,17,'h'),P=medFilter(mag,F,B,17,'v');
+  const hRe=re.map(()=>new Float32Array(B)),hIm=im.map(()=>new Float32Array(B));
+  const pRe=re.map(()=>new Float32Array(B)),pIm=im.map(()=>new Float32Array(B));
+  for(let f=0;f<F;f++)for(let b=0;b<B;b++){const hh=H[f*B+b],pp=P[f*B+b],d=hh+pp+1e-8;
+    hRe[f][b]=re[f][b]*hh/d;hIm[f][b]=im[f][b]*hh/d;
+    pRe[f][b]=re[f][b]*pp/d;pIm[f][b]=im[f][b]*pp/d;}
   return {hRe,hIm,pRe,pIm};
 }
-
 function lowPass(re,im,F,B,hz){
   const cut=Math.round(hz/(SR/FFT_SIZE));
-  const lRe=re.map(r=>new Float32Array(r)), lIm=im.map(r=>new Float32Array(r));
-  const hRe=re.map(r=>new Float32Array(r)), hIm=im.map(r=>new Float32Array(r));
-  for(let f=0;f<F;f++){
-    for(let b=cut;b<B;b++){lRe[f][b]=0;lIm[f][b]=0;}
-    for(let b=0;b<cut;b++){hRe[f][b]=0;hIm[f][b]=0;}
-  }
+  const lRe=re.map(r=>new Float32Array(r)),lIm=im.map(r=>new Float32Array(r));
+  const hRe=re.map(r=>new Float32Array(r)),hIm=im.map(r=>new Float32Array(r));
+  for(let f=0;f<F;f++){for(let b=cut;b<B;b++){lRe[f][b]=0;lIm[f][b]=0;}for(let b=0;b<cut;b++){hRe[f][b]=0;hIm[f][b]=0;}}
   return {lRe,lIm,hRe,hIm};
 }
 
-// ── ONNX model ─────────────────────────────────────
-let vocSess=null, accSess=null;
-
-async function loadModels(onProg) {
+// ── ONNX ──
+let vSess=null, aSess=null;
+async function loadModels(onProg){
   ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/';
-  async function fetch_model(url, s0, s1) {
-    const resp=await fetch(url);
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const total=+resp.headers.get('content-length')||0;
-    const reader=resp.body.getReader(); const chunks=[]; let loaded=0;
-    while(true){
-      const {done,value}=await reader.read(); if(done) break;
-      chunks.push(value); loaded+=value.length;
-      if(total) onProg(s0+(s1-s0)*loaded/total,'Downloading…');
-    }
-    const buf=new Uint8Array(loaded); let off=0;
-    for(const c of chunks){buf.set(c,off);off+=c.length;}
-    return buf.buffer;
+  async function dl(url,s0,s1){
+    const r=await fetch(url); if(!r.ok)throw new Error('HTTP '+r.status);
+    const total=+r.headers.get('content-length')||0;
+    const rd=r.body.getReader();const ch=[];let ld=0;
+    while(true){const{done,value}=await rd.read();if(done)break;ch.push(value);ld+=value.length;if(total)onProg(s0+(s1-s0)*ld/total,'Downloading model…');}
+    const b=new Uint8Array(ld);let o=0;for(const c of ch){b.set(c,o);o+=c.length;}return b.buffer;
   }
   onProg(0,'Downloading vocals model (39 MB)…');
-  vocSess=await ort.InferenceSession.create(await fetch_model(HF_BASE+'vocals.onnx',0,45),{executionProviders:['wasm']});
+  vSess=await ort.InferenceSession.create(await dl(HF+'vocals.onnx',0,46),{executionProviders:['wasm']});
   onProg(50,'Downloading accompaniment model (39 MB)…');
-  accSess=await ort.InferenceSession.create(await fetch_model(HF_BASE+'accompaniment.onnx',50,95),{executionProviders:['wasm']});
-  onProg(100,'Ready');
+  aSess=await ort.InferenceSession.create(await dl(HF+'accompaniment.onnx',50,96),{executionProviders:['wasm']});
+  onProg(100,'Models ready');
 }
 
-async function runModel(sess,magL,magR,T,B){
-  const data=new Float32Array(T*B*2);
-  for(let t=0;t<T;t++) for(let b=0;b<B;b++){
-    data[t*B*2+b*2  ]=(magL[t]?magL[t][b]:0);
-    data[t*B*2+b*2+1]=(magR[t]?magR[t][b]:0);
-  }
-  const tensor=new ort.Tensor('float32',data,[1,T,B,2]);
-  const out=await sess.run({[sess.inputNames[0]]:tensor});
-  return out[sess.outputNames[0]].data;
-}
-
-// ── main pipeline ──────────────────────────────────
-async function separateAudio(arrayBuf, onProg) {
+// ── pipeline ──
+async function separateAudio(arrayBuf,onProg){
   onProg(0,'Decoding audio…');
-  audioCtx = audioCtx || new AudioContext({sampleRate:SR});
-  if(audioCtx.state==='suspended') await audioCtx.resume();
+  audioCtx=audioCtx||new AudioContext({sampleRate:SR});
+  if(audioCtx.state==='suspended')await audioCtx.resume();
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
-  const sigL=raw.getChannelData(0);
-  const sigR=nCh>1?raw.getChannelData(1):sigL;
+  const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
 
   onProg(5,'Computing spectrograms…');
-  const win=hannWindow(FFT_SIZE);
+  const win=hann(FFT_SIZE);
   const stL=stft(sigL,win), stR=stft(sigR,win);
-  const F=stL.F, B=FREQ_BINS;
+  const F=stL.F;
 
-  const magL=stL.re.map((r,f)=>r.map((v,b)=>Math.sqrt(v*v+stL.im[f][b]**2)));
-  const magR=stR.re.map((r,f)=>r.map((v,b)=>Math.sqrt(v*v+stR.im[f][b]**2)));
+  // magnitudes (low MODEL_BINS only needed for model)
+  const magL=stL.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stL.im[f][b]);return m;});
+  const magR=stR.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stR.im[f][b]);return m;});
 
-  let vmask, amask;
-  if(vocSess&&accSess){
-    onProg(12,'Running Spleeter…');
-    const segs=Math.ceil(F/SEG_FRAMES);
-    const vFlat=new Float32Array(F*B*2), aFlat=new Float32Array(F*B*2);
-    for(let sg=0;sg<segs;sg++){
-      const t0=sg*SEG_FRAMES,t1=Math.min(t0+SEG_FRAMES,F),T=t1-t0;
-      const vm=await runModel(vocSess,magL.slice(t0,t1),magR.slice(t0,t1),T,B);
-      const am=await runModel(accSess,magL.slice(t0,t1),magR.slice(t0,t1),T,B);
-      vFlat.set(vm.slice(0,T*B*2),t0*B*2);
-      aFlat.set(am.slice(0,T*B*2),t0*B*2);
-      onProg(12+55*(sg+1)/segs,`Separating… ${sg+1}/${segs}`);
+  const vMask=new Float32Array(F*MODEL_BINS);  // vocal soft mask per (frame,bin)
+
+  if(vSess&&aSess){
+    const nSeg=Math.ceil(F/SEG_FRAMES);
+    const segData=new Float32Array(2*SEG_FRAMES*MODEL_BINS);
+    for(let seg=0;seg<nSeg;seg++){
+      segData.fill(0);
+      for(let fr=0;fr<SEG_FRAMES;fr++){
+        const f=seg*SEG_FRAMES+fr; if(f>=F)break;
+        const baseL=(0*SEG_FRAMES+fr)*MODEL_BINS, baseR=(1*SEG_FRAMES+fr)*MODEL_BINS;
+        for(let b=0;b<MODEL_BINS;b++){segData[baseL+b]=magL[f][b];segData[baseR+b]=magR[f][b];}
+      }
+      const ve=(await vSess.run({x:new ort.Tensor('float32',segData,[2,1,SEG_FRAMES,MODEL_BINS])})).y.data;
+      const ae=(await aSess.run({x:new ort.Tensor('float32',segData.slice(),[2,1,SEG_FRAMES,MODEL_BINS])})).y.data;
+      for(let fr=0;fr<SEG_FRAMES;fr++){
+        const f=seg*SEG_FRAMES+fr; if(f>=F)break;
+        const bL=(0*SEG_FRAMES+fr)*MODEL_BINS, bR=(1*SEG_FRAMES+fr)*MODEL_BINS;
+        for(let b=0;b<MODEL_BINS;b++){
+          const vp=ve[bL+b]**2+ve[bR+b]**2, ap=ae[bL+b]**2+ae[bR+b]**2;
+          vMask[f*MODEL_BINS+b]=vp/(vp+ap+1e-10);
+        }
+      }
+      onProg(12+56*(seg+1)/nSeg,`Separating vocals… ${seg+1}/${nSeg}`);
     }
-    vmask=(f,b)=>vFlat[(f*B+b)*2];
-    amask=(f,b)=>aFlat[(f*B+b)*2];
   } else {
-    onProg(67,'DSP separation…');
-    vmask=(f,b)=>{const l=magL[f]?magL[f][b]:0,r=magR[f]?magR[f][b]:0; return Math.min(l,r)/(0.5*(l+r)+1e-8);};
-    amask=(f,b)=>1-vmask(f,b);
+    onProg(40,'DSP separation (model unavailable)…');
+    for(let f=0;f<F;f++)for(let b=0;b<MODEL_BINS;b++){
+      const l=magL[f][b],r=magR[f][b];
+      vMask[f*MODEL_BINS+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
+    }
   }
 
-  onProg(68,'Applying masks…');
-  const vRe=stL.re.map(()=>new Float32Array(B));
-  const vIm=stL.im.map(()=>new Float32Array(B));
-  const aRe=stL.re.map(()=>new Float32Array(B));
-  const aIm=stL.im.map(()=>new Float32Array(B));
-  for(let f=0;f<F;f++) for(let b=0;b<B;b++){
-    const vm=vmask(f,b),am=amask(f,b);
+  onProg(70,'Applying masks…');
+  const vRe=stL.re.map(()=>new Float32Array(TOT_BINS)), vIm=stL.im.map(()=>new Float32Array(TOT_BINS));
+  const aRe=stL.re.map(()=>new Float32Array(TOT_BINS)), aIm=stL.im.map(()=>new Float32Array(TOT_BINS));
+  for(let f=0;f<F;f++)for(let b=0;b<TOT_BINS;b++){
     const mRe=(stL.re[f][b]+stR.re[f][b])*0.5, mIm=(stL.im[f][b]+stR.im[f][b])*0.5;
+    const vm = b<MODEL_BINS ? vMask[f*MODEL_BINS+b] : 0;  // high bins -> accompaniment
     vRe[f][b]=mRe*vm; vIm[f][b]=mIm*vm;
-    aRe[f][b]=mRe*am; aIm[f][b]=mIm*am;
+    aRe[f][b]=mRe*(1-vm); aIm[f][b]=mIm*(1-vm);
   }
 
-  onProg(72,'HPSS…');
-  const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,B);
-  onProg(78,'Extracting bass…');
-  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,B,300);
+  onProg(74,'Splitting drums & melody (HPSS)…');
+  const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,TOT_BINS);
+  onProg(82,'Extracting bass…');
+  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,TOT_BINS,300);
 
-  onProg(83,'Synthesizing…');
+  onProg(86,'Synthesizing stems…');
   const dur=raw.duration;
-  function toAB(re,im){
-    const sig=istft(re,im,F,win);
-    const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);
-    ab.copyToChannel(sig.subarray(0,ab.length),0); return ab;
-  }
-  buffers.drums  = toAB(pRe,pIm);
-  buffers.vocals = toAB(vRe,vIm);
-  buffers.bass   = toAB(bsRe,bsIm);
-  buffers.melody = toAB(mlRe,mlIm);
-
-  onProg(95,'Drawing waveforms…');
+  const toAB=(re,im)=>{const sig=istft(re,im,F,win);const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
+  buffers.drums=toAB(pRe,pIm);  onProg(89,'…');
+  buffers.vocals=toAB(vRe,vIm); onProg(92,'…');
+  buffers.bass=toAB(bsRe,bsIm); onProg(95,'…');
+  buffers.melody=toAB(mlRe,mlIm);
+  onProg(98,'Drawing waveforms…');
   STEMS.forEach(s=>drawWave(s));
   onProg(100,'Done');
   return dur;
 }
 
-// ── waveform ───────────────────────────────────────
+// ── waveform ──
 function drawWave(stem){
   const ids={drums:'wDrums',vocals:'wVocals',bass:'wBass',melody:'wMelody'};
-  const c=document.getElementById(ids[stem]);
-  const ctx=c.getContext('2d');
-  c.width=c.offsetWidth||100; c.height=26;
-  ctx.clearRect(0,0,c.width,c.height);
+  const c=document.getElementById(ids[stem]); const ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  c.width=(c.offsetWidth||100)*dpr; c.height=26*dpr; ctx.scale(dpr,dpr);
+  const w=c.offsetWidth||100,h=26;
+  ctx.clearRect(0,0,w,h);
   const data=buffers[stem].getChannelData(0);
-  const step=Math.ceil(data.length/c.width);
+  const step=Math.ceil(data.length/w);
   const cs=getComputedStyle(document.documentElement);
-  ctx.fillStyle=cs.getPropertyValue('--vol-fill').trim()||'#333';
-  for(let x=0;x<c.width;x++){
-    let mx=0;
-    for(let i=0;i<step;i++){const v=Math.abs(data[x*step+i]||0);if(v>mx)mx=v;}
-    const h=mx*c.height;
-    ctx.fillRect(x,(c.height-h)/2,1,Math.max(1,h));
-  }
+  ctx.fillStyle=cs.getPropertyValue('--ink').trim()||'#333';
+  for(let x=0;x<w;x++){let mx=0;for(let i=0;i<step;i++){const v=Math.abs(data[x*step+i]||0);if(v>mx)mx=v;}const bh=Math.max(0.7,mx*h);ctx.fillRect(x,(h-bh)/2,1,bh);}
 }
 
-// ── playback ───────────────────────────────────────
-function buildGains(){
-  STEMS.forEach(s=>{
-    gains[s]=audioCtx.createGain();
-    gains[s].gain.value=state.muted[s]?0:state.volume[s];
-    gains[s].connect(audioCtx.destination);
-  });
-}
-
+// ── playback ──
+function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();gains[s].gain.value=state.muted[s]?0:state.volume[s];gains[s].connect(audioCtx.destination);});}
 function startPlayback(off=0){
-  stopPlayback();
-  buildGains();
-  state.startTime=audioCtx.currentTime-off;
-  state.playing=true;
-  STEMS.forEach(s=>{
-    const src=audioCtx.createBufferSource();
-    src.buffer=buffers[s];
-    src.connect(gains[s]);
+  stopPlayback(); buildGains();
+  state.startTime=audioCtx.currentTime-off; state.playing=true;
+  STEMS.forEach(s=>{const src=audioCtx.createBufferSource();src.buffer=buffers[s];src.connect(gains[s]);
     const d=state.loopDot[s];
-    if(d>=0){
-      const bl=(60/state.bpm)*4*LOOP_BARS[d];
-      src.loop=true; src.loopStart=0; src.loopEnd=Math.min(bl,buffers[s].duration);
-    }
-    src.start(0,off);
-    sources[s]=src;
-  });
+    if(d>=0){const bl=(60/state.bpm)*4*LOOP_BARS[d];src.loop=true;src.loopStart=0;src.loopEnd=Math.min(bl,buffers[s].duration);}
+    src.start(0,off);sources[s]=src;});
   document.getElementById('center').classList.add('playing');
-  document.getElementById('btnPlay').textContent='pause';
+  setGlyph('pause'); document.getElementById('btnPlay').textContent='pause';
+  document.getElementById('centerHint').textContent='playing';
   tick();
 }
-
 function stopPlayback(){
   if(state.raf){cancelAnimationFrame(state.raf);state.raf=null;}
   state.playing=false;
   STEMS.forEach(s=>{try{sources[s]&&sources[s].stop();}catch(e){}sources[s]=null;});
   STEMS.forEach(s=>{try{gains[s]&&gains[s].disconnect();}catch(e){}});
   document.getElementById('center').classList.remove('playing');
-  document.getElementById('btnPlay').textContent='play';
+  if(state.ready){setGlyph('play');document.getElementById('btnPlay').textContent='play';document.getElementById('centerHint').textContent='play';}
 }
-
-function currentTime(){
-  if(!state.playing) return state.pauseOffset;
-  return audioCtx.currentTime-state.startTime;
-}
-
-function tick(){
-  const t=currentTime(), dur=state.duration;
-  if(t>=dur&&state.playing){stopPlayback();state.pauseOffset=0;updateUI(0);return;}
-  updateUI(t);
-  state.raf=requestAnimationFrame(tick);
-}
-
+function currentTime(){return state.playing?audioCtx.currentTime-state.startTime:state.pauseOffset;}
+function tick(){const t=currentTime();if(t>=state.duration&&state.playing){stopPlayback();state.pauseOffset=0;updateUI(0);return;}updateUI(t);state.raf=requestAnimationFrame(tick);}
 function updateUI(t){
-  const pct=t/state.duration*100;
-  document.getElementById('timelineFill').style.width=pct+'%';
-  document.getElementById('timelineHead').style.left=pct+'%';
+  const pct=Math.max(0,Math.min(1,t/state.duration));
+  document.getElementById('timelineFill').style.width=(pct*100)+'%';
+  document.getElementById('timelineHead').style.left=(pct*100)+'%';
+  document.getElementById('ringFill').setAttribute('stroke-dashoffset', (1-pct).toFixed(4));
   document.getElementById('timeCur').textContent=fmt(t);
   document.getElementById('timeTot').textContent=fmt(state.duration);
 }
-
 function fmt(s){const m=Math.floor(s/60),ss=Math.floor(s%60);return`${m}:${ss.toString().padStart(2,'0')}`;}
 
-// ── volume control ─────────────────────────────────
-function setVolume(stem, v){
+// glyph morph
+function setGlyph(kind){
+  const g=document.getElementById('centerGlyph');
+  if(kind==='play')  g.innerHTML='<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  else if(kind==='pause') g.innerHTML='<svg viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>';
+  else g.innerHTML='<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 20h14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+
+// ── volume / mute ──
+function setVolume(stem,v){
   v=Math.max(0,Math.min(1,v));
   state.volume[stem]=v;
-  if(gains[stem]) gains[stem].gain.value=state.muted[stem]?0:v;
-  document.getElementById('vb-'+stem).style.height=(v*100)+'%';
+  if(gains[stem])gains[stem].gain.value=state.muted[stem]?0:v;
+  setVolArc(stem,v);
+  document.getElementById('pct-'+stem).textContent=Math.round(v*100);
   document.getElementById('svf-'+stem).style.width=(v*100)+'%';
 }
-
 function toggleMute(stem){
-  if(!state.ready) return;
+  if(!state.ready)return;
   state.muted[stem]=!state.muted[stem];
-  if(gains[stem]) gains[stem].gain.value=state.muted[stem]?0:state.volume[stem];
-  document.getElementById('q-'+stem).classList.toggle('muted',state.muted[stem]);
-  document.querySelectorAll(`.stem-mute-btn[data-stem="${stem}"]`).forEach(b=>{
-    b.classList.toggle('muted',state.muted[stem]);
-  });
+  if(gains[stem])gains[stem].gain.value=state.muted[stem]?0:state.volume[stem];
+  document.getElementById('lbl-'+stem).classList.toggle('muted',state.muted[stem]);
+  document.getElementById('varc-'+stem).classList.toggle('muted',state.muted[stem]);
+  document.querySelectorAll(`.stem-mute-btn[data-stem="${stem}"]`).forEach(b=>b.classList.toggle('muted',state.muted[stem]));
 }
 
-// ── quadrant drag interaction ──────────────────────
+// quadrant drag = volume, hold = mute
 STEMS.forEach(stem=>{
-  const q=document.getElementById('q-'+stem);
-  let dragY=null, dragV=null, moved=false, pressTimer=null;
-
-  function onStart(y){
-    dragY=y; dragV=state.volume[stem]; moved=false;
-    q.classList.add('pressing');
-    // hold-to-mute
-    pressTimer=setTimeout(()=>{
-      if(!moved) toggleMute(stem);
-      pressTimer=null;
-    },600);
-  }
-  function onMove(y){
-    if(dragY===null) return;
-    const dy=(dragY-y)/100;
-    if(Math.abs(dy)>0.02) moved=true;
-    if(moved){
-      clearTimeout(pressTimer); pressTimer=null;
-      setVolume(stem,dragV+dy);
-    }
-  }
-  function onEnd(){
-    if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
-    dragY=null; q.classList.remove('pressing');
-  }
-
-  q.addEventListener('mousedown', e=>{ if(e.target.classList.contains('dot')) return; onStart(e.clientY); });
-  window.addEventListener('mousemove', e=>{ if(dragY!==null) onMove(e.clientY); });
-  window.addEventListener('mouseup', e=>{ if(dragY!==null) onEnd(); });
-
-  q.addEventListener('touchstart', e=>{ if(e.target.classList.contains('dot')) return; onStart(e.touches[0].clientY); },{passive:true});
-  q.addEventListener('touchmove',  e=>{ onMove(e.touches[0].clientY); e.preventDefault(); },{passive:false});
-  q.addEventListener('touchend',   ()=>onEnd());
+  const q=document.querySelector(`.quadrant[data-stem="${stem}"]`);
+  let dy0=null,v0=null,moved=false,holdT=null;
+  function start(y){dy0=y;v0=state.volume[stem];moved=false;holdT=setTimeout(()=>{if(!moved)toggleMute(stem);holdT=null;},550);}
+  function move(y){if(dy0===null)return;const dv=(dy0-y)/110;if(Math.abs(dv)>0.02)moved=true;if(moved){clearTimeout(holdT);holdT=null;setVolume(stem,v0+dv);}}
+  function end(){if(holdT){clearTimeout(holdT);holdT=null;}dy0=null;}
+  q.addEventListener('mousedown',e=>{if(e.target.classList.contains('dot'))return;start(e.clientY);});
+  window.addEventListener('mousemove',e=>{if(dy0!==null)move(e.clientY);});
+  window.addEventListener('mouseup',()=>{if(dy0!==null)end();});
+  q.addEventListener('touchstart',e=>{if(e.target.classList.contains('dot'))return;start(e.touches[0].clientY);},{passive:true});
+  q.addEventListener('touchmove',e=>{if(dy0!==null){move(e.touches[0].clientY);e.preventDefault();}},{passive:false});
+  q.addEventListener('touchend',()=>end());
 });
 
-// ── stem panel volume sliders ──────────────────────
-document.querySelectorAll('.stem-vol-wrap').forEach(sl=>{
-  sl.addEventListener('click',e=>{
-    const r=sl.getBoundingClientRect();
-    setVolume(sl.dataset.stem,Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)));
-  });
-});
+document.querySelectorAll('.stem-vol-wrap').forEach(sl=>sl.addEventListener('click',e=>{const r=sl.getBoundingClientRect();setVolume(sl.dataset.stem,(e.clientX-r.left)/r.width);}));
+document.querySelectorAll('.stem-mute-btn').forEach(b=>b.addEventListener('click',()=>toggleMute(b.dataset.stem)));
 
-// ── mute buttons ──────────────────────────────────
-document.querySelectorAll('.stem-mute-btn').forEach(b=>{
-  b.addEventListener('click',()=>toggleMute(b.dataset.stem));
-});
-
-// ── transport ─────────────────────────────────────
+// transport
 document.getElementById('btnPlay').addEventListener('click',()=>{
-  if(!state.ready) return;
-  if(!audioCtx){audioCtx=new AudioContext({sampleRate:SR});}
-  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(!state.ready)return;
+  if(!audioCtx)audioCtx=new AudioContext({sampleRate:SR});
+  if(audioCtx.state==='suspended')audioCtx.resume();
   if(state.playing){state.pauseOffset=currentTime();stopPlayback();}
   else startPlayback(state.pauseOffset);
 });
-document.getElementById('btnRestart').addEventListener('click',()=>{
-  if(!state.ready) return;
-  state.pauseOffset=0;
-  if(state.playing) startPlayback(0); else updateUI(0);
-});
-document.getElementById('btnStop').addEventListener('click',()=>{
-  if(!state.ready) return;
-  stopPlayback(); state.pauseOffset=0; updateUI(0);
-});
-document.getElementById('timeline').addEventListener('click',e=>{
-  if(!state.ready) return;
-  const r=document.getElementById('timeline').getBoundingClientRect();
-  const t=(e.clientX-r.left)/r.width*state.duration;
-  state.pauseOffset=t;
-  if(state.playing) startPlayback(t); else updateUI(t);
-});
+document.getElementById('btnRestart').addEventListener('click',()=>{if(!state.ready)return;state.pauseOffset=0;if(state.playing)startPlayback(0);else updateUI(0);});
+document.getElementById('btnStop').addEventListener('click',()=>{if(!state.ready)return;stopPlayback();state.pauseOffset=0;updateUI(0);});
+document.getElementById('timeline').addEventListener('click',e=>{if(!state.ready)return;const r=e.currentTarget.getBoundingClientRect();const t=(e.clientX-r.left)/r.width*state.duration;state.pauseOffset=t;if(state.playing)startPlayback(t);else updateUI(t);});
+document.getElementById('center').addEventListener('click',()=>{if(state.ready)document.getElementById('btnPlay').click();else document.getElementById('fileInput').click();});
 
-// center click
-document.getElementById('center').addEventListener('click',()=>{
-  if(state.ready) document.getElementById('btnPlay').click();
-  else document.getElementById('fileInput').click();
-});
+// overlay
+function showOverlay(t,m,p){const o=document.getElementById('overlay');o.classList.add('active');document.getElementById('ovTitle').textContent=t;document.getElementById('ovMsg').textContent=m;document.getElementById('progFill').style.width=p+'%';}
+function hideOverlay(){document.getElementById('overlay').classList.remove('active');}
+function prog(p,m){document.getElementById('progFill').style.width=p+'%';if(m)document.getElementById('ovMsg').textContent=m;}
 
-// ── overlay helpers ────────────────────────────────
-function showOverlay(title,msg,pct){
-  const ov=document.getElementById('overlay');
-  ov.classList.add('active');
-  document.getElementById('ovTitle').textContent=title;
-  document.getElementById('ovMsg').textContent=msg;
-  document.getElementById('progFill').style.width=pct+'%';
-}
-function hideOverlay(){ document.getElementById('overlay').classList.remove('active'); }
-function prog(pct,msg){
-  document.getElementById('progFill').style.width=pct+'%';
-  document.getElementById('ovMsg').textContent=msg;
-}
-
-// ── file handling ─────────────────────────────────
+// file handling
 async function handleFile(file){
-  if(!file||!file.type.startsWith('audio/')){alert('Drop an audio file');return;}
-  stopPlayback(); state.ready=false; state.pauseOffset=0;
+  if(!file||!file.type.startsWith('audio/')){alert('Please drop an audio file (mp3, wav, flac…)');return;}
+  stopPlayback();state.ready=false;state.pauseOffset=0;
   document.getElementById('filename').textContent=file.name;
-  STEMS.forEach(s=>{
-    state.loopDot[s]=-1;
-    document.querySelectorAll(`.dot[data-stem="${s}"]`).forEach(d=>d.classList.remove('active'));
-  });
-
-  try {
-    if(!vocSess||!accSess){
+  STEMS.forEach(s=>{state.loopDot[s]=-1;document.querySelectorAll(`.dot[data-stem="${s}"]`).forEach(d=>d.classList.remove('active'));});
+  try{
+    if(!vSess||!aSess){
       showOverlay('Loading Model','Downloading Spleeter (~80 MB). Cached after first use.',0);
-      try {
-        await loadModels((pct,msg)=>{prog(pct,msg);});
-      } catch(e){
-        console.warn('Model load failed, using DSP:',e);
-        vocSess=null; accSess=null;
-      }
+      try{await loadModels((p,m)=>prog(p,m));}
+      catch(e){console.warn('Model load failed, DSP fallback:',e);vSess=null;aSess=null;}
     }
     showOverlay('Separating Stems','Processing…',0);
-    const dur=await separateAudio(await file.arrayBuffer(),(pct,msg)=>prog(pct,msg));
-    state.duration=dur; state.ready=true;
-    hideOverlay();
+    const dur=await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
+    state.duration=dur;state.ready=true;hideOverlay();
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     document.getElementById('waveRow').classList.add('active');
-    document.getElementById('centerIcon').textContent='▷';
-    document.getElementById('centerHint').textContent='play';
+    setGlyph('play');document.getElementById('centerHint').textContent='play';
     updateUI(0);
-  } catch(e){
-    console.error(e); hideOverlay(); alert('Error: '+e.message);
-  }
+  }catch(e){console.error(e);hideOverlay();alert('Error processing file: '+e.message);}
 }
+document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
-document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0]) handleFile(e.target.files[0]);});
+// drag & drop
+const center=document.getElementById('center'), device=document.getElementById('device');
+['dragenter','dragover'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.add('drag-over');device.classList.add('drag-active');}));
+['dragleave','drop'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.remove('drag-over');device.classList.remove('drag-active');if(ev==='drop'&&e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);}));
 
-// drag-and-drop
-const wrap=document.getElementById('deviceWrap');
-const center=document.getElementById('center');
-const device=document.getElementById('device');
-['dragenter','dragover'].forEach(ev=>
-  document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.add('drag-over');device.classList.add('drag-active');})
-);
-['dragleave','drop'].forEach(ev=>
-  document.body.addEventListener(ev,e=>{
-    e.preventDefault();
-    center.classList.remove('drag-over');device.classList.remove('drag-active');
-    if(ev==='drop'&&e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-  })
-);
-
-// ── init ──────────────────────────────────────────
-window.addEventListener('load',()=>{
-  placeDots();
-  // init vol bars to reflect initial volume
-  STEMS.forEach(s=>{
-    document.getElementById('vb-'+s).style.height=(state.volume[s]*100)+'%';
-    document.getElementById('svf-'+s).style.width=(state.volume[s]*100)+'%';
-  });
-});
-
-window.addEventListener('resize',()=>{
-  // redraw dots on resize
-  document.querySelectorAll('.dot').forEach(d=>d.remove());
-  placeDots();
-  if(state.ready) STEMS.forEach(s=>drawWave(s));
-});
+// init
+window.addEventListener('load',buildDevice);
+let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{buildDevice();if(state.ready)STEMS.forEach(s=>drawWave(s));},150);});
 </script>
 </body>
 </html>
