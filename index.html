@@ -585,6 +585,7 @@ const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
 const SEG_FRAMES = 512;               // spleeter time-frames per segment
 const LOOP_BARS = [1, 2, 4, 8];
 const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
+const MODEL_LOAD_TIMEOUT_MS = 18_000;
 const SAMPLE_TRACKS = [
   {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
   {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
@@ -841,28 +842,34 @@ function isBetterModelReady(){
 }
 
 async function dl(url, onProg, s0, s1){
-  const r = await fetch(url);
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const total = +r.headers.get('content-length') || 0;
-  const body = r.body;
-  if (!body || typeof body.getReader !== 'function') {
-    const blob = await r.arrayBuffer();
-    return blob;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MODEL_LOAD_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, { signal: controller.signal });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const total = +r.headers.get('content-length') || 0;
+    const body = r.body;
+    if (!body || typeof body.getReader !== 'function') {
+      const blob = await r.arrayBuffer();
+      return blob;
+    }
+    const rd = body.getReader();
+    const ch = [];
+    let ld = 0;
+    while(true){
+      const { done, value } = await rd.read();
+      if (done) break;
+      ch.push(value);
+      ld += value.length;
+      if (onProg && total) onProg(s0 + (s1 - s0) * (ld / total), 'Downloading model…');
+    }
+    const b = new Uint8Array(ld);
+    let o = 0;
+    for (const c of ch){ b.set(c, o); o += c.length; }
+    return b.buffer;
+  } finally {
+    clearTimeout(timeout);
   }
-  const rd = body.getReader();
-  const ch = [];
-  let ld = 0;
-  while(true){
-    const { done, value } = await rd.read();
-    if (done) break;
-    ch.push(value);
-    ld += value.length;
-    if (onProg && total) onProg(s0 + (s1 - s0) * (ld / total), 'Downloading model…');
-  }
-  const b = new Uint8Array(ld);
-  let o = 0;
-  for (const c of ch){ b.set(c, o); o += c.length; }
-  return b.buffer;
 }
 
 async function loadBetterModel(onProg){
@@ -888,6 +895,9 @@ async function loadBetterModel(onProg){
       bench.better.loadMs = performance.now() - loadStart;
       setBenchline();
     } catch (err){
+      if (err?.name === 'AbortError') {
+        throw new Error(`Model download timed out after ${Math.round(MODEL_LOAD_TIMEOUT_MS / 1000)}s`);
+      }
       betterVocalsSession = null;
       betterAccompanimentSession = null;
       bench.better.loadMs = 0;
@@ -1363,7 +1373,11 @@ async function handleFile(file){
         await ensureModelReady('better', (p,m) => prog(p,m));
       } catch (e) {
         console.warn('Model load failed, using fast mode:', e);
-        showOverlay('Model fallback','ML model failed to load; using fast mode',5);
+        const errMsg = getErrorMessage(e);
+        const fallbackMsg = /timed out/i.test(errMsg)
+          ? `ML model failed to load (${errMsg}); using fast mode`
+          : 'ML model failed to load; using fast mode';
+        showOverlay('Model fallback',fallbackMsg,5);
       }
     }
 
