@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stem Player</title>
+<meta name="description" content="Stem Player is a browser-only instrument for splitting tracks into drums, vocals, bass, and melody stems, then looping by musical bars.">
+<meta name="keywords" content="stem player, stem separation, vocal isolation, drums split, browser audio tool, loop playback, music remix">
+<meta name="author" content="Eric Spencer">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Stem Player">
+<meta property="og:description" content="Browser-based stem separation and bar-based looping for drums, bass, vocals, and melody.">
+<meta property="og:url" content="https://github.com/EricSpencer00/stem-player">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Stem Player">
+<meta name="twitter:description" content="Browser-based stem separation and bar-based looping for drums, bass, vocals, and melody.">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://huggingface.co" crossorigin>
+<link rel="dns-prefetch" href="https://huggingface.co">
+<link rel="canonical" href="https://github.com/EricSpencer00/stem-player">
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
 <style>
 :root {
@@ -525,8 +539,10 @@ footer a:hover { border-color: var(--ink-faint); }
 </div>
 
 <footer>
-  UI inspired by <a href="https://krystalgamer.github.io/stem-player-emulator/" target="_blank" rel="noopener">krystalgamer</a>
-  &nbsp;·&nbsp; ML: Spleeter / Deezer &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
+  Crafted by <a href="https://ericspencer.us" target="_blank" rel="noopener">Eric Spencer</a>
+  · Open-source at <a href="https://github.com/EricSpencer00/stem-player" target="_blank" rel="noopener">github.com/EricSpencer00/stem-player</a>
+  · UI inspired by <a href="https://krystalgamer.github.io/stem-player-emulator/" target="_blank" rel="noopener">krystalgamer</a>
+  · ML: Spleeter / Deezer · HPSS · ONNX Runtime Web
 </footer>
 
 <script>
@@ -539,6 +555,17 @@ const SR        = 44100;
 const TOT_BINS  = FFT_SIZE / 2 + 1;   // 2049
 const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
 const SEG_FRAMES = 512;               // spleeter time-frames per segment
+const MODEL_CACHE_NAME = 'stem-player-onnx-models-v1';
+const BPM_MIN = 60;
+const BPM_MAX = 240;
+const BPM_FALLBACK = 120;
+const MOBILE_DOWNLOAD = /Mobi|Android|iPhone|iPad|iPod|IEMobile|Windows Phone/i.test(navigator.userAgent || '') ||
+  (() => {
+    const c = navigator.connection;
+    if(!c) return false;
+    const t = (c.effectiveType || '').toLowerCase();
+    return !!c.saveData || t === 'slow-2g' || t === '2g';
+  })();
 const LOOP_BARS = [1, 2, 4, 8];
 const SAMPLE_TRACKS = [
   {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
@@ -547,6 +574,10 @@ const SAMPLE_TRACKS = [
 ];
 const STEMS = ['drums','vocals','bass','melody'];
 const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
+const MODEL_ENDPOINTS = {
+  vocals: HF + 'vocals.onnx',
+  accompaniment: HF + 'accompaniment.onnx',
+};
 
 // quadrant angular ranges (screen deg, 0=east, 90=south, clockwise)
 const Q_RANGE = {
@@ -565,7 +596,10 @@ const state = {
   loopStart:{drums:0,vocals:0,bass:0,melody:0},
   loopEnd:{drums:0,vocals:0,bass:0,melody:0},
   loopBase:0,
-  pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
+  beatOffset:0,
+  tempoConfidence:0,
+  pauseOffset:0, startTime:0, duration:0, bpm:BPM_FALLBACK, raf:null,
+  isProcessing:false, dirtyProgress:false,
 };
 let audioCtx;
 const gains={}, sources={}, buffers={};
@@ -613,24 +647,137 @@ function setVolArc(stem, v){
   if(el) el.setAttribute('stroke-dasharray', `${v.toFixed(4)} 1`);
 }
 
+function markDirtyProgress(){
+  state.dirtyProgress = true;
+}
+
+function clamp(value, min, max){
+  return Math.min(max, Math.max(min, value));
+}
+
+function estimateTempo(signal, sampleRate){
+  if(!signal || !signal.length || !sampleRate || sampleRate <= 0){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+  const minSamples = sampleRate * 5;
+  if(signal.length < minSamples){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+
+  const frame = Math.max(1, Math.floor(sampleRate * 0.03));
+  const hop = Math.max(1, Math.floor(sampleRate * 0.01));
+  const frames = Math.floor((signal.length - frame) / hop);
+  if(frames < 8){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+
+  const onset = new Float32Array(frames);
+  let sm = 0;
+  let prevSm = 0;
+  let total = 0;
+  for(let i=0; i<frames; i++){
+    let rms = 0;
+    const base = i * hop;
+    for(let j=0; j<frame; j++){
+      const sample = signal[base + j] || 0;
+      rms += sample * sample;
+    }
+    rms = Math.sqrt(rms / frame);
+    sm = sm * 0.84 + rms * 0.16;
+    const v = sm - prevSm;
+    onset[i] = v > 0 ? v : 0;
+    prevSm = sm;
+    total += onset[i];
+  }
+  if(total === 0){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+
+  let mean = 0;
+  for(let i=0; i<frames; i++) mean += onset[i];
+  mean /= frames;
+
+  let energy = 0;
+  for(let i=0; i<frames; i++){
+    const d = onset[i] - mean;
+    energy += d * d;
+  }
+  if(energy < 1e-10){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+
+  const hopSec = hop / sampleRate;
+  const minLag = Math.max(1, Math.round((60 / BPM_MAX) / hopSec));
+  const maxLag = Math.max(minLag + 1, Math.floor((60 / BPM_MIN) / hopSec));
+  const capLag = Math.min(maxLag, frames - 2);
+  if(minLag >= capLag){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+
+  let bestLag = -1;
+  let bestScore = -Infinity;
+  for(let lag = minLag; lag <= capLag; lag++){
+    let cross = 0;
+    let a2 = 0;
+    let b2 = 0;
+    for(let i = lag; i < frames; i++){
+      const a = onset[i] - mean;
+      const b = onset[i - lag] - mean;
+      cross += a * b;
+      a2 += a * a;
+      b2 += b * b;
+    }
+    const score = cross / Math.sqrt((a2 * b2) + 1e-12);
+    if(score > bestScore){
+      bestScore = score;
+      bestLag = lag;
+    }
+  }
+
+  if(!Number.isFinite(bestScore) || !Number.isFinite(bestLag) || bestLag <= 0 || bestScore < 0.07){
+    return {bpm:BPM_FALLBACK, confidence:0, offset:0};
+  }
+
+  let bestOffset = 0;
+  let bestOffsetScore = -Infinity;
+  for(let o = 0; o < bestLag; o++){
+    let score = 0;
+    for(let i = o; i < frames; i += bestLag){
+      score += onset[i];
+    }
+    if(score > bestOffsetScore){
+      bestOffsetScore = score;
+      bestOffset = o;
+    }
+  }
+
+  let bpm = 60 / (bestLag * hopSec);
+  while(bpm < BPM_MIN) bpm *= 2;
+  while(bpm > BPM_MAX) bpm /= 2;
+  return {
+    bpm: Math.round(clamp(bpm, BPM_MIN, BPM_MAX)),
+    confidence: bestScore,
+    offset: bestOffset * hopSec,
+  };
+}
+
 function measureLength(){
-  return (60/state.bpm) * 4;
+  return (60 / clamp(state.bpm, BPM_MIN, BPM_MAX)) * 4;
 }
 
 function snapLoopStart(currentSec){
   const len = measureLength();
   if(!len || !Number.isFinite(currentSec) || !state.duration) return 0;
-  const boundary = Math.floor(currentSec / len) * len;
-  const nextBoundary = boundary + len;
-  const epsilon = 0.03;
-
-  if (Math.abs(currentSec - boundary) < epsilon) {
-    return boundary;
-  }
-  return nextBoundary;
+  const adjusted = Math.max(0, currentSec - state.beatOffset);
+  const floor = state.beatOffset + Math.floor(adjusted / len) * len;
+  const ceil = floor + len;
+  const toFloor = currentSec - floor;
+  const toCeil = ceil - currentSec;
+  return (toFloor <= toCeil) ? floor : ceil;
 }
 
 function setLoop(stem, idx){
+  markDirtyProgress();
   state.loopDot[stem]=idx;
   const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
   buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
@@ -724,19 +871,83 @@ function lowPass(re,im,F,B,hz){
 
 // ── ONNX ──
 let vSess=null, aSess=null;
+function concatTyped(chunks, total){
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for(const chunk of chunks){
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out.buffer;
+}
+async function cacheAwareFetch(url, s0, s1, label, onProg){
+  let modelCache = null;
+  const useCache = !MOBILE_DOWNLOAD && ('caches' in window);
+  if(useCache){
+    try{
+      modelCache = await caches.open(MODEL_CACHE_NAME);
+      const cached = await modelCache.match(url);
+      if(cached){
+        onProg(s1, `${label} model loaded from cache`);
+        return cached.arrayBuffer();
+      }
+    }catch(err){
+      console.warn('Model cache lookup failed', label, err);
+      modelCache = null;
+    }
+  }
+
+  onProg(s0, `Downloading ${label} model…`);
+
+  const downloadResp = await fetch(url, {cache: 'default'});
+  if(!downloadResp.ok) throw new Error(`HTTP ${downloadResp.status}`);
+  const cacheResp = downloadResp.clone();
+  const total = +downloadResp.headers.get('content-length') || 0;
+  const canStream = !MOBILE_DOWNLOAD && total > 0 && downloadResp.body && typeof downloadResp.body.getReader === 'function';
+
+  let buf;
+  if(canStream){
+    const reader = downloadResp.body.getReader();
+    const chunks = [];
+    let loaded = 0;
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      chunks.push(value);
+      loaded += value.length;
+      onProg(s0 + (s1 - s0) * (loaded / total), `Downloading ${label} model… ${Math.round((loaded / total) * 100)}%`);
+    }
+    buf = concatTyped(chunks, total);
+  } else {
+    buf = await downloadResp.arrayBuffer();
+    onProg(s1, `Downloading ${label} model…`);
+  }
+
+  if(modelCache){
+    try{
+      await modelCache.put(url, cacheResp);
+    }catch(err){
+      console.warn('Model cache write failed', label, err);
+    }
+  }
+  return buf;
+}
 async function loadModels(onProg){
   ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/';
-  async function dl(url,s0,s1){
-    const r=await fetch(url); if(!r.ok)throw new Error('HTTP '+r.status);
-    const total=+r.headers.get('content-length')||0;
-    const rd=r.body.getReader();const ch=[];let ld=0;
-    while(true){const{done,value}=await rd.read();if(done)break;ch.push(value);ld+=value.length;if(total)onProg(s0+(s1-s0)*ld/total,'Downloading model…');}
-    const b=new Uint8Array(ld);let o=0;for(const c of ch){b.set(c,o);o+=c.length;}return b.buffer;
+  let vocalsBuf, accompanimentBuf;
+  if(MOBILE_DOWNLOAD){
+    vocalsBuf = await cacheAwareFetch(MODEL_ENDPOINTS.vocals, 0, 48, 'vocals', onProg);
+    accompanimentBuf = await cacheAwareFetch(MODEL_ENDPOINTS.accompaniment, 52, 100, 'accompaniment', onProg);
+  }else{
+    [vocalsBuf, accompanimentBuf] = await Promise.all([
+      cacheAwareFetch(MODEL_ENDPOINTS.vocals, 0, 48, 'vocals', onProg),
+      cacheAwareFetch(MODEL_ENDPOINTS.accompaniment, 52, 100, 'accompaniment', onProg),
+    ]);
   }
-  onProg(0,'Downloading vocals model (39 MB)…');
-  vSess=await ort.InferenceSession.create(await dl(HF+'vocals.onnx',0,46),{executionProviders:['wasm']});
-  onProg(50,'Downloading accompaniment model (39 MB)…');
-  aSess=await ort.InferenceSession.create(await dl(HF+'accompaniment.onnx',50,96),{executionProviders:['wasm']});
+  onProg(48,'Initializing vocals model…');
+  vSess=await ort.InferenceSession.create(vocalsBuf,{executionProviders:['wasm']});
+  onProg(50,'Initializing accompaniment model…');
+  aSess=await ort.InferenceSession.create(accompanimentBuf,{executionProviders:['wasm']});
   onProg(100,'Models ready');
 }
 
@@ -748,6 +959,15 @@ async function separateAudio(arrayBuf,onProg){
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
+  const tempo = estimateTempo(sigL, raw.sampleRate);
+  let bpmSignal=sigL;
+  if(nCh>1){
+    bpmSignal=new Float32Array(sigL.length);
+    for(let i=0;i<sigL.length;i++) bpmSignal[i]=(sigL[i]+sigR[i])*0.5;
+  }
+  state.bpm = tempo.bpm || BPM_FALLBACK;
+  state.tempoConfidence = tempo.confidence;
+  state.beatOffset = clamp(tempo.offset || 0, 0, Math.max(0, measureLength() - 1e-6));
 
   onProg(5,'Computing spectrograms…');
   const win=hann(FFT_SIZE);
@@ -893,6 +1113,7 @@ function setGlyph(kind){
 
 // ── volume / mute ──
 function setVolume(stem,v,fromSlider){
+  markDirtyProgress();
   v=Math.max(0,Math.min(1,v));
   state.volume[stem]=v;
   if(gains[stem])gains[stem].gain.value=state.muted[stem]?0:v;
@@ -901,6 +1122,7 @@ function setVolume(stem,v,fromSlider){
   if(!fromSlider){const sl=document.getElementById('vol-'+stem);if(sl)sl.value=Math.round(v*100);}
 }
 function setMute(stem, muted){
+  markDirtyProgress();
   state.muted[stem]=muted;
   if(gains[stem])gains[stem].gain.value=muted?0:state.volume[stem];
   document.getElementById('lbl-'+stem).classList.toggle('muted',muted);
@@ -1054,8 +1276,15 @@ async function handleFile(file){
     alert('Please drop an audio file (mp3, wav, flac, etc.).');
     return;
   }
-  stopPlayback();state.ready=false;state.pauseOffset=0;
+  stopPlayback();
+  state.ready=false;
+  state.pauseOffset=0;
+  state.isProcessing=true;
+  state.dirtyProgress=false;
+  state.tempoConfidence=0;
+  state.beatOffset=0;
   document.getElementById('filename').textContent=file.name;
+  state.bpm=BPM_FALLBACK;
   STEMS.forEach(s=>{
     state.loopDot[s]=-1;
   state.loopStart[s]=0;
@@ -1072,26 +1301,69 @@ async function handleFile(file){
     }
     showOverlay('Separating Stems','Processing…',0);
     const dur=await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
-    state.duration=dur;state.ready=true;hideOverlay();
+    state.duration=dur;state.ready=true;state.isProcessing=false;state.dirtyProgress=true;hideOverlay();
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     document.getElementById('waveRow').classList.add('active');
     setGlyph('play');document.getElementById('centerHint').textContent='play';
     document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
     updateUI(0);
-  }catch(e){console.error(e);hideOverlay();alert('Error processing file: '+e.message);}
+  }catch(e){console.error(e);state.isProcessing=false;hideOverlay();alert('Error processing file: '+e.message);}
 }
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
 // drag & drop
 const center=document.getElementById('center'), device=document.getElementById('device');
-['dragenter','dragover'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.add('drag-over');device.classList.add('drag-active');}));
-['dragleave','drop'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.remove('drag-over');device.classList.remove('drag-active');if(ev==='drop'&&e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);}));
+const dragTargets = [document.body, center, device];
+function stopDragMotion(event){
+  event.preventDefault();
+  event.stopPropagation();
+}
+function setDragActive(active){
+  center.classList.toggle('drag-over', active);
+  device.classList.toggle('drag-active', active);
+}
+function getFileFromDrop(event){
+  const dt = event.dataTransfer;
+  if(!dt) return null;
+  if(dt.items && dt.items.length){
+    for(const item of dt.items){
+      if(item && item.kind === 'file'){
+        return item.getAsFile();
+      }
+    }
+  }
+  if(dt.files && dt.files.length){
+    return dt.files[0];
+  }
+  return null;
+}
+dragTargets.forEach(target=>{
+  target.addEventListener('dragenter', (event)=>{stopDragMotion(event); setDragActive(true);});
+  target.addEventListener('dragover', (event)=>{stopDragMotion(event); setDragActive(true);});
+  target.addEventListener('dragleave', (event)=>{stopDragMotion(event); if(target === document.body) setDragActive(false);});
+  target.addEventListener('drop', (event)=>{
+    stopDragMotion(event);
+    setDragActive(false);
+    const file = getFileFromDrop(event);
+    if(file) handleFile(file);
+  });
+});
 
 // init
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically
 buildSampleButtons();
 let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(state.ready)STEMS.forEach(s=>drawWave(s));},150);});
+function warnIfUnsaved(event) {
+  if(!state.dirtyProgress && !state.isProcessing && !state.playing) return;
+  const warning = 'Are you sure you want to leave? Unsaved stem setup and loop edits will be lost.';
+  event.preventDefault();
+  event.returnValue = warning;
+  return warning;
+}
+window.addEventListener('beforeunload', (event) => warnIfUnsaved(event));
+window.addEventListener('pagehide', (event) => warnIfUnsaved(event));
+
 </script>
 </body>
 </html>
