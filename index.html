@@ -340,14 +340,21 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 .stem-mute-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
 .stem-mute-btn[aria-pressed="true"] { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
 
-/* loop select */
-.loop-sel {
+/* loop buttons */
+.loop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.loop-btn {
   font-family: inherit; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--ink-soft); background: none; border: 1px solid var(--track); border-radius: 999px;
   min-height: 34px; padding: 0 8px; cursor: pointer; appearance: none; text-align: center;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.loop-sel.on { color: var(--amber); border-color: var(--amber); }
-.loop-sel:hover { border-color: var(--ink-faint); }
+.loop-btn.on { color: var(--amber); border-color: var(--amber); }
+.loop-btn:hover { border-color: var(--ink-faint); }
 
 /* global focus ring */
 :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
@@ -372,11 +379,30 @@ footer a { color: inherit; text-decoration: none; border-bottom: 1px solid trans
 footer a:hover { border-color: var(--ink-faint); }
 
 #fileInput { display: none; }
+
+.sample-rows {
+  width: min(480px, 88vw);
+  margin: 0 auto 10px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.sample-rows button {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--ink-soft);
+  background: none;
+  border: 1px solid var(--track);
+  border-radius: 999px;
+  padding: 8px;
+}
+.sample-rows button:hover { border-color: var(--ink-faint); }
 </style>
 </head>
 <body>
 
-<input type="file" id="fileInput" accept="audio/*">
+<input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac">
 
 <div class="wordmark"><div class="rule"></div><span>Stem Player</span><div class="rule"></div></div>
 
@@ -421,6 +447,7 @@ footer a:hover { border-color: var(--ink-faint); }
 </div>
 
 <p class="hint" id="hint">Drop a track to begin</p>
+<div class="sample-rows" id="sampleRows"></div>
 
 <div class="wave-row" id="waveRow">
   <div class="wave-cell"><div class="wave-cap">Drums</div><canvas class="wave" id="wDrums"></canvas></div>
@@ -449,25 +476,45 @@ footer a:hover { border-color: var(--ink-faint); }
     <label class="stem-name" for="vol-drums">Drums</label>
     <input class="vol" type="range" id="vol-drums" data-stem="drums" min="0" max="100" value="80" aria-label="Drums volume">
     <button class="stem-mute-btn" data-stem="drums" aria-pressed="false" aria-label="Mute drums">mute</button>
-    <div class="loop-row"><select class="loop-sel" data-stem="drums" aria-label="Loop drums"><option value="-1">No loop</option><option value="0">Loop 1</option><option value="1">Loop 2</option><option value="2">Loop 4</option><option value="3">Loop 8</option></select></div>
+    <div class="loop-row" data-stem="drums">
+      <button type="button" class="loop-btn" data-loop="0" data-stem="drums" aria-label="Loop drums by 1 bar">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="drums" aria-label="Loop drums by 2 bars">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="drums" aria-label="Loop drums by 4 bars">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="drums" aria-label="Loop drums by 8 bars">8</button>
+    </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-bass">Bass</label>
     <input class="vol" type="range" id="vol-bass" data-stem="bass" min="0" max="100" value="80" aria-label="Bass volume">
     <button class="stem-mute-btn" data-stem="bass" aria-pressed="false" aria-label="Mute bass">mute</button>
-    <div class="loop-row"><select class="loop-sel" data-stem="bass" aria-label="Loop bass"><option value="-1">No loop</option><option value="0">Loop 1</option><option value="1">Loop 2</option><option value="2">Loop 4</option><option value="3">Loop 8</option></select></div>
+    <div class="loop-row" data-stem="bass">
+      <button type="button" class="loop-btn" data-loop="0" data-stem="bass" aria-label="Loop bass by 1 bar">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="bass" aria-label="Loop bass by 2 bars">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="bass" aria-label="Loop bass by 4 bars">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="bass" aria-label="Loop bass by 8 bars">8</button>
+    </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-vocals">Vocals</label>
     <input class="vol" type="range" id="vol-vocals" data-stem="vocals" min="0" max="100" value="80" aria-label="Vocals volume">
     <button class="stem-mute-btn" data-stem="vocals" aria-pressed="false" aria-label="Mute vocals">mute</button>
-    <div class="loop-row"><select class="loop-sel" data-stem="vocals" aria-label="Loop vocals"><option value="-1">No loop</option><option value="0">Loop 1</option><option value="1">Loop 2</option><option value="2">Loop 4</option><option value="3">Loop 8</option></select></div>
+    <div class="loop-row" data-stem="vocals">
+      <button type="button" class="loop-btn" data-loop="0" data-stem="vocals" aria-label="Loop vocals by 1 bar">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="vocals" aria-label="Loop vocals by 2 bars">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="vocals" aria-label="Loop vocals by 4 bars">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="vocals" aria-label="Loop vocals by 8 bars">8</button>
+    </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-melody">Melody</label>
     <input class="vol" type="range" id="vol-melody" data-stem="melody" min="0" max="100" value="80" aria-label="Melody volume">
     <button class="stem-mute-btn" data-stem="melody" aria-pressed="false" aria-label="Mute melody">mute</button>
-    <div class="loop-row"><select class="loop-sel" data-stem="melody" aria-label="Loop melody"><option value="-1">No loop</option><option value="0">Loop 1</option><option value="1">Loop 2</option><option value="2">Loop 4</option><option value="3">Loop 8</option></select></div>
+    <div class="loop-row" data-stem="melody">
+      <button type="button" class="loop-btn" data-loop="0" data-stem="melody" aria-label="Loop melody by 1 bar">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="melody" aria-label="Loop melody by 2 bars">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="melody" aria-label="Loop melody by 4 bars">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="melody" aria-label="Loop melody by 8 bars">8</button>
+    </div>
   </div>
 </div>
 
@@ -493,6 +540,11 @@ const TOT_BINS  = FFT_SIZE / 2 + 1;   // 2049
 const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
 const SEG_FRAMES = 512;               // spleeter time-frames per segment
 const LOOP_BARS = [1, 2, 4, 8];
+const SAMPLE_TRACKS = [
+  {name:'SoundHelix — Acoustic', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'},
+  {name:'SoundHelix — New Life', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'},
+  {name:'SoundHelix — Relaxing', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'},
+];
 const STEMS = ['drums','vocals','bass','melody'];
 const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
 
@@ -510,6 +562,9 @@ const state = {
   muted:  {drums:false,vocals:false,bass:false,melody:false},
   volume: {drums:0.8,vocals:0.8,bass:0.8,melody:0.8},
   loopDot:{drums:-1,vocals:-1,bass:-1,melody:-1},
+  loopStart:{drums:0,vocals:0,bass:0,melody:0},
+  loopEnd:{drums:0,vocals:0,bass:0,melody:0},
+  loopBase:0,
   pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
 };
 let audioCtx;
@@ -558,12 +613,43 @@ function setVolArc(stem, v){
   if(el) el.setAttribute('stroke-dasharray', `${v.toFixed(4)} 1`);
 }
 
+function measureLength(){
+  return (60/state.bpm) * 4;
+}
+
+function snapLoopStart(currentSec){
+  const len = measureLength();
+  if(!len || !Number.isFinite(currentSec) || !state.duration) return 0;
+  return Math.floor(currentSec / len) * len;
+}
+
 function setLoop(stem, idx){
   state.loopDot[stem]=idx;
-  const sel=document.querySelector(`.loop-sel[data-stem="${stem}"]`);
-  if(sel){ sel.value=String(idx); sel.classList.toggle('on', idx>=0); }
-  document.getElementById('varc-'+stem).classList.toggle('looping', idx>=0);
-  if(state.playing){const t=currentTime()%state.duration; startPlayback(t);}
+  const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
+  buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
+
+  if(idx < 0){
+    document.getElementById(`varc-${stem}`).classList.remove('looping');
+    if(state.playing)startPlayback(currentTime()%state.duration);
+    return;
+  }
+
+  const len = measureLength();
+  const start = snapLoopStart(currentTime()%state.duration);
+  const end = start + LOOP_BARS[idx] * len;
+  state.loopBase = start;
+
+  if(end > state.duration){
+    alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
+    state.loopDot[stem] = -1;
+    buttons.forEach((button)=>button.classList.toggle('on', false));
+    return;
+  }
+
+  state.loopStart[stem] = start;
+  state.loopEnd[stem] = end;
+  document.getElementById(`varc-${stem}`).classList.add('looping');
+  if(state.playing){startPlayback(currentTime()%state.duration);}
 }
 
 // ── FFT ──
@@ -747,8 +833,21 @@ function startPlayback(off=0){
   state.startTime=audioCtx.currentTime-off; state.playing=true;
   STEMS.forEach(s=>{const src=audioCtx.createBufferSource();src.buffer=buffers[s];src.connect(gains[s]);
     const d=state.loopDot[s];
-    if(d>=0){const bl=(60/state.bpm)*4*LOOP_BARS[d];src.loop=true;src.loopStart=0;src.loopEnd=Math.min(bl,buffers[s].duration);}
-    src.start(0,off);sources[s]=src;});
+    let startOffset=off;
+    if(d>=0){
+      const loopStart=state.loopStart[s];
+      const loopEnd=state.loopEnd[s];
+      if(loopEnd > loopStart){
+        src.loop=true;
+        src.loopStart=loopStart;
+        src.loopEnd=loopEnd;
+        if(startOffset >= loopEnd){startOffset=loopStart;}
+      }
+    }else{
+      src.loop=false;
+    }
+    src.start(0,startOffset);
+    sources[s]=src;});
   document.getElementById('center').classList.add('playing');
   setGlyph('pause'); document.getElementById('btnPlay').textContent='pause';
   document.getElementById('centerHint').textContent='playing';
@@ -808,19 +907,20 @@ function setMute(stem, muted){
 }
 function toggleMute(stem){ if(state.ready) setMute(stem,!state.muted[stem]); }
 
-// quadrant: tap = mute, vertical drag = volume (Pointer Events + capture)
+// quadrant: tap = mute, diagonal drag = volume (Pointer Events + capture)
 STEMS.forEach(stem=>{
   const q=document.querySelector(`.quadrant[data-stem="${stem}"]`);
-  let id=null,y0=0,v0=0,moved=false;
+  let id=null,x0=0,y0=0,v0=0,moved=false;
   q.addEventListener('pointerdown',e=>{
     if(!state.ready)return;
-    id=e.pointerId; y0=e.clientY; v0=state.volume[stem]; moved=false;
+    id=e.pointerId; x0=e.clientX; y0=e.clientY; v0=state.volume[stem]; moved=false;
     q.setPointerCapture(id);
   });
   q.addEventListener('pointermove',e=>{
     if(id!==e.pointerId)return;
-    const dv=(y0-e.clientY)/180;            // gentle: full travel ~180px
-    if(Math.abs(e.clientY-y0)>4) moved=true;
+    const dx=e.clientX-x0, dy=y0-e.clientY;            // diagonal motion: +dx and +dy increase
+    const dv=(dx+dy)/220;
+    if(Math.abs(dx)>4 || Math.abs(dy)>4) moved=true;
     if(moved) setVolume(stem,v0+dv);
   });
   function release(e){
@@ -843,7 +943,14 @@ STEMS.forEach(stem=>{
 // panel sliders / mute / loop
 document.querySelectorAll('input.vol').forEach(sl=>sl.addEventListener('input',()=>setVolume(sl.dataset.stem,sl.value/100,true)));
 document.querySelectorAll('.stem-mute-btn').forEach(b=>b.addEventListener('click',()=>toggleMute(b.dataset.stem)));
-document.querySelectorAll('.loop-sel').forEach(s=>s.addEventListener('change',()=>{ if(state.ready) setLoop(s.dataset.stem, parseInt(s.value,10)); else s.value='-1'; }));
+document.querySelectorAll('.loop-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    if(!state.ready) return;
+    const stem=btn.dataset.stem;
+    const loopIdx=Number(btn.dataset.loop);
+    setLoop(stem, state.loopDot[stem]===loopIdx ? -1 : loopIdx);
+  });
+});
 
 // transport
 document.getElementById('btnPlay').addEventListener('click',()=>{
@@ -872,12 +979,51 @@ function showOverlay(t,m,p){const o=document.getElementById('overlay');o.classLi
 function hideOverlay(){document.getElementById('overlay').classList.remove('active');}
 function prog(p,m){document.getElementById('progFill').style.width=p+'%';if(m)document.getElementById('ovMsg').textContent=m;}
 
+async function useSampleTrack(track){
+  try{
+    showOverlay('Loading Sample',`Downloading ${track.name}…`,10);
+    const resp=await fetch(track.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob=await resp.blob();
+    const file=new File([blob], track.name.replace(/[^\w.-]+/g,'_')+'.mp3', { type: blob.type || 'audio/mpeg' });
+    await handleFile(file);
+  }catch(e){
+    hideOverlay();
+    alert('Unable to load sample track: '+e.message);
+  }
+}
+
+function buildSampleButtons(){
+  const container = document.getElementById('sampleRows');
+  if(!container)return;
+  container.innerHTML='';
+  SAMPLE_TRACKS.forEach(track=>{
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.textContent=track.name;
+    btn.addEventListener('click',()=>useSampleTrack(track));
+    container.appendChild(btn);
+  });
+}
+
 // file handling
 async function handleFile(file){
-  if(!file||!file.type.startsWith('audio/')){alert('Please drop an audio file (mp3, wav, flac…)');return;}
+  const isAudioType = file && file.type ? file.type.startsWith('audio/') : false;
+  const isAudioName = !!file && /\.(mp3|wav|m4a|aac|ogg|flac|opus|aiff)$/i.test(file.name||'');
+  if(!file||!(isAudioType || isAudioName)){
+    alert('Please drop an audio file (mp3, wav, flac, etc.).');
+    return;
+  }
   stopPlayback();state.ready=false;state.pauseOffset=0;
   document.getElementById('filename').textContent=file.name;
-  STEMS.forEach(s=>{state.loopDot[s]=-1;const sel=document.querySelector(`.loop-sel[data-stem="${s}"]`);if(sel){sel.value='-1';sel.classList.remove('on');}document.getElementById('varc-'+s).classList.remove('looping');});
+  STEMS.forEach(s=>{
+    state.loopDot[s]=-1;
+  state.loopStart[s]=0;
+  state.loopEnd[s]=0;
+  state.loopBase=0;
+  document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
+    document.getElementById('varc-'+s).classList.remove('looping');
+  });
   try{
     if(!vSess||!aSess){
       showOverlay('Loading Model','Downloading Spleeter (~80 MB). Cached after first use.',0);
@@ -891,7 +1037,7 @@ async function handleFile(file){
     document.getElementById('stems-panel').classList.add('active');
     document.getElementById('waveRow').classList.add('active');
     setGlyph('play');document.getElementById('centerHint').textContent='play';
-    document.getElementById('hint').textContent='Tap a quarter to mute · drag up / down to set its level';
+    document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
     updateUI(0);
   }catch(e){console.error(e);hideOverlay();alert('Error processing file: '+e.message);}
 }
@@ -904,6 +1050,7 @@ const center=document.getElementById('center'), device=document.getElementById('
 
 // init
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically
+buildSampleButtons();
 let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(state.ready)STEMS.forEach(s=>drawWave(s));},150);});
 </script>
 </body>
