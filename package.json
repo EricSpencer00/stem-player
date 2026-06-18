@@ -7,6 +7,7 @@
     "test": "node tests/regressions.js && node tests/upload-smoke.js",
     "test:regressions": "node tests/regressions.js",
     "test:smoke": "node tests/upload-smoke.js",
+    "benchmark": "node tests/benchmark.js",
     "playwright:install": "playwright install chromium"
   },
   "devDependencies": {
