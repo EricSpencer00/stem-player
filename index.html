@@ -46,6 +46,7 @@ body {
   align-items: center;
   margin-bottom: 22px;
   gap: 16px;
+  flex-wrap: wrap;
 }
 .wordmark {
   display: flex;
@@ -87,6 +88,7 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-family: inherit;
+  min-height: 40px;
 }
 
 
@@ -149,7 +151,7 @@ body {
   background: none;
   border: none;
   padding: 0;
-  touch-action: none;            /* vertical drag = volume, not page scroll */
+  touch-action: none;            /* quadrant drag = volume, not page scroll */
   -webkit-user-select: none;
   border-radius: 0;
   transition: background 0.18s;
@@ -212,6 +214,49 @@ body {
 #mm-vocals { left: 80%; top: 31%; }
 #mm-bass   { left: 20%; top: 69%; }
 #mm-melody { left: 80%; top: 69%; }
+
+.quadrant.solo {
+  background: oklch(64% 0.13 64 / 0.10);
+}
+
+.q-solo-mark {
+  position: absolute;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+  z-index: 7;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%,-50%);
+  transition: opacity 0.2s;
+}
+.q-solo-mark.on { opacity: 0.9; }
+#solo-drums  { left: 31%; top: 20%; }
+#solo-vocals { left: 69%; top: 20%; }
+#solo-bass   { left: 31%; top: 80%; }
+#solo-melody { left: 69%; top: 80%; }
+
+.circle-loop-row {
+  position: absolute;
+  z-index: 9;
+  display: none;
+  grid-template-columns: repeat(2, 28px);
+  gap: 5px;
+  pointer-events: auto;
+}
+.device-wrap.ready .circle-loop-row { display: grid; }
+.circle-loop-row .loop-btn {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  font-size: 8px;
+  background: oklch(92% 0.012 84 / 0.76);
+}
+#circle-loops-drums  { left: 27%; top: 42%; transform: translate(-50%,-50%); }
+#circle-loops-vocals { left: 73%; top: 42%; transform: translate(-50%,-50%); }
+#circle-loops-bass   { left: 27%; top: 58%; transform: translate(-50%,-50%); }
+#circle-loops-melody { left: 73%; top: 58%; transform: translate(-50%,-50%); }
 
 /* discoverability hint under the circle */
 .hint {
@@ -311,9 +356,10 @@ canvas.wave { width: 100%; height: 26px; background: var(--wave-bg); border-radi
 #playbar { width: min(480px, 88vw); display: none; flex-direction: column; gap: 11px; margin-bottom: 18px; }
 #playbar.active { display: flex; }
 .filename { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-indent: 0.2em; }
-.timeline-wrap { height: 2px; background: var(--track); cursor: pointer; position: relative; border-radius: 2px; }
-.timeline-fill { position: absolute; inset: 0; background: var(--ink); width: 0%; pointer-events: none; border-radius: 2px; }
-.timeline-head { position: absolute; top: 50%; left: 0%; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); transform: translate(-50%,-50%); pointer-events: none; transition: left 0.1s linear; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.3); }
+.timeline-wrap { min-height: 44px; cursor: pointer; position: relative; border-radius: 2px; display: flex; align-items: center; }
+.timeline-wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--track); border-radius: 2px; transform: translateY(-50%); }
+.timeline-fill { position: absolute; left: 0; right: auto; top: 50%; bottom: auto; height: 2px; background: var(--ink); width: 0%; pointer-events: none; border-radius: 2px; transform: translateY(-50%); }
+.timeline-head { position: absolute; top: 50%; left: 0%; width: 13px; height: 13px; border-radius: 50%; background: var(--ink); transform: translate(-50%,-50%); pointer-events: none; transition: left 0.1s linear; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.3); }
 .time-row { display: flex; justify-content: space-between; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); }
 .transport { display: flex; justify-content: center; align-items: center; gap: 10px; }
 .tbtn {
@@ -333,7 +379,7 @@ canvas.wave { width: 100%; height: 26px; background: var(--wave-bg); border-radi
 #stems-panel.active { display: flex; }
 .stem-row {
   display: grid;
-  grid-template-columns: 52px 1fr auto auto;
+  grid-template-columns: 52px 1fr auto auto auto;
   align-items: center; gap: 14px;
   padding: 10px 0; border-top: 1px solid var(--track);
 }
@@ -363,14 +409,17 @@ input.vol.muted::-webkit-slider-thumb { background: var(--ink-ghost); }
 input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 
 /* mute button */
-.stem-mute-btn {
+.stem-mute-btn,
+.stem-solo-btn {
   font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--ink-soft); background: none; border: 1px solid var(--track); border-radius: 999px;
   font-family: inherit; cursor: pointer; min-height: 34px; min-width: 56px; padding: 0 10px;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.stem-mute-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+.stem-mute-btn:hover,
+.stem-solo-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
 .stem-mute-btn[aria-pressed="true"] { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
+.stem-solo-btn[aria-pressed="true"] { color: var(--page); background: var(--amber); border-color: var(--amber); }
 
 /* loop buttons */
 .loop-row {
@@ -382,7 +431,7 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 .loop-btn {
   font-family: inherit; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--ink-soft); background: none; border: 1px solid var(--track); border-radius: 999px;
-  min-height: 34px; padding: 0 8px; cursor: pointer; appearance: none; text-align: center;
+  min-height: 34px; min-width: 34px; padding: 0 8px; cursor: pointer; appearance: none; text-align: center;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .loop-btn.on { color: var(--amber); border-color: var(--amber); }
@@ -398,12 +447,18 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 /* mobile */
 @media (max-width: 540px) {
   body { justify-content: flex-start; padding: 20px 14px 32px; }
-  .stem-row { grid-template-columns: 48px 1fr auto; grid-template-areas: "name slider mute" "loop loop loop"; row-gap: 8px; }
+  .topbar { justify-content: center; }
+  .model-settings { width: 100%; justify-content: center; }
+  .stem-row { grid-template-columns: 48px 1fr auto auto; grid-template-areas: "name slider solo mute" "loop loop loop loop"; row-gap: 8px; column-gap: 8px; }
   .stem-name { grid-area: name; }
   input.vol { grid-area: slider; }
-  .stem-mute-btn { grid-area: mute; min-height: 40px; }
+  .stem-solo-btn { grid-area: solo; min-height: 44px; min-width: 54px; }
+  .stem-mute-btn { grid-area: mute; min-height: 44px; min-width: 54px; }
   .loop-row { grid-area: loop; display: flex; align-items: center; gap: 8px; }
+  .loop-btn { min-height: 44px; min-width: 44px; }
   .tbtn { min-height: 44px; }
+  .circle-loop-row { grid-template-columns: repeat(2, 24px); gap: 4px; }
+  .circle-loop-row .loop-btn { min-width: 24px; min-height: 24px; font-size: 7px; }
 }
 
 footer { margin-top: 26px; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); text-align: center; line-height: 2.1; }
@@ -431,6 +486,11 @@ footer a:hover { border-color: var(--ink-faint); }
   padding: 8px;
 }
 .sample-rows button:hover { border-color: var(--ink-faint); }
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
 </style>
 </head>
 <body>
@@ -464,15 +524,20 @@ footer a:hover { border-color: var(--ink-faint); }
     <g id="volArcs"></g>
   </svg>
 
-  <button type="button" class="quadrant q-drums"  data-stem="drums"  aria-label="Drums: click to mute, drag up or down to change level"></button>
-  <button type="button" class="quadrant q-vocals" data-stem="vocals" aria-label="Vocals: click to mute, drag up or down to change level"></button>
-  <button type="button" class="quadrant q-bass"   data-stem="bass"   aria-label="Bass: click to mute, drag up or down to change level"></button>
-  <button type="button" class="quadrant q-melody" data-stem="melody" aria-label="Melody: click to mute, drag up or down to change level"></button>
+  <button type="button" class="quadrant q-drums"  data-stem="drums"  aria-label="Drums: click to solo, drag away from center to increase level"></button>
+  <button type="button" class="quadrant q-vocals" data-stem="vocals" aria-label="Vocals: click to solo, drag away from center to increase level"></button>
+  <button type="button" class="quadrant q-bass"   data-stem="bass"   aria-label="Bass: click to solo, drag away from center to increase level"></button>
+  <button type="button" class="quadrant q-melody" data-stem="melody" aria-label="Melody: click to solo, drag away from center to increase level"></button>
 
   <span class="q-mute-mark" id="mm-drums">muted</span>
   <span class="q-mute-mark" id="mm-vocals">muted</span>
   <span class="q-mute-mark" id="mm-bass">muted</span>
   <span class="q-mute-mark" id="mm-melody">muted</span>
+
+  <span class="q-solo-mark" id="solo-drums">solo</span>
+  <span class="q-solo-mark" id="solo-vocals">solo</span>
+  <span class="q-solo-mark" id="solo-bass">solo</span>
+  <span class="q-solo-mark" id="solo-melody">solo</span>
 
   <div class="q-label" id="lbl-drums" aria-hidden="true">Drums<span class="pct" id="pct-drums">80</span></div>
   <div class="q-label" id="lbl-vocals" aria-hidden="true">Vocals<span class="pct" id="pct-vocals">80</span></div>
@@ -486,6 +551,31 @@ footer a:hover { border-color: var(--ink-faint); }
     </span>
     <span class="center-hint" id="centerHint">drop audio</span>
   </button>
+
+  <div class="circle-loop-row" id="circle-loops-drums" data-stem="drums" aria-label="Drums loop controls">
+    <button type="button" class="loop-btn" data-loop="0" data-stem="drums" aria-label="Loop drums by 1 bar" aria-pressed="false">1</button>
+    <button type="button" class="loop-btn" data-loop="1" data-stem="drums" aria-label="Loop drums by 2 bars" aria-pressed="false">2</button>
+    <button type="button" class="loop-btn" data-loop="2" data-stem="drums" aria-label="Loop drums by 4 bars" aria-pressed="false">4</button>
+    <button type="button" class="loop-btn" data-loop="3" data-stem="drums" aria-label="Loop drums by 8 bars" aria-pressed="false">8</button>
+  </div>
+  <div class="circle-loop-row" id="circle-loops-vocals" data-stem="vocals" aria-label="Vocals loop controls">
+    <button type="button" class="loop-btn" data-loop="0" data-stem="vocals" aria-label="Loop vocals by 1 bar" aria-pressed="false">1</button>
+    <button type="button" class="loop-btn" data-loop="1" data-stem="vocals" aria-label="Loop vocals by 2 bars" aria-pressed="false">2</button>
+    <button type="button" class="loop-btn" data-loop="2" data-stem="vocals" aria-label="Loop vocals by 4 bars" aria-pressed="false">4</button>
+    <button type="button" class="loop-btn" data-loop="3" data-stem="vocals" aria-label="Loop vocals by 8 bars" aria-pressed="false">8</button>
+  </div>
+  <div class="circle-loop-row" id="circle-loops-bass" data-stem="bass" aria-label="Bass loop controls">
+    <button type="button" class="loop-btn" data-loop="0" data-stem="bass" aria-label="Loop bass by 1 bar" aria-pressed="false">1</button>
+    <button type="button" class="loop-btn" data-loop="1" data-stem="bass" aria-label="Loop bass by 2 bars" aria-pressed="false">2</button>
+    <button type="button" class="loop-btn" data-loop="2" data-stem="bass" aria-label="Loop bass by 4 bars" aria-pressed="false">4</button>
+    <button type="button" class="loop-btn" data-loop="3" data-stem="bass" aria-label="Loop bass by 8 bars" aria-pressed="false">8</button>
+  </div>
+  <div class="circle-loop-row" id="circle-loops-melody" data-stem="melody" aria-label="Melody loop controls">
+    <button type="button" class="loop-btn" data-loop="0" data-stem="melody" aria-label="Loop melody by 1 bar" aria-pressed="false">1</button>
+    <button type="button" class="loop-btn" data-loop="1" data-stem="melody" aria-label="Loop melody by 2 bars" aria-pressed="false">2</button>
+    <button type="button" class="loop-btn" data-loop="2" data-stem="melody" aria-label="Loop melody by 4 bars" aria-pressed="false">4</button>
+    <button type="button" class="loop-btn" data-loop="3" data-stem="melody" aria-label="Loop melody by 8 bars" aria-pressed="false">8</button>
+  </div>
 </div>
 
 <p class="hint" id="hint">Drop a track to begin</p>
@@ -516,54 +606,58 @@ footer a:hover { border-color: var(--ink-faint); }
   <div class="stem-row">
     <label class="stem-name" for="vol-drums">Drums</label>
     <input class="vol" type="range" id="vol-drums" data-stem="drums" min="0" max="100" value="80" aria-label="Drums volume">
+    <button class="stem-solo-btn" data-stem="drums" aria-pressed="false" aria-label="Solo drums">solo</button>
     <button class="stem-mute-btn" data-stem="drums" aria-pressed="false" aria-label="Mute drums">mute</button>
     <div class="loop-row" data-stem="drums">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="drums" aria-label="Loop drums by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="drums" aria-label="Loop drums by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="drums" aria-label="Loop drums by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="drums" aria-label="Loop drums by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="drums" aria-label="Loop drums by 1 bar" aria-pressed="false">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="drums" aria-label="Loop drums by 2 bars" aria-pressed="false">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="drums" aria-label="Loop drums by 4 bars" aria-pressed="false">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="drums" aria-label="Loop drums by 8 bars" aria-pressed="false">8</button>
     </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-bass">Bass</label>
     <input class="vol" type="range" id="vol-bass" data-stem="bass" min="0" max="100" value="80" aria-label="Bass volume">
+    <button class="stem-solo-btn" data-stem="bass" aria-pressed="false" aria-label="Solo bass">solo</button>
     <button class="stem-mute-btn" data-stem="bass" aria-pressed="false" aria-label="Mute bass">mute</button>
     <div class="loop-row" data-stem="bass">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="bass" aria-label="Loop bass by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="bass" aria-label="Loop bass by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="bass" aria-label="Loop bass by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="bass" aria-label="Loop bass by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="bass" aria-label="Loop bass by 1 bar" aria-pressed="false">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="bass" aria-label="Loop bass by 2 bars" aria-pressed="false">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="bass" aria-label="Loop bass by 4 bars" aria-pressed="false">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="bass" aria-label="Loop bass by 8 bars" aria-pressed="false">8</button>
     </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-vocals">Vocals</label>
     <input class="vol" type="range" id="vol-vocals" data-stem="vocals" min="0" max="100" value="80" aria-label="Vocals volume">
+    <button class="stem-solo-btn" data-stem="vocals" aria-pressed="false" aria-label="Solo vocals">solo</button>
     <button class="stem-mute-btn" data-stem="vocals" aria-pressed="false" aria-label="Mute vocals">mute</button>
     <div class="loop-row" data-stem="vocals">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="vocals" aria-label="Loop vocals by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="vocals" aria-label="Loop vocals by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="vocals" aria-label="Loop vocals by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="vocals" aria-label="Loop vocals by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="vocals" aria-label="Loop vocals by 1 bar" aria-pressed="false">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="vocals" aria-label="Loop vocals by 2 bars" aria-pressed="false">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="vocals" aria-label="Loop vocals by 4 bars" aria-pressed="false">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="vocals" aria-label="Loop vocals by 8 bars" aria-pressed="false">8</button>
     </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-melody">Melody</label>
     <input class="vol" type="range" id="vol-melody" data-stem="melody" min="0" max="100" value="80" aria-label="Melody volume">
+    <button class="stem-solo-btn" data-stem="melody" aria-pressed="false" aria-label="Solo melody">solo</button>
     <button class="stem-mute-btn" data-stem="melody" aria-pressed="false" aria-label="Mute melody">mute</button>
     <div class="loop-row" data-stem="melody">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="melody" aria-label="Loop melody by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="melody" aria-label="Loop melody by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="melody" aria-label="Loop melody by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="melody" aria-label="Loop melody by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="melody" aria-label="Loop melody by 1 bar" aria-pressed="false">1</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="melody" aria-label="Loop melody by 2 bars" aria-pressed="false">2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="melody" aria-label="Loop melody by 4 bars" aria-pressed="false">4</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="melody" aria-label="Loop melody by 8 bars" aria-pressed="false">8</button>
     </div>
   </div>
 </div>
 
 <div class="sample-rows" id="sampleRows"></div>
 
-<div id="overlay">
+<div id="overlay" role="status" aria-live="polite" aria-busy="false">
   <div class="ov-title" id="ovTitle">Processing</div>
-  <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
+  <div class="prog-wrap" id="progressbar" role="progressbar" aria-label="Processing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="prog-fill" id="progFill"></div></div>
   <div class="ov-msg" id="ovMsg">Select separator mode and load as needed.</div>
 </div>
 
@@ -586,6 +680,8 @@ const SEG_FRAMES = 512;               // spleeter time-frames per segment
 const LOOP_BARS = [1, 2, 4, 8];
 const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
 const MODEL_LOAD_TIMEOUT_MS = 18_000;
+const MAX_AUDIO_BYTES = 80 * 1024 * 1024;
+const MAX_AUDIO_DURATION_SEC = 10 * 60;
 const SAMPLE_TRACKS = [
   {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
   {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
@@ -625,12 +721,20 @@ const Q_RANGE = {
   bass:   [ 90, 180],
   melody: [  0,  90],
 };
+const VOLUME_DRAG_VECTOR = {
+  drums:  {x:-1, y:-1},
+  vocals: {x: 1, y:-1},
+  bass:   {x:-1, y: 1},
+  melody: {x: 1, y: 1},
+};
 
 // ── state ──
 const state = {
   ready:false, playing:false,
+  processing:false, jobId:0,
   muted:  {drums:false,vocals:false,bass:false,melody:false},
   volume: {drums:0.8,vocals:0.8,bass:0.8,melody:0.8},
+  soloStem:null,
   loopDot:{drums:-1,vocals:-1,bass:-1,melody:-1},
   loopStart:{drums:0,vocals:0,bass:0,melody:0},
   loopEnd:{drums:0,vocals:0,bass:0,melody:0},
@@ -703,8 +807,12 @@ function snapLoopStart(currentSec){
 
 function setLoop(stem, idx){
   state.loopDot[stem]=idx;
-  const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
-  buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
+  const buttons = document.querySelectorAll(`.loop-btn[data-stem="${stem}"]`);
+  buttons.forEach((button)=>{
+    const isOn = Number(button.dataset.loop)===idx;
+    button.classList.toggle('on', isOn);
+    button.setAttribute('aria-pressed', String(isOn));
+  });
 
   if(idx < 0){
     document.getElementById(`varc-${stem}`).classList.remove('looping');
@@ -720,7 +828,10 @@ function setLoop(stem, idx){
   if(end > state.duration){
     alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
     state.loopDot[stem] = -1;
-    buttons.forEach((button)=>button.classList.toggle('on', false));
+    buttons.forEach((button)=>{
+      button.classList.toggle('on', false);
+      button.setAttribute('aria-pressed', 'false');
+    });
     document.getElementById(`varc-${stem}`).classList.remove('looping');
     if(state.playing)applyLoopToStem(stem);
     return;
@@ -744,18 +855,20 @@ function fftIP(re,im){
       const nr=wr*wr0-wi*wi0;wi=wr*wi0+wi*wr0;wr=nr;}}}
 }
 function ifftIP(re,im){for(let i=0;i<im.length;i++)im[i]=-im[i];fftIP(re,im);const N=re.length;for(let i=0;i<N;i++){re[i]/=N;im[i]=-im[i]/N;}}
-function stft(sig,win){
+async function stft(sig,win){
   const F=Math.floor((sig.length-FFT_SIZE)/HOP_SIZE)+1;
+  if (F < 1) throw new Error('Audio is too short to separate. Try a file longer than 0.1 seconds.');
   const re=[],im=[],fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
   for(let f=0;f<F;f++){const s=f*HOP_SIZE;
     for(let i=0;i<FFT_SIZE;i++){fr[i]=(s+i<sig.length?sig[s+i]:0)*win[i];fi[i]=0;}
     fftIP(fr,fi);
     re.push(new Float32Array(fr.subarray(0,TOT_BINS)));
     im.push(new Float32Array(fi.subarray(0,TOT_BINS)));
+    if ((f & 7) === 0) await yieldToUiTick();
   }
   return {re,im,F};
 }
-function istft(re,im,F,win){
+async function istft(re,im,F,win){
   const len=(F-1)*HOP_SIZE+FFT_SIZE,out=new Float32Array(len),nrm=new Float32Array(len);
   const fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
   for(let f=0;f<F;f++){
@@ -764,34 +877,66 @@ function istft(re,im,F,win){
     ifftIP(fr,fi);
     const s=f*HOP_SIZE;
     for(let i=0;i<FFT_SIZE;i++){out[s+i]+=fr[i]*win[i];nrm[s+i]+=win[i]*win[i];}
+    if ((f & 15) === 0) await yieldToUiTick();
   }
   for(let i=0;i<len;i++)if(nrm[i]>1e-8)out[i]/=nrm[i];
   return out;
 }
 
 // ── HPSS ──
-function medFilter(spec,F,B,L,axis){
+async function medFilter(spec,F,B,L,axis){
   const out=new Float32Array(F*B),col=new Float32Array(L),h=L>>1;
-  if(axis==='h'){for(let b=0;b<B;b++)for(let f=0;f<F;f++){for(let k=0;k<L;k++){const fi=f-h+k;col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}col.sort();out[f*B+b]=col[h];}}
-  else{for(let f=0;f<F;f++)for(let b=0;b<B;b++){for(let k=0;k<L;k++){const bi=b-h+k;col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}col.sort();out[f*B+b]=col[h];}}
+  if(axis==='h'){
+    for(let b=0;b<B;b++){
+      for(let f=0;f<F;f++){
+        for(let k=0;k<L;k++){const fi=f-h+k;col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}
+        col.sort();
+        out[f*B+b]=col[h];
+      }
+      if ((b & 15) === 0) await yieldToUiTick();
+    }
+  } else {
+    for(let f=0;f<F;f++){
+      for(let b=0;b<B;b++){
+        for(let k=0;k<L;k++){const bi=b-h+k;col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}
+        col.sort();
+        out[f*B+b]=col[h];
+      }
+      if ((f & 15) === 0) await yieldToUiTick();
+    }
+  }
   return out;
 }
-function hpss(re,im,F,B){
+async function hpss(re,im,F,B){
   const mag=new Float32Array(F*B);
-  for(let f=0;f<F;f++)for(let b=0;b<B;b++)mag[f*B+b]=re[f][b]**2+im[f][b]**2;
-  const H=medFilter(mag,F,B,17,'h'),P=medFilter(mag,F,B,17,'v');
+  for(let f=0;f<F;f++){
+    for(let b=0;b<B;b++)mag[f*B+b]=re[f][b]**2+im[f][b]**2;
+    if ((f & 31) === 0) await yieldToUiTick();
+  }
+  const H=await medFilter(mag,F,B,17,'h'),P=await medFilter(mag,F,B,17,'v');
   const hRe=re.map(()=>new Float32Array(B)),hIm=im.map(()=>new Float32Array(B));
   const pRe=re.map(()=>new Float32Array(B)),pIm=im.map(()=>new Float32Array(B));
-  for(let f=0;f<F;f++)for(let b=0;b<B;b++){const hh=H[f*B+b],pp=P[f*B+b],d=hh+pp+1e-8;
-    hRe[f][b]=re[f][b]*hh/d;hIm[f][b]=im[f][b]*hh/d;
-    pRe[f][b]=re[f][b]*pp/d;pIm[f][b]=im[f][b]*pp/d;}
+  for(let f=0;f<F;f++){
+    for(let b=0;b<B;b++){
+      const hh=H[f*B+b],pp=P[f*B+b],d=hh+pp+1e-8;
+      hRe[f][b]=re[f][b]*hh/d;
+      hIm[f][b]=im[f][b]*hh/d;
+      pRe[f][b]=re[f][b]*pp/d;
+      pIm[f][b]=im[f][b]*pp/d;
+    }
+    if ((f & 31) === 0) await yieldToUiTick();
+  }
   return {hRe,hIm,pRe,pIm};
 }
-function lowPass(re,im,F,B,hz){
+async function lowPass(re,im,F,B,hz){
   const cut=Math.round(hz/(SR/FFT_SIZE));
   const lRe=re.map(r=>new Float32Array(r)),lIm=im.map(r=>new Float32Array(r));
   const hRe=re.map(r=>new Float32Array(r)),hIm=im.map(r=>new Float32Array(r));
-  for(let f=0;f<F;f++){for(let b=cut;b<B;b++){lRe[f][b]=0;lIm[f][b]=0;}for(let b=0;b<cut;b++){hRe[f][b]=0;hIm[f][b]=0;}}
+  for(let f=0;f<F;f++){
+    for(let b=cut;b<B;b++){lRe[f][b]=0;lIm[f][b]=0;}
+    for(let b=0;b<cut;b++){hRe[f][b]=0;hIm[f][b]=0;}
+    if ((f & 31) === 0) await yieldToUiTick();
+  }
   return {lRe,lIm,hRe,hIm};
 }
 
@@ -824,6 +969,37 @@ function msToString(v){
   if (!Number.isFinite(v) || v <= 0) return 'n/a';
   if (v < 1000) return `${v.toFixed(0)} ms`;
   return `${(v / 1000).toFixed(2)} s`;
+}
+
+function clampPercent(v, lo=0, hi=100){
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function yieldToUiTick(){
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function startProgressPulse(onProg, from, to, message){
+  if (!onProg) return () => {};
+  const started = performance.now();
+  const span = Math.max(0, to - from);
+  const duration = 8_000;
+  let running = true;
+  let timerId = 0;
+
+  const tick = () => {
+    if (!running) return;
+    const ratio = Math.min(1, (performance.now() - started) / duration);
+    const p = clampPercent(from + span * ratio, from, to);
+    onProg(p, message);
+    timerId = window.setTimeout(tick, 110);
+  };
+
+  tick();
+  return () => {
+    running = false;
+    if (timerId) clearTimeout(timerId);
+  };
 }
 
 function setBenchline(){
@@ -916,7 +1092,7 @@ function ensureModelReady(mode, onProg){
   return loadBetterModel(onProg);
 }
 
-function smoothMask(src, frames, bins){
+async function smoothMask(src, frames, bins){
   const out = new Float32Array(src.length);
   const radiusT = 1;
   const radiusB = 1;
@@ -938,6 +1114,7 @@ function smoothMask(src, frames, bins){
       }
       out[row + b] = s / c;
     }
+    if ((f & 15) === 0) await yieldToUiTick();
   }
   return out;
 }
@@ -947,18 +1124,45 @@ async function separateAudio(arrayBuf,onProg,mode='better'){
   onProg(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
   if(audioCtx.state==='suspended')await audioCtx.resume();
-  const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
+  const stopDecodePulse = startProgressPulse(onProg, 0, 4, 'Decoding audio…');
+  let raw;
+  try {
+    raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
+  } finally {
+    stopDecodePulse();
+  }
+  if (!Number.isFinite(raw.duration) || raw.duration <= 0) {
+    throw new Error('Unable to read audio duration. Please try another audio file.');
+  }
+  if (raw.duration > MAX_AUDIO_DURATION_SEC) {
+    throw new Error(`Audio is too long for in-browser separation. Please use a track under ${Math.round(MAX_AUDIO_DURATION_SEC / 60)} minutes.`);
+  }
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
 
   onProg(5,'Computing spectrograms…');
   const win=hann(FFT_SIZE);
-  const stL=stft(sigL,win), stR=stft(sigR,win);
+  const stL=await stft(sigL,win), stR=await stft(sigR,win);
   const F=stL.F;
 
   // magnitudes (low MODEL_BINS only needed for model)
-  const magL=stL.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stL.im[f][b]);return m;});
-  const magR=stR.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stR.im[f][b]);return m;});
+  const magL=new Array(F);
+  const magR=new Array(F);
+  for(let f=0; f<F; f++){
+    const l = new Float32Array(MODEL_BINS);
+    const r = new Float32Array(MODEL_BINS);
+    const leftRe = stL.re[f];
+    const leftIm = stL.im[f];
+    const rightRe = stR.re[f];
+    const rightIm = stR.im[f];
+    for(let b=0;b<MODEL_BINS;b++){
+      l[b]=Math.hypot(leftRe[b], leftIm[b]);
+      r[b]=Math.hypot(rightRe[b], rightIm[b]);
+    }
+    magL[f]=l;
+    magR[f]=r;
+    if ((f & 31) === 0) await yieldToUiTick();
+  }
 
   const useModel = MODEL_PRESETS[mode]?.needsModel === true;
   const useBetterModel = useModel && isBetterModelReady();
@@ -987,43 +1191,60 @@ async function separateAudio(arrayBuf,onProg,mode='better'){
           vMask[f*MODEL_BINS+b]=vp/(vp+ap+1e-10);
         }
       }
+      if ((seg & 3) === 0) await yieldToUiTick();
       onProg(12+56*(seg+1)/nSeg,`Separating vocals… ${seg+1}/${nSeg}`);
     }
   } else {
     onProg(40,'DSP separation (model unavailable)…');
-    for(let f=0;f<F;f++)for(let b=0;b<MODEL_BINS;b++){
-      const l=magL[f][b],r=magR[f][b];
-      vMask[f*MODEL_BINS+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
+    for(let f=0;f<F;f++){
+      const row = f*MODEL_BINS;
+      for(let b=0;b<MODEL_BINS;b++){
+        const l=magL[f][b],r=magR[f][b];
+        vMask[row+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
+      }
+      if ((f & 31) === 0) await yieldToUiTick();
     }
   }
 
   if (mode === 'better'){
     onProg(62, 'Refining mask (better mode)…');
-    vMask = smoothMask(vMask, F, MODEL_BINS);
+    vMask = await smoothMask(vMask, F, MODEL_BINS);
   }
 
   onProg(70,'Applying masks…');
   const vRe=stL.re.map(()=>new Float32Array(TOT_BINS)), vIm=stL.im.map(()=>new Float32Array(TOT_BINS));
   const aRe=stL.re.map(()=>new Float32Array(TOT_BINS)), aIm=stL.im.map(()=>new Float32Array(TOT_BINS));
-  for(let f=0;f<F;f++)for(let b=0;b<TOT_BINS;b++){
-    const mRe=(stL.re[f][b]+stR.re[f][b])*0.5, mIm=(stL.im[f][b]+stR.im[f][b])*0.5;
-    const vm = b<MODEL_BINS ? vMask[f*MODEL_BINS+b] : 0;  // high bins -> accompaniment
-    vRe[f][b]=mRe*vm; vIm[f][b]=mIm*vm;
-    aRe[f][b]=mRe*(1-vm); aIm[f][b]=mIm*(1-vm);
+  for(let f=0;f<F;f++){
+    const leftRe = stL.re[f];
+    const rightRe = stR.re[f];
+    const leftIm = stL.im[f];
+    const rightIm = stR.im[f];
+    const vReRow = vRe[f];
+    const vImRow = vIm[f];
+    const aReRow = aRe[f];
+    const aImRow = aIm[f];
+    const maskRow = f*MODEL_BINS;
+    for(let b=0;b<TOT_BINS;b++){
+      const mRe=(leftRe[b]+rightRe[b])*0.5, mIm=(leftIm[b]+rightIm[b])*0.5;
+      const vm = b<MODEL_BINS ? vMask[maskRow+b] : 0;  // high bins -> accompaniment
+      vReRow[b]=mRe*vm; vImRow[b]=mIm*vm;
+      aReRow[b]=mRe*(1-vm); aImRow[b]=mIm*(1-vm);
+    }
+    if ((f & 31) === 0) await yieldToUiTick();
   }
 
   onProg(74,'Splitting drums & melody (HPSS)…');
-  const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,TOT_BINS);
+  const {hRe,hIm,pRe,pIm}=await hpss(aRe,aIm,F,TOT_BINS);
   onProg(82,'Extracting bass…');
-  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,TOT_BINS,300);
+  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=await lowPass(hRe,hIm,F,TOT_BINS,300);
 
   onProg(86,'Synthesizing stems…');
   const dur=raw.duration;
-  const toAB=(re,im)=>{const sig=istft(re,im,F,win);const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
-  buffers.drums=toAB(pRe,pIm);  onProg(89,'…');
-  buffers.vocals=toAB(vRe,vIm); onProg(92,'…');
-  buffers.bass=toAB(bsRe,bsIm); onProg(95,'…');
-  buffers.melody=toAB(mlRe,mlIm);
+  const toAB=async (re,im)=>{const sig=await istft(re,im,F,win);const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
+  buffers.drums=await toAB(pRe,pIm); await yieldToUiTick(); onProg(89,'…');
+  buffers.vocals=await toAB(vRe,vIm); await yieldToUiTick(); onProg(92,'…');
+  buffers.bass=await toAB(bsRe,bsIm); await yieldToUiTick(); onProg(95,'…');
+  buffers.melody=await toAB(mlRe,mlIm); await yieldToUiTick();
   onProg(98,'Drawing waveforms…');
   STEMS.forEach(s=>drawWave(s));
   onProg(100,'Done');
@@ -1046,13 +1267,23 @@ function drawWave(stem){
 }
 
 // ── playback ──
-function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();gains[s].gain.value=state.muted[s]?0:state.volume[s];gains[s].connect(audioCtx.destination);});}
+function effectiveStemGain(stem){
+  if (state.soloStem && state.soloStem !== stem) return 0;
+  return state.muted[stem] ? 0 : state.volume[stem];
+}
+function applyStemGain(stem){
+  if(gains[stem])gains[stem].gain.value=effectiveStemGain(stem);
+}
+function applyAllStemGains(){
+  STEMS.forEach(applyStemGain);
+}
+function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();gains[s].gain.value=effectiveStemGain(s);gains[s].connect(audioCtx.destination);});}
 function hasActiveLoop(){
   return STEMS.some(s=>state.loopDot[s] >= 0);
 }
 function loopAwareTime(t){
   if(!state.duration || !hasActiveLoop()) return t;
-  return t % state.duration;
+  return Math.min(t, state.duration);
 }
 function pauseTime(){
   return loopAwareTime(currentTime());
@@ -1158,7 +1389,7 @@ function tick(){
   state.raf=requestAnimationFrame(tick);
 }
 function updateUI(t){
-  const pct=Math.max(0,Math.min(1,t/state.duration));
+  const pct=state.duration ? Math.max(0,Math.min(1,t/state.duration)) : 0;
   document.getElementById('timelineFill').style.width=(pct*100)+'%';
   document.getElementById('timelineHead').style.left=(pct*100)+'%';
   document.getElementById('ringFill').setAttribute('stroke-dashoffset', (1-pct).toFixed(4));
@@ -1182,14 +1413,36 @@ function setGlyph(kind){
 function setVolume(stem,v,fromSlider){
   v=Math.max(0,Math.min(1,v));
   state.volume[stem]=v;
-  if(gains[stem])gains[stem].gain.value=state.muted[stem]?0:v;
+  applyStemGain(stem);
   setVolArc(stem,v);
   document.getElementById('pct-'+stem).textContent=Math.round(v*100);
   if(!fromSlider){const sl=document.getElementById('vol-'+stem);if(sl)sl.value=Math.round(v*100);}
 }
-function setMute(stem, muted){
+function updateSoloUI(){
+  STEMS.forEach(stem=>{
+    const on = state.soloStem === stem;
+    document.querySelector(`.quadrant[data-stem="${stem}"]`).classList.toggle('solo', on);
+    document.getElementById('solo-'+stem).classList.toggle('on', on);
+    const btn=document.querySelector(`.stem-solo-btn[data-stem="${stem}"]`);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? 'soloed' : 'solo';
+  });
+}
+function setSolo(stem){
+  state.soloStem = state.soloStem === stem ? null : stem;
+  if (state.soloStem) {
+    setMute(state.soloStem, false, {preserveSolo:true});
+  }
+  updateSoloUI();
+  applyAllStemGains();
+}
+function setMute(stem, muted, options={}){
   state.muted[stem]=muted;
-  if(gains[stem])gains[stem].gain.value=muted?0:state.volume[stem];
+  if(muted && state.soloStem === stem && !options.preserveSolo){
+    state.soloStem = null;
+    updateSoloUI();
+  }
+  applyStemGain(stem);
   document.getElementById('lbl-'+stem).classList.toggle('muted',muted);
   document.querySelector(`.quadrant[data-stem="${stem}"]`).classList.toggle('muted',muted);
   document.getElementById('mm-'+stem).classList.toggle('on',muted);
@@ -1200,8 +1453,9 @@ function setMute(stem, muted){
   btn.textContent=muted?'muted':'mute';
 }
 function toggleMute(stem){ if(state.ready) setMute(stem,!state.muted[stem]); }
+function toggleSolo(stem){ if(state.ready) setSolo(stem); }
 
-// quadrant: tap = mute, diagonal drag = volume (Pointer Events + capture)
+// quadrant: tap = solo, drag outward from center = volume up
 STEMS.forEach(stem=>{
   const q=document.querySelector(`.quadrant[data-stem="${stem}"]`);
   let id=null,x0=0,y0=0,v0=0,moved=false;
@@ -1212,30 +1466,32 @@ STEMS.forEach(stem=>{
   });
   q.addEventListener('pointermove',e=>{
     if(id!==e.pointerId)return;
-    const dx=e.clientX-x0, dy=y0-e.clientY;            // diagonal motion: +dx and +dy increase
-    const dv=(dx+dy)/220;
+    const dx=e.clientX-x0, dy=e.clientY-y0;
+    const vector = VOLUME_DRAG_VECTOR[stem];
+    const dv=(dx*vector.x + dy*vector.y)/180;
     if(Math.abs(dx)>4 || Math.abs(dy)>4) moved=true;
     if(moved) setVolume(stem,v0+dv);
   });
   function release(e){
     if(id!==e.pointerId)return;
     try{q.releasePointerCapture(id);}catch(_){}
-    if(!moved) toggleMute(stem);            // it was a tap
+    if(!moved) toggleSolo(stem);
     id=null;
   }
   q.addEventListener('pointerup',release);
   q.addEventListener('pointercancel',release);
-  // keyboard: Enter/Space = mute, arrows = volume
+  // keyboard: Enter/Space = solo, arrows = volume
   q.addEventListener('keydown',e=>{
     if(!state.ready)return;
     if(e.key==='ArrowUp'||e.key==='ArrowRight'){setVolume(stem,state.volume[stem]+0.05);e.preventDefault();}
     else if(e.key==='ArrowDown'||e.key==='ArrowLeft'){setVolume(stem,state.volume[stem]-0.05);e.preventDefault();}
-    else if(e.key==='Enter'||e.key===' '){toggleMute(stem);e.preventDefault();}
+    else if(e.key==='Enter'||e.key===' '){toggleSolo(stem);e.preventDefault();}
   });
 });
 
 // panel sliders / mute / loop
 document.querySelectorAll('input.vol').forEach(sl=>sl.addEventListener('input',()=>setVolume(sl.dataset.stem,sl.value/100,true)));
+document.querySelectorAll('.stem-solo-btn').forEach(b=>b.addEventListener('click',()=>toggleSolo(b.dataset.stem)));
 document.querySelectorAll('.stem-mute-btn').forEach(b=>b.addEventListener('click',()=>toggleMute(b.dataset.stem)));
 document.querySelectorAll('.loop-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -1273,11 +1529,41 @@ document.getElementById('timeline').addEventListener('keydown',e=>{
 document.getElementById('center').addEventListener('click',()=>{if(state.ready)document.getElementById('btnPlay').click();else document.getElementById('fileInput').click();});
 
 // overlay
-function showOverlay(t,m,p){const o=document.getElementById('overlay');o.classList.add('active');document.getElementById('ovTitle').textContent=t;document.getElementById('ovMsg').textContent=m;document.getElementById('progFill').style.width=p+'%';}
-function hideOverlay(){document.getElementById('overlay').classList.remove('active');}
-function prog(p,m){document.getElementById('progFill').style.width=p+'%';if(m)document.getElementById('ovMsg').textContent=m;}
+function setProgressValue(p){
+  const pct = clampPercent(Number(p) || 0);
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progressbar').setAttribute('aria-valuenow', String(Math.round(pct)));
+}
+function showOverlay(t,m,p){
+  const o=document.getElementById('overlay');
+  o.classList.add('active');
+  o.setAttribute('aria-busy','true');
+  document.getElementById('ovTitle').textContent=t;
+  document.getElementById('ovMsg').textContent=m;
+  setProgressValue(p);
+}
+function hideOverlay(){
+  const o=document.getElementById('overlay');
+  o.classList.remove('active');
+  o.setAttribute('aria-busy','false');
+}
+function prog(p,m){setProgressValue(p);if(m)document.getElementById('ovMsg').textContent=m;}
+
+function setProcessing(active){
+  state.processing = active;
+  document.getElementById('modelMode').disabled = active;
+  document.querySelectorAll('.sample-rows button').forEach((button)=>{button.disabled = active;});
+}
+
+function assertCurrentJob(jobId){
+  if (jobId !== state.jobId) throw new Error('Processing was superseded by a newer file.');
+}
 
 async function useSampleTrack(track, button){
+  if (state.processing) {
+    alert('Please wait for the current separation to finish before loading another track.');
+    return;
+  }
   const label = button?.textContent || track.name;
   if (button) {
     button.disabled = true;
@@ -1339,19 +1625,42 @@ function buildSampleButtons(){
 
 // file handling
 async function handleFile(file){
+  if(state.processing){
+    alert('Please wait for the current separation to finish before loading another track.');
+    return;
+  }
   const isAudioType = file && file.type ? file.type.startsWith('audio/') : false;
   const isAudioName = !!file && /\.(mp3|wav|m4a|aac|ogg|flac|opus|aiff)$/i.test(file.name||'');
   if(!file||!(isAudioType || isAudioName)){
     alert('Please drop an audio file (mp3, wav, flac, etc.).');
     return;
   }
+  if(file.size > MAX_AUDIO_BYTES){
+    alert(`This file is too large for in-browser separation. Please use an audio file under ${Math.round(MAX_AUDIO_BYTES / 1024 / 1024)} MB.`);
+    return;
+  }
+  const jobId = ++state.jobId;
+  setProcessing(true);
   stopPlayback();state.ready=false;state.pauseOffset=0;
+  document.getElementById('deviceWrap').classList.remove('ready');
+  document.getElementById('playbar').classList.remove('active');
+  document.getElementById('stems-panel').classList.remove('active');
+  document.getElementById('waveRow').classList.remove('active');
+  setGlyph('upload');
+  document.getElementById('centerHint').textContent='drop audio';
+  document.getElementById('hint').textContent='Processing track';
   document.getElementById('filename').textContent=file.name;
+  state.soloStem=null;
+  updateSoloUI();
   STEMS.forEach(s=>{
+    buffers[s]=null;
     state.loopDot[s]=-1;
     state.loopStart[s]=0;
     state.loopEnd[s]=0;
-    document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
+    document.querySelectorAll(`.loop-btn[data-stem="${s}"]`).forEach(btn=>{
+      btn.classList.remove('on');
+      btn.setAttribute('aria-pressed','false');
+    });
     document.getElementById('varc-'+s).classList.remove('looping');
   });
   state.loopBase = 0;
@@ -1362,6 +1671,7 @@ async function handleFile(file){
     const runSeparation = async (mode) => {
       const start = performance.now();
       const dur = await separateAudio(await file.arrayBuffer(), (p,m) => prog(p,m), mode);
+      assertCurrentJob(jobId);
       bench[mode].separateMs = performance.now() - start;
       setBenchline();
       return dur;
@@ -1398,14 +1708,26 @@ async function handleFile(file){
       }
     }
 
+    assertCurrentJob(jobId);
     state.duration=dur;state.ready=true;hideOverlay();
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     document.getElementById('waveRow').classList.add('active');
+    document.getElementById('deviceWrap').classList.add('ready');
     setGlyph('play');document.getElementById('centerHint').textContent='play';
-    document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+    document.getElementById('hint').textContent='Tap a quarter to solo · drag away from center to set its level';
     updateUI(0);
-  }catch(e){console.error(e);hideOverlay();alert('Error processing file: '+getErrorMessage(e));}
+  }catch(e){
+    console.error(e);
+    hideOverlay();
+    document.getElementById('hint').textContent='Drop a track to begin';
+    alert('Error processing file: '+getErrorMessage(e));
+  }
+  finally {
+    if (jobId === state.jobId) setProcessing(false);
+    const input = document.getElementById('fileInput');
+    if (input) input.value = '';
+  }
 }
 document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 

@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 function findPlaywrightModule() {
+  try {
+    return require.resolve('playwright');
+  } catch (_) {}
+
   const npxRoot = '/Users/eric/.npm/_npx';
   for (const dir of fs.readdirSync(npxRoot)) {
     const candidate = path.join(npxRoot, dir, 'node_modules', 'playwright', 'index.js');
