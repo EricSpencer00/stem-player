@@ -94,6 +94,21 @@ function findPlaywrightModule() {
     throw new Error('Play button did not return to play state after stop.');
   }
 
+  const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
+  await page.click('.export-rows button[data-export="drums"]');
+  const download = await downloadPromise;
+  const suggested = download.suggestedFilename();
+  if (!/-drums\.wav$/.test(suggested)) {
+    throw new Error(`Unexpected export filename: ${suggested}`);
+  }
+
+  const mixDownloadPromise = page.waitForEvent('download', { timeout: 20000 });
+  await page.click('.export-rows button[data-export="mix"]');
+  const mixDownload = await mixDownloadPromise;
+  if (!/-mix\.wav$/.test(mixDownload.suggestedFilename())) {
+    throw new Error(`Unexpected mix export filename: ${mixDownload.suggestedFilename()}`);
+  }
+
   console.log('PASS upload-smoke');
   await browser.close();
 })();

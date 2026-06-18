@@ -468,6 +468,66 @@ footer a:hover { border-color: var(--ink-faint); }
 
 #fileInput { display: none; }
 
+/* ── loop region band on the timeline ── */
+.timeline-loop {
+  position: absolute;
+  top: 50%;
+  height: 10px;
+  transform: translateY(-50%);
+  background: var(--amber-glow);
+  border-radius: 3px;
+  left: 0;
+  width: 0;
+  display: none;
+  pointer-events: none;
+}
+.timeline-loop.active { display: block; }
+
+/* ── export panel ── */
+#export-panel {
+  width: min(480px, 88vw);
+  display: none;
+  flex-direction: column;
+  gap: 9px;
+  margin: 6px 0 14px;
+}
+#export-panel.active { display: flex; }
+.export-cap {
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-indent: 0.2em;
+  text-align: center;
+}
+.export-rows {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.export-rows button {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: none;
+  border: 1px solid var(--track);
+  border-radius: 999px;
+  padding: 9px 4px;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 40px;
+  text-indent: 0.1em;
+  transition: border-color 0.15s, color 0.15s;
+}
+.export-rows button:hover { border-color: var(--ink-faint); color: var(--ink); }
+.export-rows button.export-mix { color: var(--ink); border-color: var(--ink-faint); }
+@media (max-width: 540px) {
+  .export-rows { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .export-rows button { min-height: 44px; }
+}
+.kbd-hint { display: block; margin-top: 10px; color: var(--ink-faint); }
+
 .sample-rows {
   width: min(480px, 88vw);
   margin: 0 auto 10px;
@@ -591,6 +651,7 @@ select:disabled {
   <div class="filename" id="filename"></div>
   <div class="timeline-wrap" id="timeline" role="slider" tabindex="0"
        aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="timeline-loop" id="timelineLoop"></div>
     <div class="timeline-fill" id="timelineFill"></div>
     <div class="timeline-head" id="timelineHead"></div>
   </div>
@@ -653,6 +714,17 @@ select:disabled {
   </div>
 </div>
 
+<div id="export-panel">
+  <div class="export-cap">Export · WAV</div>
+  <div class="export-rows">
+    <button type="button" data-export="drums" aria-label="Download drums stem as WAV">Drums</button>
+    <button type="button" data-export="bass" aria-label="Download bass stem as WAV">Bass</button>
+    <button type="button" data-export="vocals" aria-label="Download vocals stem as WAV">Vocals</button>
+    <button type="button" data-export="melody" aria-label="Download melody stem as WAV">Melody</button>
+    <button type="button" data-export="mix" class="export-mix" aria-label="Download the current mix as WAV">Mix</button>
+  </div>
+</div>
+
 <div class="sample-rows" id="sampleRows"></div>
 
 <div id="overlay" role="status" aria-live="polite" aria-busy="false">
@@ -664,6 +736,7 @@ select:disabled {
 <footer>
   UI inspired by <a href="https://krystalgamer.github.io/stem-player-emulator/" target="_blank" rel="noopener">krystalgamer</a>
   &nbsp;·&nbsp; ML: Spleeter / Deezer &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
+  <span class="kbd-hint">Space play · 1–4 solo · ⇧ + 1–4 mute · R restart · S stop</span>
   <span id="benchStats" aria-live="polite"></span>
 </footer>
 
@@ -740,6 +813,7 @@ const state = {
   loopEnd:{drums:0,vocals:0,bass:0,melody:0},
   loopBase:0,
   modelMode:'better',
+  trackName:'',
   pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
 };
 let audioCtx;
@@ -1400,6 +1474,17 @@ function updateUI(t){
   document.getElementById('timeTot').textContent=fmt(state.duration);
 }
 function fmt(s){const m=Math.floor(s/60),ss=Math.floor(s%60);return`${m}:${ss.toString().padStart(2,'0')}`;}
+function updateLoopBand(){
+  const el=document.getElementById('timelineLoop');
+  if(!el)return;
+  const active=STEMS.filter(s=>state.loopDot[s]>=0 && state.loopEnd[s]>state.loopStart[s]);
+  if(!active.length || !state.duration){el.classList.remove('active');return;}
+  const start=Math.min(...active.map(s=>state.loopStart[s]));
+  const end=Math.max(...active.map(s=>state.loopEnd[s]));
+  el.style.left=(start/state.duration*100)+'%';
+  el.style.width=Math.max(0,(end-start)/state.duration*100)+'%';
+  el.classList.add('active');
+}
 
 // glyph morph
 function setGlyph(kind){
@@ -1499,6 +1584,7 @@ document.querySelectorAll('.loop-btn').forEach(btn=>{
     const stem=btn.dataset.stem;
     const loopIdx=Number(btn.dataset.loop);
     setLoop(stem, state.loopDot[stem]===loopIdx ? -1 : loopIdx);
+    updateLoopBand();
   });
 });
 
@@ -1623,6 +1709,104 @@ function buildSampleButtons(){
   });
 }
 
+// ── export (WAV) ──
+function audioBufferToWav(buffer){
+  const numCh=buffer.numberOfChannels;
+  const sr=buffer.sampleRate;
+  const len=buffer.length;
+  const blockAlign=numCh*2;
+  const dataLen=len*blockAlign;
+  const ab=new ArrayBuffer(44+dataLen);
+  const view=new DataView(ab);
+  let p=0;
+  const wstr=s=>{for(let i=0;i<s.length;i++)view.setUint8(p++,s.charCodeAt(i));};
+  const u32=v=>{view.setUint32(p,v,true);p+=4;};
+  const u16=v=>{view.setUint16(p,v,true);p+=2;};
+  wstr('RIFF');u32(36+dataLen);wstr('WAVE');
+  wstr('fmt ');u32(16);u16(1);u16(numCh);u32(sr);u32(sr*blockAlign);u16(blockAlign);u16(16);
+  wstr('data');u32(dataLen);
+  const chans=[];
+  for(let c=0;c<numCh;c++)chans.push(buffer.getChannelData(c));
+  for(let i=0;i<len;i++){
+    for(let c=0;c<numCh;c++){
+      const v=Math.max(-1,Math.min(1,chans[c][i]||0));
+      view.setInt16(p, v<0 ? v*0x8000 : v*0x7FFF, true);
+      p+=2;
+    }
+  }
+  return new Blob([ab],{type:'audio/wav'});
+}
+function downloadBlob(blob, filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+// bake the current mix (volume + mute + solo) into one buffer; loops are not applied
+async function renderMix(){
+  const present=STEMS.filter(s=>buffers[s]);
+  if(!present.length) throw new Error('Nothing to export yet.');
+  const len=present.reduce((m,s)=>Math.max(m, buffers[s].length), 0);
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if(!Offline) throw new Error('Offline rendering is not supported in this browser.');
+  const offline=new Offline(1, len, SR);
+  present.forEach(s=>{
+    const g=offline.createGain();
+    g.gain.value=effectiveStemGain(s);
+    g.connect(offline.destination);
+    const src=offline.createBufferSource();
+    src.buffer=buffers[s];
+    src.connect(g);
+    src.start(0);
+  });
+  return offline.startRendering();
+}
+function exportBaseName(){
+  const raw=(state.trackName||'stem-player').replace(/\.[^.]+$/,'');
+  return raw.replace(/[^\w.-]+/g,'_').replace(/^_+|_+$/g,'') || 'stem-player';
+}
+async function exportStem(kind, btn){
+  if(!state.ready || state.processing) return;
+  const label=btn?.textContent;
+  if(btn){btn.disabled=true; btn.textContent='…';}
+  try{
+    const buffer = kind==='mix' ? await renderMix() : buffers[kind];
+    if(!buffer) throw new Error('Nothing to export yet.');
+    downloadBlob(audioBufferToWav(buffer), `${exportBaseName()}-${kind}.wav`);
+  }catch(e){
+    alert('Export failed: '+getErrorMessage(e));
+  }finally{
+    if(btn){btn.disabled=false; if(label!=null)btn.textContent=label;}
+  }
+}
+document.querySelectorAll('.export-rows button').forEach(btn=>{
+  btn.addEventListener('click',()=>exportStem(btn.dataset.export, btn));
+});
+
+// ── keyboard shortcuts ──
+document.addEventListener('keydown',e=>{
+  const tag=(e.target?.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='select'||tag==='textarea')return;
+  if(e.metaKey||e.ctrlKey||e.altKey)return;   // don't hijack browser/OS shortcuts
+  if(!state.ready)return;
+  const k=e.key;
+  if(k===' '||k==='Enter'){
+    if(tag==='button')return;   // let the focused control handle activation
+    e.preventDefault();
+    document.getElementById('btnPlay').click();
+  } else if(k==='r'||k==='R'){
+    document.getElementById('btnRestart').click();
+  } else if(k==='s'||k==='S'){
+    document.getElementById('btnStop').click();
+  } else if(k>='1'&&k<='4'){
+    const order=['drums','bass','vocals','melody'];
+    const stem=order[Number(k)-1];
+    if(e.shiftKey)toggleMute(stem); else toggleSolo(stem);
+    e.preventDefault();
+  }
+});
+
 // file handling
 async function handleFile(file){
   if(state.processing){
@@ -1646,10 +1830,12 @@ async function handleFile(file){
   document.getElementById('playbar').classList.remove('active');
   document.getElementById('stems-panel').classList.remove('active');
   document.getElementById('waveRow').classList.remove('active');
+  document.getElementById('export-panel').classList.remove('active');
   setGlyph('upload');
   document.getElementById('centerHint').textContent='drop audio';
   document.getElementById('hint').textContent='Processing track';
   document.getElementById('filename').textContent=file.name;
+  state.trackName=file.name;
   state.soloStem=null;
   updateSoloUI();
   STEMS.forEach(s=>{
@@ -1664,6 +1850,7 @@ async function handleFile(file){
     document.getElementById('varc-'+s).classList.remove('looping');
   });
   state.loopBase = 0;
+  updateLoopBand();
   try{
     const requestedMode = getModelModeFromUi();
     setModelMode(requestedMode);
@@ -1713,6 +1900,7 @@ async function handleFile(file){
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     document.getElementById('waveRow').classList.add('active');
+    document.getElementById('export-panel').classList.add('active');
     document.getElementById('deviceWrap').classList.add('ready');
     setGlyph('play');document.getElementById('centerHint').textContent='play';
     document.getElementById('hint').textContent='Tap a quarter to solo · drag away from center to set its level';
@@ -1740,8 +1928,20 @@ const center=document.getElementById('center'), device=document.getElementById('
 setBenchline();
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically
 buildSampleButtons();
+const MODE_STORAGE_KEY = 'stemPlayer.separatorMode';
+function loadSavedMode(){
+  try {
+    const saved = localStorage.getItem(MODE_STORAGE_KEY);
+    if (saved === 'fast' || saved === 'better') state.modelMode = saved;
+  } catch (_) {}
+}
+function saveMode(mode){
+  try { localStorage.setItem(MODE_STORAGE_KEY, mode); } catch (_) {}
+}
+loadSavedMode();
 document.getElementById('modelMode').addEventListener('change', () => {
   setModelMode(getModelModeFromUi());
+  saveMode(selectedModelMode);
 });
 setModelMode(state.modelMode);
 let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(state.ready)STEMS.forEach(s=>drawWave(s));},150);});

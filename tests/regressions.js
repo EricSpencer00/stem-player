@@ -141,6 +141,41 @@ check('Sample loading has failure guards', () => {
   assertRegex(/new URL\(track\.url, location\.href\)/m, 'sample URL normalization missing.');
 });
 
+check('WAV export panel exists with stem and mix buttons', () => {
+  const start = html.indexOf('id="export-panel"');
+  if (start === -1) throw new Error('export-panel missing.');
+  const stems = ['drums', 'bass', 'vocals', 'melody', 'mix'];
+  for (const kind of stems) {
+    if (!new RegExp(`data-export="${kind}"`).test(html)) {
+      throw new Error(`export button for ${kind} missing.`);
+    }
+  }
+});
+
+check('WAV export helpers are defined and wired', () => {
+  assertRegex(/function\s+audioBufferToWav\s*\(/m, 'audioBufferToWav encoder missing.');
+  assertRegex(/function\s+renderMix\s*\(/m, 'renderMix offline mixer missing.');
+  assertRegex(/async\s+function\s+exportStem\s*\(/m, 'exportStem handler missing.');
+  assertRegex(/document\.querySelectorAll\('\.export-rows button'\)\.forEach/m, 'export buttons not wired.');
+});
+
+check('Keyboard shortcuts are bound', () => {
+  assertRegex(/document\.addEventListener\('keydown',\s*e\s*=>/m, 'global keydown handler missing.');
+  assertRegex(/document\.getElementById\('btnPlay'\)\.click\(\)/m, 'space-to-play shortcut missing.');
+  assertRegex(/toggleSolo\(stem\)/m, 'number-key solo shortcut missing.');
+});
+
+check('Separator mode preference is persisted', () => {
+  assertRegex(/MODE_STORAGE_KEY/m, 'mode storage key missing.');
+  assertRegex(/localStorage\.setItem\(MODE_STORAGE_KEY/m, 'mode persistence write missing.');
+  assertRegex(/localStorage\.getItem\(MODE_STORAGE_KEY\)/m, 'mode persistence read missing.');
+});
+
+check('Timeline loop region indicator exists', () => {
+  assertRegex(/id="timelineLoop"/m, 'timeline loop band element missing.');
+  assertRegex(/function\s+updateLoopBand\s*\(/m, 'updateLoopBand function missing.');
+});
+
 check('Inline app script has no syntax errors', () => {
   const scriptRe = new RegExp('<script>([\\s\\S]*?)<\\/script>');
   const m = html.match(scriptRe);

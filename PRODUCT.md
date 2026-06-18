@@ -10,7 +10,9 @@ Primarily YEEZY / Kanye listeners familiar with the physical DONDA stem player d
 ## Product Purpose
 A browser-only audio stem separator. Drop any audio file; the app splits it into
 drums, bass, vocals, and melody using a client-side ML model. Each stem is
-independently playable, mutable, and loopable. No accounts, no uploads, no server.
+independently playable, mutable, loopable, and exportable as WAV — including a
+baked mix that respects the current levels, mutes, and solo. No accounts, no
+uploads, no server. Keyboard-drivable for quick hands-on mixing.
 
 ## Brand Tone
 Sparse. Functional. Physical. The device IS the interface — no chrome, no marketing.
