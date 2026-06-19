@@ -260,13 +260,29 @@ body {
   backdrop-filter: blur(5px);
   z-index: 100;
   align-items: center; justify-content: center;
-  flex-direction: column; gap: 18px;
+  flex-direction: column; gap: 16px;
 }
 #overlay.active { display: flex; }
 .ov-title { font-size: 10px; letter-spacing: 0.42em; text-transform: uppercase; color: var(--ink-soft); text-indent: 0.42em; }
-.ov-msg   { font-size: 9px; letter-spacing: 0.06em; color: var(--ink-faint); max-width: 250px; text-align: center; line-height: 1.9; }
-.prog-wrap { width: 210px; height: 2px; background: var(--track); position: relative; border-radius: 2px; overflow: hidden; }
-.prog-fill { position: absolute; inset: 0; background: var(--ink); width: 0%; transition: width 0.3s ease; }
+.ov-msg   { font-size: 9px; letter-spacing: 0.06em; color: var(--ink-faint); max-width: min(280px, 74vw); text-align: center; line-height: 1.9; min-height: 1.9em; }
+.prog-wrap { width: min(252px, 68vw); height: 3px; background: var(--track); position: relative; border-radius: 3px; overflow: hidden; box-shadow: inset 0 1px 2px oklch(24% 0.012 70 / 0.07); }
+.prog-fill { position: absolute; inset: 0; background: var(--ink); width: 0%; transition: width 0.42s cubic-bezier(0.22,1,0.36,1); overflow: hidden; }
+.prog-fill::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; right: -52px;
+  width: 52px;
+  background: linear-gradient(90deg, transparent, oklch(92% 0.012 84 / 0.45), transparent);
+  animation: progressSweep 1.35s linear infinite;
+}
+@keyframes progressSweep {
+  from { transform: translateX(-230px); }
+  to   { transform: translateX(52px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prog-fill { transition: none; }
+  .prog-fill::after { animation: none; opacity: 0; }
+}
 
 /* ── waveforms ── */
 .wave-row { width: min(480px, 88vw); display: none; gap: 4px; margin-bottom: 16px; }
@@ -518,10 +534,10 @@ footer a:hover { border-color: var(--ink-faint); }
   </div>
 </div>
 
-<div id="overlay">
+<div id="overlay" role="status" aria-live="polite" aria-busy="false">
   <div class="ov-title" id="ovTitle">Processing</div>
-  <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
-  <div class="ov-msg" id="ovMsg">Downloading Spleeter model. Cached after first use.</div>
+  <div class="prog-wrap" id="progWrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="ovTitle" aria-describedby="ovMsg"><div class="prog-fill" id="progFill"></div></div>
+  <div class="ov-msg" id="ovMsg">Preparing audio.</div>
 </div>
 
 <footer>
@@ -671,47 +687,83 @@ function fftIP(re,im){
       const nr=wr*wr0-wi*wi0;wi=wr*wi0+wi*wr0;wr=nr;}}}
 }
 function ifftIP(re,im){for(let i=0;i<im.length;i++)im[i]=-im[i];fftIP(re,im);const N=re.length;for(let i=0;i<N;i++){re[i]/=N;im[i]=-im[i]/N;}}
-function stft(sig,win){
+async function stft(sig,win,onProgress){
   const F=Math.floor((sig.length-FFT_SIZE)/HOP_SIZE)+1;
   const re=[],im=[],fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
+  const stride=Math.max(1,Math.floor(F/24));
   for(let f=0;f<F;f++){const s=f*HOP_SIZE;
     for(let i=0;i<FFT_SIZE;i++){fr[i]=(s+i<sig.length?sig[s+i]:0)*win[i];fi[i]=0;}
     fftIP(fr,fi);
     re.push(new Float32Array(fr.subarray(0,TOT_BINS)));
     im.push(new Float32Array(fi.subarray(0,TOT_BINS)));
+    if(onProgress&&(f%stride===0||f===F-1))await onProgress((f+1)/F);
   }
   return {re,im,F};
 }
-function istft(re,im,F,win){
+async function buildMagnitude(st,onProgress){
+  const mag=[];
+  const stride=Math.max(1,Math.floor(st.F/24));
+  for(let f=0;f<st.F;f++){
+    const row=new Float32Array(MODEL_BINS);
+    for(let b=0;b<MODEL_BINS;b++)row[b]=Math.hypot(st.re[f][b],st.im[f][b]);
+    mag.push(row);
+    if(onProgress&&(f%stride===0||f===st.F-1))await onProgress((f+1)/st.F);
+  }
+  return mag;
+}
+async function istft(re,im,F,win,onProgress){
   const len=(F-1)*HOP_SIZE+FFT_SIZE,out=new Float32Array(len),nrm=new Float32Array(len);
   const fr=new Float32Array(FFT_SIZE),fi=new Float32Array(FFT_SIZE);
+  const stride=Math.max(1,Math.floor(F/24));
   for(let f=0;f<F;f++){
     for(let b=0;b<TOT_BINS;b++){fr[b]=re[f][b];fi[b]=im[f][b];}
     for(let b=1;b<TOT_BINS-1;b++){fr[FFT_SIZE-b]=fr[b];fi[FFT_SIZE-b]=-fi[b];}
     ifftIP(fr,fi);
     const s=f*HOP_SIZE;
     for(let i=0;i<FFT_SIZE;i++){out[s+i]+=fr[i]*win[i];nrm[s+i]+=win[i]*win[i];}
+    if(onProgress&&(f%stride===0||f===F-1))await onProgress((f+1)/F);
   }
   for(let i=0;i<len;i++)if(nrm[i]>1e-8)out[i]/=nrm[i];
   return out;
 }
 
 // ── HPSS ──
-function medFilter(spec,F,B,L,axis){
+async function medFilter(spec,F,B,L,axis,onProgress){
   const out=new Float32Array(F*B),col=new Float32Array(L),h=L>>1;
-  if(axis==='h'){for(let b=0;b<B;b++)for(let f=0;f<F;f++){for(let k=0;k<L;k++){const fi=f-h+k;col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}col.sort();out[f*B+b]=col[h];}}
-  else{for(let f=0;f<F;f++)for(let b=0;b<B;b++){for(let k=0;k<L;k++){const bi=b-h+k;col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}col.sort();out[f*B+b]=col[h];}}
+  if(axis==='h'){
+    const stride=Math.max(1,Math.floor(B/18));
+    for(let b=0;b<B;b++){
+      for(let f=0;f<F;f++){for(let k=0;k<L;k++){const fi=f-h+k;col[k]=(fi>=0&&fi<F)?spec[fi*B+b]:0;}col.sort();out[f*B+b]=col[h];}
+      if(onProgress&&(b%stride===0||b===B-1))await onProgress((b+1)/B);
+    }
+  }
+  else{
+    const stride=Math.max(1,Math.floor(F/18));
+    for(let f=0;f<F;f++){
+      for(let b=0;b<B;b++){for(let k=0;k<L;k++){const bi=b-h+k;col[k]=(bi>=0&&bi<B)?spec[f*B+bi]:0;}col.sort();out[f*B+b]=col[h];}
+      if(onProgress&&(f%stride===0||f===F-1))await onProgress((f+1)/F);
+    }
+  }
   return out;
 }
-function hpss(re,im,F,B){
+async function hpss(re,im,F,B,onProgress){
+  const report=async(p,m)=>{if(onProgress)await onProgress(p,m);};
   const mag=new Float32Array(F*B);
-  for(let f=0;f<F;f++)for(let b=0;b<B;b++)mag[f*B+b]=re[f][b]**2+im[f][b]**2;
-  const H=medFilter(mag,F,B,17,'h'),P=medFilter(mag,F,B,17,'v');
+  const stride=Math.max(1,Math.floor(F/18));
+  for(let f=0;f<F;f++){
+    for(let b=0;b<B;b++)mag[f*B+b]=re[f][b]**2+im[f][b]**2;
+    if(f%stride===0||f===F-1)await report(0.12*(f+1)/F,'Measuring rhythm and tone…');
+  }
+  const H=await medFilter(mag,F,B,17,'h',p=>report(0.12+0.38*p,'Finding sustained parts…'));
+  const P=await medFilter(mag,F,B,17,'v',p=>report(0.50+0.38*p,'Finding drum hits…'));
   const hRe=re.map(()=>new Float32Array(B)),hIm=im.map(()=>new Float32Array(B));
   const pRe=re.map(()=>new Float32Array(B)),pIm=im.map(()=>new Float32Array(B));
-  for(let f=0;f<F;f++)for(let b=0;b<B;b++){const hh=H[f*B+b],pp=P[f*B+b],d=hh+pp+1e-8;
-    hRe[f][b]=re[f][b]*hh/d;hIm[f][b]=im[f][b]*hh/d;
-    pRe[f][b]=re[f][b]*pp/d;pIm[f][b]=im[f][b]*pp/d;}
+  for(let f=0;f<F;f++){
+    for(let b=0;b<B;b++){const hh=H[f*B+b],pp=P[f*B+b],d=hh+pp+1e-8;
+      hRe[f][b]=re[f][b]*hh/d;hIm[f][b]=im[f][b]*hh/d;
+      pRe[f][b]=re[f][b]*pp/d;pIm[f][b]=im[f][b]*pp/d;}
+    if(f%stride===0||f===F-1)await report(0.88+0.12*(f+1)/F,'Finishing drum split…');
+  }
   return {hRe,hIm,pRe,pIm};
 }
 function lowPass(re,im,F,B,hz){
@@ -726,37 +778,52 @@ function lowPass(re,im,F,B,hz){
 let vSess=null, aSess=null;
 async function loadModels(onProg){
   ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/';
+  const step=async(p,m)=>{if(onProg)await onProg(p,m);};
   async function dl(url,s0,s1){
     const r=await fetch(url); if(!r.ok)throw new Error('HTTP '+r.status);
     const total=+r.headers.get('content-length')||0;
-    const rd=r.body.getReader();const ch=[];let ld=0;
-    while(true){const{done,value}=await rd.read();if(done)break;ch.push(value);ld+=value.length;if(total)onProg(s0+(s1-s0)*ld/total,'Downloading model…');}
+    const rd=r.body.getReader();const ch=[];let ld=0,next=s0;
+    while(true){
+      const{done,value}=await rd.read();if(done)break;
+      ch.push(value);ld+=value.length;
+      if(total){
+        const p=s0+(s1-s0)*ld/total;
+        if(p>=next||p>=s1){next=p+1.5;await step(p,'Downloading model weights…');}
+      }
+    }
     const b=new Uint8Array(ld);let o=0;for(const c of ch){b.set(c,o);o+=c.length;}return b.buffer;
   }
-  onProg(0,'Downloading vocals model (39 MB)…');
-  vSess=await ort.InferenceSession.create(await dl(HF+'vocals.onnx',0,46),{executionProviders:['wasm']});
-  onProg(50,'Downloading accompaniment model (39 MB)…');
-  aSess=await ort.InferenceSession.create(await dl(HF+'accompaniment.onnx',50,96),{executionProviders:['wasm']});
-  onProg(100,'Models ready');
+  await step(0,'Opening vocals model…');
+  const vocals=await dl(HF+'vocals.onnx',0,42);
+  await step(44,'Preparing vocals model in browser…');
+  vSess=await ort.InferenceSession.create(vocals,{executionProviders:['wasm']});
+  await step(50,'Vocals model ready.');
+  await step(52,'Opening accompaniment model…');
+  const accompaniment=await dl(HF+'accompaniment.onnx',52,92);
+  await step(94,'Preparing accompaniment model in browser…');
+  aSess=await ort.InferenceSession.create(accompaniment,{executionProviders:['wasm']});
+  await step(100,'Models ready.');
 }
 
 // ── pipeline ──
 async function separateAudio(arrayBuf,onProg){
-  onProg(0,'Decoding audio…');
+  const step=async(p,m)=>{if(onProg)await onProg(p,m);};
+  await step(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
   if(audioCtx.state==='suspended')await audioCtx.resume();
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
 
-  onProg(5,'Computing spectrograms…');
+  await step(8,'Audio decoded.');
   const win=hann(FFT_SIZE);
-  const stL=stft(sigL,win), stR=stft(sigR,win);
+  const stL=await stft(sigL,win,p=>step(10+12*p,'Computing left spectrogram…'));
+  const stR=await stft(sigR,win,p=>step(22+12*p,'Computing right spectrogram…'));
   const F=stL.F;
 
   // magnitudes (low MODEL_BINS only needed for model)
-  const magL=stL.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stL.im[f][b]);return m;});
-  const magR=stR.re.map((r,f)=>{const m=new Float32Array(MODEL_BINS);for(let b=0;b<MODEL_BINS;b++)m[b]=Math.hypot(r[b],stR.im[f][b]);return m;});
+  const magL=await buildMagnitude(stL,p=>step(34+4*p,'Measuring left channel…'));
+  const magR=await buildMagnitude(stR,p=>step(38+4*p,'Measuring right channel…'));
 
   const vMask=new Float32Array(F*MODEL_BINS);  // vocal soft mask per (frame,bin)
 
@@ -780,41 +847,49 @@ async function separateAudio(arrayBuf,onProg){
           vMask[f*MODEL_BINS+b]=vp/(vp+ap+1e-10);
         }
       }
-      onProg(12+56*(seg+1)/nSeg,`Separating vocals… ${seg+1}/${nSeg}`);
+      await step(44+24*(seg+1)/nSeg,`Separating vocals ${seg+1}/${nSeg}…`);
     }
   } else {
-    onProg(40,'DSP separation (model unavailable)…');
-    for(let f=0;f<F;f++)for(let b=0;b<MODEL_BINS;b++){
+    const stride=Math.max(1,Math.floor(F/24));
+    for(let f=0;f<F;f++){
+      for(let b=0;b<MODEL_BINS;b++){
       const l=magL[f][b],r=magR[f][b];
       vMask[f*MODEL_BINS+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
+      }
+      if(f%stride===0||f===F-1)await step(44+24*(f+1)/F,'Separating vocals with browser DSP…');
     }
   }
 
-  onProg(70,'Applying masks…');
+  await step(70,'Applying masks…');
   const vRe=stL.re.map(()=>new Float32Array(TOT_BINS)), vIm=stL.im.map(()=>new Float32Array(TOT_BINS));
   const aRe=stL.re.map(()=>new Float32Array(TOT_BINS)), aIm=stL.im.map(()=>new Float32Array(TOT_BINS));
-  for(let f=0;f<F;f++)for(let b=0;b<TOT_BINS;b++){
-    const mRe=(stL.re[f][b]+stR.re[f][b])*0.5, mIm=(stL.im[f][b]+stR.im[f][b])*0.5;
-    const vm = b<MODEL_BINS ? vMask[f*MODEL_BINS+b] : 0;  // high bins -> accompaniment
-    vRe[f][b]=mRe*vm; vIm[f][b]=mIm*vm;
-    aRe[f][b]=mRe*(1-vm); aIm[f][b]=mIm*(1-vm);
+  const maskStride=Math.max(1,Math.floor(F/24));
+  for(let f=0;f<F;f++){
+    for(let b=0;b<TOT_BINS;b++){
+      const mRe=(stL.re[f][b]+stR.re[f][b])*0.5, mIm=(stL.im[f][b]+stR.im[f][b])*0.5;
+      const vm = b<MODEL_BINS ? vMask[f*MODEL_BINS+b] : 0;  // high bins -> accompaniment
+      vRe[f][b]=mRe*vm; vIm[f][b]=mIm*vm;
+      aRe[f][b]=mRe*(1-vm); aIm[f][b]=mIm*(1-vm);
+    }
+    if(f%maskStride===0||f===F-1)await step(70+4*(f+1)/F,'Applying masks…');
   }
 
-  onProg(74,'Splitting drums & melody (HPSS)…');
-  const {hRe,hIm,pRe,pIm}=hpss(aRe,aIm,F,TOT_BINS);
-  onProg(82,'Extracting bass…');
+  const {hRe,hIm,pRe,pIm}=await hpss(aRe,aIm,F,TOT_BINS,(p,m)=>step(74+8*p,m));
+  await step(83,'Extracting bass…');
   const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,TOT_BINS,300);
 
-  onProg(86,'Synthesizing stems…');
+  await step(86,'Synthesizing stems…');
   const dur=raw.duration;
-  const toAB=(re,im)=>{const sig=istft(re,im,F,win);const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
-  buffers.drums=toAB(pRe,pIm);  onProg(89,'…');
-  buffers.vocals=toAB(vRe,vIm); onProg(92,'…');
-  buffers.bass=toAB(bsRe,bsIm); onProg(95,'…');
-  buffers.melody=toAB(mlRe,mlIm);
-  onProg(98,'Drawing waveforms…');
-  STEMS.forEach(s=>drawWave(s));
-  onProg(100,'Done');
+  const toAB=async(re,im,label,s0,s1)=>{const sig=await istft(re,im,F,win,p=>step(s0+(s1-s0)*p,`Synthesizing ${label}…`));const ab=audioCtx.createBuffer(1,Math.min(sig.length,Math.ceil(dur*SR)),SR);ab.copyToChannel(sig.subarray(0,ab.length),0);return ab;};
+  buffers.drums=await toAB(pRe,pIm,'drums',86,89);
+  buffers.vocals=await toAB(vRe,vIm,'vocals',89,92);
+  buffers.bass=await toAB(bsRe,bsIm,'bass',92,95);
+  buffers.melody=await toAB(mlRe,mlIm,'melody',95,98);
+  for(let i=0;i<STEMS.length;i++){
+    await step(98+1.5*i/STEMS.length,`Drawing ${STEMS[i]} waveform…`);
+    drawWave(STEMS[i]);
+  }
+  await step(100,'Ready.');
   return dur;
 }
 
@@ -982,9 +1057,31 @@ document.getElementById('timeline').addEventListener('keydown',e=>{
 document.getElementById('center').addEventListener('click',()=>{if(state.ready)document.getElementById('btnPlay').click();else document.getElementById('fileInput').click();});
 
 // overlay
-function showOverlay(t,m,p){const o=document.getElementById('overlay');o.classList.add('active');document.getElementById('ovTitle').textContent=t;document.getElementById('ovMsg').textContent=m;document.getElementById('progFill').style.width=p+'%';}
-function hideOverlay(){document.getElementById('overlay').classList.remove('active');}
-function prog(p,m){document.getElementById('progFill').style.width=p+'%';if(m)document.getElementById('ovMsg').textContent=m;}
+function waitForPaint(){
+  return new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
+}
+function showOverlay(t,m,p){
+  const o=document.getElementById('overlay');
+  o.classList.add('active');
+  o.setAttribute('aria-busy','true');
+  document.getElementById('ovTitle').textContent=t;
+  prog(p,m);
+}
+function hideOverlay(){
+  const o=document.getElementById('overlay');
+  o.classList.remove('active');
+  o.setAttribute('aria-busy','false');
+}
+function prog(p,m){
+  const pct=Math.max(0,Math.min(100,Number.isFinite(p)?p:0));
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progWrap').setAttribute('aria-valuenow',String(Math.round(pct)));
+  if(m)document.getElementById('ovMsg').textContent=m;
+}
+async function paintProgress(p,m){
+  prog(p,m);
+  await waitForPaint();
+}
 
 async function useSampleTrack(track, button){
   const label = button?.textContent || track.name;
@@ -1006,17 +1103,35 @@ async function useSampleTrack(track, button){
   }
 
   try{
-    showOverlay('Loading Sample',`Downloading ${track.name}…`,10);
+    showOverlay('Loading Sample',`Opening ${track.name}…`,4);
+    await paintProgress(8,`Opening ${track.name}…`);
     const resp=await fetch(trackUrl.href);
     const ctype = resp.headers.get('content-type') || '';
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     if (ctype && !ctype.startsWith('audio/') && !ctype.includes('octet-stream')) {
       throw new Error(`Track is not an audio file (${ctype || 'unknown type'})`);
     }
-    const blob=await resp.blob();
+    const total=+resp.headers.get('content-length')||0;
+    let blob;
+    if(resp.body&&total){
+      const reader=resp.body.getReader();
+      const chunks=[];let loaded=0,next=12;
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        chunks.push(value);loaded+=value.length;
+        const p=12+54*loaded/total;
+        if(p>=next||loaded>=total){next=p+2.5;await paintProgress(p,`Downloading ${track.name}…`);}
+      }
+      blob=new Blob(chunks,{type:ctype||'audio/mpeg'});
+    }else{
+      blob=await resp.blob();
+      await paintProgress(66,`Downloaded ${track.name}.`);
+    }
     if (!blob || !blob.size) {
       throw new Error('Sample file is empty.');
     }
+    await paintProgress(70,'Preparing sample audio…');
     const file=new File([blob], track.name.replace(/[^\w.-]+/g,'_')+'.mp3', { type: blob.type || 'audio/mpeg' });
     await handleFile(file);
   }catch(e){
@@ -1066,13 +1181,19 @@ async function handleFile(file){
   });
   try{
     if(!vSess||!aSess){
-      showOverlay('Loading Model','Downloading Spleeter (~80 MB). Cached after first use.',0);
-      try{await loadModels((p,m)=>prog(p,m));}
-      catch(e){console.warn('Model load failed, DSP fallback:',e);vSess=null;aSess=null;}
+      showOverlay('Loading Model','Preparing stem model…',0);
+      await paintProgress(1,'Preparing stem model…');
+      try{await loadModels((p,m)=>paintProgress(p,m));}
+      catch(e){console.warn('Model load failed, DSP fallback:',e);vSess=null;aSess=null;await paintProgress(100,'Model unavailable. Using browser DSP.');}
     }
-    showOverlay('Separating Stems','Processing…',0);
-    const dur=await separateAudio(await file.arrayBuffer(),(p,m)=>prog(p,m));
-    state.duration=dur;state.ready=true;hideOverlay();
+    showOverlay('Separating Stems','Reading audio file…',0);
+    await paintProgress(2,'Reading audio file…');
+    const audioBytes=await file.arrayBuffer();
+    await paintProgress(6,'Audio file ready.');
+    const dur=await separateAudio(audioBytes,(p,m)=>paintProgress(p,m));
+    state.duration=dur;state.ready=true;
+    await paintProgress(100,'Ready.');
+    hideOverlay();
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     document.getElementById('waveRow').classList.add('active');
