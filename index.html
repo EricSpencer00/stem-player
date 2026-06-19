@@ -835,12 +835,23 @@ async function loadModels(onProg){
   await step(100,'Models ready.');
 }
 
+function wait(ms){
+  return new Promise(resolve=>setTimeout(resolve,ms));
+}
+async function resumeAudioContextForDecode(ctx, timeoutMs=1000){
+  if(!ctx || ctx.state!=='suspended' || typeof ctx.resume!=='function') return;
+  await Promise.race([
+    ctx.resume().catch(()=>{}),
+    wait(timeoutMs),
+  ]);
+}
+
 // ── pipeline ──
 async function separateAudio(arrayBuf,onProg){
   const step=async(p,m)=>{if(onProg)await onProg(p,m);};
   await step(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
-  if(audioCtx.state==='suspended')await audioCtx.resume();
+  await resumeAudioContextForDecode(audioCtx);
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;

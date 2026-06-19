@@ -295,6 +295,7 @@ globalThis.__app = {
   setVolume,
   setMute,
   toggleMute,
+  resumeAudioContextForDecode: typeof resumeAudioContextForDecode === 'function' ? resumeAudioContextForDecode : undefined,
   setHeadphones: typeof setHeadphones === 'function' ? setHeadphones : undefined,
   resetAllTracks: typeof resetAllTracks === 'function' ? resetAllTracks : undefined,
   hasMutedTracks: typeof hasMutedTracks === 'function' ? hasMutedTracks : undefined,
@@ -320,6 +321,25 @@ test('loop buttons represent quarter, half, one, and two measure lengths', () =>
   const { app } = loadApp();
 
   assert.deepEqual(Array.from(app.LOOP_BARS), [0.25, 0.5, 1, 2]);
+});
+
+test('decode setup does not wait forever when Safari keeps AudioContext suspended', async () => {
+  const { app } = loadApp();
+  let resumeCalled = false;
+  const safariLikeContext = {
+    state: 'suspended',
+    resume() {
+      resumeCalled = true;
+      return new Promise(() => {});
+    },
+  };
+
+  assert.equal(typeof app.resumeAudioContextForDecode, 'function');
+  const started = Date.now();
+  await app.resumeAudioContextForDecode(safariLikeContext, 5);
+
+  assert.equal(resumeCalled, true);
+  assert.ok(Date.now() - started < 100);
 });
 
 test('enabling a loop captures the current beat partition and keeps playing from the current offset', () => {
