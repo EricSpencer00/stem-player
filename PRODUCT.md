@@ -16,12 +16,16 @@ independently playable, mutable, and loopable. No accounts, no uploads, no serve
 - Load local audio by dropping a file on the device or choosing one through the center control.
 - Load bundled sample tracks from the local `samples/` directory for same-origin playback.
 - Decode and separate tracks entirely in the browser using ONNX Runtime Web plus browser DSP fallback behavior.
-- Render four playable stems: drums, bass, vocals, and melody.
+- Recover from stalled remote model downloads by timing out the stream and continuing with browser DSP fallback.
+- Render four playable stems: drums, bass, vocals, and melody, with a full-width visible-window audio overview and per-stem play cursor.
 - Play, pause, restart, stop, seek, and view elapsed/total time.
 - Control each stem from the device surface: tap to mute, drag diagonally to adjust volume.
-- Control each stem from the panel: volume slider, mute, and headphones/solo isolation.
-- Reset all silenced tracks with the unsilence control.
-- Loop each stem independently with `1/4`, `1/2`, `1`, and `2` measure buttons.
+- Control each stem from the panel: volume slider, icon mute, icon headphones/solo isolation, and a dedicated spectrogram rail.
+- Mute or unmute all stems from one persistent global toggle without resetting individual volume choices.
+- Loop each stem independently with `1/4`, `1/2`, `1`, and `2` measure buttons, or use the All row to apply one linked loop across every stem.
+- Swap loop monitoring between Mix mode, where looped stems play against the full track, and Solo mode, where the looped stem is cued through the headphones layer without mutating mute state.
+- Keep the stem overview focused on the relevant audible window: normal playback follows a rolling slice, while active loops expand the window to include the earliest looped stem and current transport.
+- Clicking an empty part of a stem overview seeks within the visible window; looping remains on the explicit quantized buttons.
 - Detect tempo from the loaded audio, prefer plausible tempo candidates, and use the detected 4/4 measure offset for loop snapping.
 - Preserve active loop ranges across seek/restart while clearing all loop state on new file loads.
 - Reject loops that would spill past the end of the track and clear stale loop UI/state.
