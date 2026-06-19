@@ -5,6 +5,10 @@ import vm from 'node:vm';
 
 const STEMS = ['drums', 'vocals', 'bass', 'melody'];
 
+function loadHtml() {
+  return readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+}
+
 class FakeClassList {
   constructor() {
     this.names = new Set();
@@ -246,7 +250,7 @@ class FakeAudioContext {
 }
 
 function loadApp() {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = loadHtml();
   const inlineScript = html.match(/<script>\s*'use strict';([\s\S]*)<\/script>/);
   assert.ok(inlineScript, 'expected to find app script in index.html');
 
@@ -288,6 +292,10 @@ globalThis.__app = {
   sources,
   gains,
   buffers,
+  estimateTempo: typeof estimateTempo === 'function' ? estimateTempo : undefined,
+  chooseTempoCandidate: typeof chooseTempoCandidate === 'function' ? chooseTempoCandidate : undefined,
+  measureLength: typeof measureLength === 'function' ? measureLength : undefined,
+  snapLoopStart: typeof snapLoopStart === 'function' ? snapLoopStart : undefined,
   setLoop,
   startPlayback,
   stopPlayback,
@@ -299,6 +307,7 @@ globalThis.__app = {
   setHeadphones: typeof setHeadphones === 'function' ? setHeadphones : undefined,
   resetAllTracks: typeof resetAllTracks === 'function' ? resetAllTracks : undefined,
   hasMutedTracks: typeof hasMutedTracks === 'function' ? hasMutedTracks : undefined,
+  clearAllLoops: typeof clearAllLoops === 'function' ? clearAllLoops : undefined,
   setAudioContext(ctx) { audioCtx = ctx; },
   getAudioContext() { return audioCtx; }
 };`;
@@ -317,10 +326,109 @@ function preparePlayback(app, audioCtx, offset = 0) {
   });
 }
 
+function assertAlmostEqual(actual, expected, tolerance = 1e-9) {
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `expected ${actual} to be within ${tolerance} of ${expected}`,
+  );
+}
+
+function makePulseTrain({ bpm, offset = 0, duration = 12, sampleRate = 1000 }) {
+  const signal = new Float32Array(Math.ceil(duration * sampleRate));
+  const beat = 60 / bpm;
+  for (let t = offset; t < duration; t += beat) {
+    const center = Math.round(t * sampleRate);
+    for (let i = 0; i < 24; i++) {
+      const idx = center + i;
+      if (idx < signal.length) signal[idx] += 1 - (i / 24);
+    }
+  }
+  return { signal, sampleRate };
+}
+
+function makeFourFourPulseTrain({ bpm, beatOffset = 0, downbeatPhase = 0, duration = 16, sampleRate = 1000 }) {
+  const signal = new Float32Array(Math.ceil(duration * sampleRate));
+  const beat = 60 / bpm;
+  for (let beatIndex = 0, t = beatOffset; t < duration; beatIndex++, t += beat) {
+    const phase = ((beatIndex % 4) + 4) % 4;
+    const amp = phase === downbeatPhase ? 1 : 0.32;
+    const center = Math.round(t * sampleRate);
+    for (let i = 0; i < 24; i++) {
+      const idx = center + i;
+      if (idx < signal.length) signal[idx] += amp * (1 - (i / 24));
+    }
+  }
+  return { signal, sampleRate };
+}
+
 test('loop buttons represent quarter, half, one, and two measure lengths', () => {
   const { app } = loadApp();
 
   assert.deepEqual(Array.from(app.LOOP_BARS), [0.25, 0.5, 1, 2]);
+});
+
+test('touch controls keep fixed hit areas when labels change', () => {
+  const html = loadHtml();
+
+  assert.match(html, /\.tbtn\s*\{(?=[^}]*width:\s*112px;)(?=[^}]*min-height:\s*48px;)/s);
+  assert.match(html, /\.stem-mute-btn,\s*\.stem-headphones-btn,\s*\.unsilence-btn\s*\{(?=[^}]*width:\s*76px;)(?=[^}]*min-height:\s*44px;)/s);
+  assert.match(html, /\.loop-row\s*\{(?=[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);)/s);
+  assert.match(html, /\.loop-btn\s*\{(?=[^}]*width:\s*100%;)(?=[^}]*min-height:\s*44px;)/s);
+  assert.match(html, /\.timeline-wrap\s*\{(?=[^}]*height:\s*28px;)/s);
+});
+
+test('tempo estimator recovers beat tempo and beat-grid offset', () => {
+  const { app } = loadApp();
+  const { signal, sampleRate } = makePulseTrain({ bpm: 96, offset: 0.18 });
+
+  assert.equal(typeof app.estimateTempo, 'function');
+  const tempo = app.estimateTempo(signal, sampleRate);
+
+  assert.ok(Math.abs(tempo.bpm - 96) <= 2, `expected bpm near 96, got ${tempo.bpm}`);
+  assert.ok(tempo.confidence > 0.07, `expected usable confidence, got ${tempo.confidence}`);
+  assert.ok(Math.abs(tempo.offset - 0.18) <= 0.04, `expected offset near 0.18, got ${tempo.offset}`);
+});
+
+test('tempo estimator prefers the 4/4 downbeat when one beat phase is accented', () => {
+  const { app } = loadApp();
+  const { signal, sampleRate } = makeFourFourPulseTrain({
+    bpm: 120,
+    beatOffset: 0.11,
+    downbeatPhase: 2,
+  });
+
+  const tempo = app.estimateTempo(signal, sampleRate);
+
+  assert.ok(Math.abs(tempo.bpm - 120) <= 2, `expected bpm near 120, got ${tempo.bpm}`);
+  assert.ok(Math.abs(tempo.beatOffset - 0.11) <= 0.04, `expected beat offset near 0.11, got ${tempo.beatOffset}`);
+  assert.ok(Math.abs(tempo.offset - 1.11) <= 0.05, `expected measure offset near 1.11, got ${tempo.offset}`);
+});
+
+test('tempo candidate selection avoids near-tie half-time loop grids', () => {
+  const { app } = loadApp();
+
+  assert.equal(typeof app.chooseTempoCandidate, 'function');
+  const selected = app.chooseTempoCandidate([
+    { bpm: 61, rawBpm: 61, score: 0.397, lag: 99 },
+    { bpm: 91, rawBpm: 91, score: 0.348, lag: 66 },
+    { bpm: 182, rawBpm: 182, score: 0.224, lag: 33 },
+  ]);
+
+  assert.equal(Math.round(selected.bpm), 91);
+  assert.equal(selected.lag, 66);
+});
+
+test('loop start snaps to the next selected subdivision on the measured bar grid', () => {
+  const { app } = loadApp();
+  app.state.duration = 30;
+  app.state.bpm = 100;
+  app.state.measureOffset = 0.25;
+
+  assert.equal(typeof app.snapLoopStart, 'function');
+  assertAlmostEqual(app.measureLength(), 2.4);
+  assertAlmostEqual(app.snapLoopStart(3.0, 0.6), 3.25);
+  assertAlmostEqual(app.snapLoopStart(2.651, 0.6), 2.65);
+  assertAlmostEqual(app.snapLoopStart(4.7), 5.05);
 });
 
 test('decode setup does not wait forever when Safari keeps AudioContext suspended', async () => {
@@ -399,27 +507,47 @@ test('play attempts to resume an interrupted AudioContext before starting playba
   assert.equal(app.state.playing, true);
 });
 
-test('enabling a loop captures the current beat partition and keeps playing from the current offset', () => {
+test('enabling a loop uses the tempo grid and reschedules only that stem', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
   preparePlayback(app, audioCtx);
-  app.state.bpm = 120;
+  app.state.bpm = 90;
   app.startPlayback(0);
-  const originalSource = app.sources.drums;
+  const original = Object.fromEntries(STEMS.map((stem) => [stem, app.sources[stem]]));
   audioCtx.currentTime = 2.26;
 
   app.setLoop('drums', 0);
 
-  assert.equal(app.state.loopStart.drums, 2);
-  assert.equal(app.state.loopEnd.drums, 2.5);
-  assert.equal(app.sources.drums, originalSource);
+  assertAlmostEqual(app.state.loopStart.drums, 8 / 3);
+  assertAlmostEqual(app.state.loopEnd.drums, (8 / 3) + (60 / 90));
+  assert.notEqual(app.sources.drums, original.drums);
+  assert.equal(original.drums.stopped, true);
+  assert.equal(app.sources.vocals, original.vocals);
+  assert.equal(app.sources.bass, original.bass);
+  assert.equal(app.sources.melody, original.melody);
   assert.equal(app.sources.drums.loop, true);
-  assert.equal(app.sources.drums.loopStart, 2);
-  assert.equal(app.sources.drums.loopEnd, 2.5);
+  assertAlmostEqual(app.sources.drums.loopStart, 8 / 3);
+  assertAlmostEqual(app.sources.drums.loopEnd, (8 / 3) + (60 / 90));
   assert.equal(app.sources.drums.starts.length, 1);
+  assert.equal(app.sources.drums.starts.at(-1).offset, 2.26);
 });
 
-test('changing a loop while playing keeps the current stem source and only updates its loop points', () => {
+test('short loops snap to the next beat subdivision instead of the next bar', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.bpm = 90;
+  app.startPlayback(0);
+  audioCtx.currentTime = 3.5;
+
+  app.setLoop('drums', 0);
+
+  assertAlmostEqual(app.state.loopStart.drums, 4);
+  assertAlmostEqual(app.state.loopEnd.drums, 14 / 3);
+  assert.equal(app.sources.drums.starts.at(-1).offset, 3.5);
+});
+
+test('changing a loop while playing only replaces the selected stem source', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
   preparePlayback(app, audioCtx);
@@ -431,12 +559,13 @@ test('changing a loop while playing keeps the current stem source and only updat
 
   app.setLoop('vocals', 1);
 
-  assert.equal(app.sources.vocals, original.vocals);
-  assert.equal(original.vocals.stopped, false);
+  assert.notEqual(app.sources.vocals, original.vocals);
+  assert.equal(original.vocals.stopped, true);
   assert.equal(app.sources.vocals.loop, true);
-  assert.equal(app.sources.vocals.loopStart, 3);
-  assert.equal(app.sources.vocals.loopEnd, 4);
+  assert.equal(app.sources.vocals.loopStart, 4);
+  assert.equal(app.sources.vocals.loopEnd, 5);
   assert.equal(app.sources.vocals.starts.length, 1);
+  assert.equal(app.sources.vocals.starts.at(-1).offset, 3.1);
   assert.equal(app.sources.drums, original.drums);
   assert.equal(app.sources.bass, original.bass);
   assert.equal(app.sources.melody, original.melody);
@@ -446,21 +575,80 @@ test('changing a loop while playing keeps the current stem source and only updat
   assert.equal(app.state.startTime, originalStartTime);
 });
 
-test('disabling a loop while playing leaves the current stem source running in time', () => {
+test('disabling a loop while playing replaces that stem to rejoin linear playback', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
   preparePlayback(app, audioCtx);
   app.state.bpm = 120;
   app.startPlayback(0);
-  const originalSource = app.sources.bass;
+  const original = Object.fromEntries(STEMS.map((stem) => [stem, app.sources[stem]]));
 
+  audioCtx.currentTime = 2.2;
   app.setLoop('bass', 2);
+  const loopedSource = app.sources.bass;
+  audioCtx.currentTime = 6.4;
   app.setLoop('bass', -1);
 
-  assert.equal(app.sources.bass, originalSource);
+  assert.notEqual(loopedSource, original.bass);
+  assert.notEqual(app.sources.bass, loopedSource);
+  assert.equal(loopedSource.stopped, true);
   assert.equal(app.sources.bass.loop, false);
   assert.equal(app.sources.bass.starts.length, 1);
-  assert.equal(originalSource.stopped, false);
+  assert.equal(app.sources.bass.starts.at(-1).offset, 6.4);
+  assert.equal(app.sources.drums, original.drums);
+  assert.equal(app.sources.vocals, original.vocals);
+  assert.equal(app.sources.melody, original.melody);
+  assert.equal(original.drums.stopped, false);
+  assert.equal(original.vocals.stopped, false);
+  assert.equal(original.melody.stopped, false);
+});
+
+test('rejecting a loop that extends past the track clears stale loop state', () => {
+  const { app, document, context } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.bpm = 120;
+  app.startPlayback(0);
+
+  audioCtx.currentTime = 2.26;
+  app.setLoop('melody', 0);
+  const loopedSource = app.sources.melody;
+  assert.equal(loopedSource.loop, true);
+
+  audioCtx.currentTime = 29.2;
+  app.setLoop('melody', 3);
+
+  assert.equal(context.__alerts.length, 1);
+  assert.equal(app.state.loopDot.melody, -1);
+  assert.equal(app.state.loopStart.melody, 0);
+  assert.equal(app.state.loopEnd.melody, 0);
+  assert.equal(document.getElementById('varc-melody').classList.contains('looping'), false);
+  assert.deepEqual(document.loopButtons.melody.map((button) => button.classList.contains('on')), [false, false, false, false]);
+  assert.notEqual(app.sources.melody, loopedSource);
+  assert.equal(loopedSource.stopped, true);
+  assert.equal(app.sources.melody.loop, false);
+  assert.equal(app.sources.melody.starts.length, 1);
+  assert.equal(app.sources.melody.starts.at(-1).offset, 29.2);
+});
+
+test('loop reset clears loop state and UI for every stem', () => {
+  const { app, document } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.bpm = 120;
+  app.state.pauseOffset = 2.26;
+
+  assert.equal(typeof app.clearAllLoops, 'function');
+  STEMS.forEach((stem, idx) => app.setLoop(stem, idx % app.LOOP_BARS.length));
+  app.clearAllLoops();
+
+  for (const stem of STEMS) {
+    assert.equal(app.state.loopDot[stem], -1);
+    assert.equal(app.state.loopStart[stem], 0);
+    assert.equal(app.state.loopEnd[stem], 0);
+    assert.equal(document.getElementById(`varc-${stem}`).classList.contains('looping'), false);
+    assert.deepEqual(document.loopButtons[stem].map((button) => button.classList.contains('on')), [false, false, false, false]);
+  }
 });
 
 test('headphones isolate one stem without changing mute or volume state', () => {

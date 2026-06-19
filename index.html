@@ -202,8 +202,8 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 29%;
-  height: 29%;
+  width: 32%;
+  height: 32%;
   border-radius: 50%;
   background: radial-gradient(75% 75% at 40% 35%, oklch(83% 0.018 76), var(--center));
   display: flex;
@@ -295,21 +295,24 @@ canvas.wave { width: 100%; height: 26px; background: var(--wave-bg); border-radi
 #playbar { width: min(480px, 88vw); display: none; flex-direction: column; gap: 11px; margin-bottom: 18px; }
 #playbar.active { display: flex; }
 .filename { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-indent: 0.2em; }
-.timeline-wrap { height: 2px; background: var(--track); cursor: pointer; position: relative; border-radius: 2px; }
-.timeline-fill { position: absolute; inset: 0; background: var(--ink); width: 0%; pointer-events: none; border-radius: 2px; }
-.timeline-head { position: absolute; top: 50%; left: 0%; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); transform: translate(-50%,-50%); pointer-events: none; transition: left 0.1s linear; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.3); }
+.timeline-wrap { height: 28px; background: transparent; cursor: pointer; position: relative; border-radius: 999px; touch-action: manipulation; }
+.timeline-wrap::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; transform: translateY(-50%); background: var(--track); border-radius: 3px; }
+.timeline-fill { position: absolute; left: 0; top: 50%; height: 3px; transform: translateY(-50%); background: var(--ink); width: 0%; pointer-events: none; border-radius: 3px; }
+.timeline-head { position: absolute; top: 50%; left: 0%; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); transform: translate(-50%,-50%); pointer-events: none; transition: left 0.1s linear; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.3); }
 .time-row { display: flex; justify-content: space-between; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); }
-.transport { display: flex; justify-content: center; align-items: center; gap: 10px; }
+.transport { display: flex; justify-content: center; align-items: center; gap: 8px; }
 .tbtn {
   background: none; border: 1px solid var(--track); border-radius: 999px;
   font-family: inherit; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--ink-soft); cursor: pointer;
-  min-height: 40px; padding: 0 18px;
+  width: 112px; min-height: 48px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
   text-indent: 0.18em;
+  touch-action: manipulation;
 }
 .tbtn:hover { color: var(--ink); border-color: var(--ink-faint); }
-.tbtn.primary { color: var(--page); background: var(--ink); border-color: var(--ink); font-size: 11px; letter-spacing: 0.22em; min-width: 96px; }
+.tbtn.primary { color: var(--page); background: var(--ink); border-color: var(--ink); font-size: 11px; letter-spacing: 0.22em; }
 .tbtn.primary:hover { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
 
 /* ── stem panel ── */
@@ -317,7 +320,7 @@ canvas.wave { width: 100%; height: 26px; background: var(--wave-bg); border-radi
 #stems-panel.active { display: flex; }
 .stem-row {
   display: grid;
-  grid-template-columns: 52px 1fr auto auto;
+  grid-template-columns: 58px minmax(0, 1fr) 76px 76px;
   grid-template-areas:
     "name slider mute phones"
     "loop loop loop loop";
@@ -331,19 +334,20 @@ input.vol { grid-area: slider; }
 /* native range slider, themed */
 input.vol {
   -webkit-appearance: none; appearance: none;
-  width: 100%; height: 28px; background: transparent; cursor: pointer; margin: 0;
+  width: 100%; height: 38px; background: transparent; cursor: pointer; margin: 0;
+  touch-action: manipulation;
 }
 input.vol::-webkit-slider-runnable-track { height: 2px; background: var(--track); border-radius: 2px; }
 input.vol::-moz-range-track { height: 2px; background: var(--track); border-radius: 2px; }
 input.vol::-moz-range-progress { height: 2px; background: var(--ink); border-radius: 2px; }
 input.vol::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 18px; height: 18px; border-radius: 50%; background: var(--ink);
-  margin-top: -8px; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.35);
+  width: 24px; height: 24px; border-radius: 50%; background: var(--ink);
+  margin-top: -11px; box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.35);
   transition: transform 0.12s;
 }
 input.vol::-moz-range-thumb {
-  width: 18px; height: 18px; border: none; border-radius: 50%; background: var(--ink);
+  width: 24px; height: 24px; border: none; border-radius: 50%; background: var(--ink);
   box-shadow: 0 1px 3px oklch(24% 0.01 70 / 0.35);
 }
 input.vol:active::-webkit-slider-thumb { transform: scale(1.15); }
@@ -357,11 +361,12 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 .unsilence-btn {
   font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--ink-soft); background: none; border: 1px solid var(--track); border-radius: 999px;
-  font-family: inherit; cursor: pointer; min-height: 34px; min-width: 56px; padding: 0 10px;
+  font-family: inherit; cursor: pointer; min-height: 44px; width: 76px; padding: 0;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
+  touch-action: manipulation;
 }
 .stem-mute-btn { grid-area: mute; }
-.stem-headphones-btn { grid-area: phones; min-width: 62px; }
+.stem-headphones-btn { grid-area: phones; }
 .stem-mute-btn:hover,
 .stem-headphones-btn:hover,
 .unsilence-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
@@ -369,7 +374,7 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 .stem-headphones-btn[aria-pressed="true"] { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
 .unsilence-btn {
   width: 100%;
-  min-height: 36px;
+  min-height: 44px;
   border-color: var(--ink-faint);
 }
 .unsilence-btn[hidden] { display: none; }
@@ -377,17 +382,17 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 /* loop buttons */
 .loop-row {
   grid-area: loop;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
+  gap: 8px;
 }
 .loop-btn {
-  font-family: inherit; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: inherit; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--ink-soft); background: none; border: 1px solid var(--track); border-radius: 999px;
-  min-height: 34px; padding: 0 8px; cursor: pointer; appearance: none; text-align: center;
+  width: 100%; min-width: 0; min-height: 44px; padding: 0; cursor: pointer; appearance: none; text-align: center;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  touch-action: manipulation;
 }
 .loop-btn.on { color: var(--amber); border-color: var(--amber); }
 .loop-btn:hover { border-color: var(--ink-faint); }
@@ -402,11 +407,11 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 /* mobile */
 @media (max-width: 540px) {
   body { justify-content: flex-start; padding: 20px 14px 32px; }
-  .stem-row { grid-template-columns: 48px 1fr auto auto; row-gap: 8px; }
+  .stem-row { grid-template-columns: 54px minmax(0, 1fr) 72px 72px; gap: 8px; }
   .stem-mute-btn,
-  .stem-headphones-btn { min-height: 40px; }
-  .loop-row { display: flex; align-items: center; gap: 8px; }
-  .tbtn { min-height: 44px; }
+  .stem-headphones-btn { width: 72px; }
+  .transport { gap: 6px; }
+  .tbtn { width: 96px; min-height: 48px; }
 }
 
 footer { margin-top: 26px; font-size: 8px; letter-spacing: 0.12em; color: var(--ink-faint); text-align: center; line-height: 2.1; }
@@ -430,7 +435,12 @@ footer a:hover { border-color: var(--ink-faint); }
   background: none;
   border: 1px solid var(--track);
   border-radius: 999px;
-  padding: 8px;
+  min-height: 52px;
+  padding: 8px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  touch-action: manipulation;
 }
 .sample-rows button:hover { border-color: var(--ink-faint); }
 </style>
@@ -580,6 +590,13 @@ const TOT_BINS  = FFT_SIZE / 2 + 1;   // 2049
 const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
 const SEG_FRAMES = 512;               // spleeter time-frames per segment
 const DEFAULT_VOLUME = 0.8;
+const BEATS_PER_MEASURE = 4;
+const BPM_MIN = 60;
+const BPM_MAX = 240;
+const BPM_FALLBACK = 120;
+const BPM_PREFERRED_MIN = 80;
+const BPM_PREFERRED_MAX = 180;
+const TEMPO_MIN_CONFIDENCE = 0.04;
 const LOOP_BARS = [0.25, 0.5, 1, 2];
 const SAMPLE_TRACKS = [
   {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
@@ -606,7 +623,8 @@ const state = {
   loopDot:{drums:-1,vocals:-1,bass:-1,melody:-1},
   loopStart:{drums:0,vocals:0,bass:0,melody:0},
   loopEnd:{drums:0,vocals:0,bass:0,melody:0},
-  pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
+  beatOffset:0, measureOffset:0, tempoConfidence:0, downbeatConfidence:0,
+  pauseOffset:0, startTime:0, duration:0, bpm:BPM_FALLBACK, raf:null,
 };
 let audioCtx;
 const gains={}, sources={}, buffers={};
@@ -654,12 +672,191 @@ function setVolArc(stem, v){
   if(el) el.setAttribute('stroke-dasharray', `${v.toFixed(4)} 1`);
 }
 
+function clamp(value, min, max){
+  return Math.min(max, Math.max(min, value));
+}
+
+function chooseTempoCandidate(candidates){
+  const sorted = candidates
+    .filter((candidate)=>Number.isFinite(candidate.score) && Number.isFinite(candidate.bpm) && candidate.lag > 0)
+    .sort((a,b)=>b.score-a.score);
+  const best = sorted[0];
+  if(!best) return {bpm:BPM_FALLBACK, rawBpm:BPM_FALLBACK, score:0, lag:0};
+  const preferred = sorted.find((candidate)=>
+    candidate.bpm >= BPM_PREFERRED_MIN &&
+    candidate.bpm <= BPM_PREFERRED_MAX &&
+    candidate.score >= best.score * 0.85
+  );
+  if((best.bpm < BPM_PREFERRED_MIN || best.bpm > BPM_PREFERRED_MAX) && preferred){
+    return preferred;
+  }
+  return best;
+}
+
+function tempoFallback(){
+  return {bpm:BPM_FALLBACK, confidence:0, beatOffset:0, measureOffset:0, offset:0, downbeatConfidence:0};
+}
+
+function onsetScoreAt(onset, frames, offset, stride){
+  let score = 0;
+  let count = 0;
+  for(let i = offset; i < frames; i += stride){
+    score += onset[i] || 0;
+    if(i > 0) score += (onset[i - 1] || 0) * 0.5;
+    if(i + 1 < frames) score += (onset[i + 1] || 0) * 0.5;
+    count++;
+  }
+  return count ? score / count : 0;
+}
+
+function estimateMeasureOffset(onset, frames, beatLag, beatOffsetFrame, hopSec){
+  const beatOffset = beatOffsetFrame * hopSec;
+  const measureLag = beatLag * BEATS_PER_MEASURE;
+  if(measureLag >= frames){
+    return {offset:beatOffset, confidence:0};
+  }
+
+  const phases = [];
+  for(let phase = 0; phase < BEATS_PER_MEASURE; phase++){
+    const offsetFrame = beatOffsetFrame + (phase * beatLag);
+    phases.push({
+      offset:offsetFrame * hopSec,
+      score:onsetScoreAt(onset, frames, offsetFrame, measureLag),
+    });
+  }
+  phases.sort((a,b)=>b.score-a.score);
+
+  const best = phases[0];
+  const second = phases[1] || {score:0};
+  const total = phases.reduce((sum, phase)=>sum + phase.score, 0);
+  const share = best && total > 0 ? best.score / total : 0;
+  const confidence = best && best.score > 0 ? (best.score - second.score) / best.score : 0;
+  if(best && confidence >= 0.12 && share >= 0.36){
+    return {offset:best.offset, confidence};
+  }
+  return {offset:beatOffset, confidence};
+}
+
+function estimateTempo(signal, sampleRate){
+  if(!signal || !signal.length || !sampleRate || sampleRate <= 0){
+    return tempoFallback();
+  }
+  const minSamples = sampleRate * 5;
+  if(signal.length < minSamples){
+    return tempoFallback();
+  }
+
+  const frame = Math.max(1, Math.floor(sampleRate * 0.03));
+  const hop = Math.max(1, Math.floor(sampleRate * 0.01));
+  const frames = Math.floor((signal.length - frame) / hop);
+  if(frames < 8){
+    return tempoFallback();
+  }
+
+  const onset = new Float32Array(frames);
+  let sm = 0;
+  let prevSm = 0;
+  let total = 0;
+  for(let i=0; i<frames; i++){
+    let rms = 0;
+    const base = i * hop;
+    for(let j=0; j<frame; j++){
+      const sample = signal[base + j] || 0;
+      rms += sample * sample;
+    }
+    rms = Math.sqrt(rms / frame);
+    sm = sm * 0.84 + rms * 0.16;
+    const v = sm - prevSm;
+    onset[i] = v > 0 ? v : 0;
+    prevSm = sm;
+    total += onset[i];
+  }
+  if(total === 0){
+    return tempoFallback();
+  }
+
+  let mean = 0;
+  for(let i=0; i<frames; i++) mean += onset[i];
+  mean /= frames;
+
+  let energy = 0;
+  for(let i=0; i<frames; i++){
+    const d = onset[i] - mean;
+    energy += d * d;
+  }
+  if(energy < 1e-10){
+    return tempoFallback();
+  }
+
+  const hopSec = hop / sampleRate;
+  const minLag = Math.max(1, Math.round((60 / BPM_MAX) / hopSec));
+  const maxLag = Math.max(minLag + 1, Math.floor((60 / BPM_MIN) / hopSec));
+  const capLag = Math.min(maxLag, frames - 2);
+  if(minLag >= capLag){
+    return tempoFallback();
+  }
+
+  let bestLag = -1;
+  let bestScore = -Infinity;
+  const candidates = [];
+  for(let lag = minLag; lag <= capLag; lag++){
+    let cross = 0;
+    let a2 = 0;
+    let b2 = 0;
+    for(let i = lag; i < frames; i++){
+      const a = onset[i] - mean;
+      const b = onset[i - lag] - mean;
+      cross += a * b;
+      a2 += a * a;
+      b2 += b * b;
+    }
+    const score = cross / Math.sqrt((a2 * b2) + 1e-12);
+    let bpm = 60 / (lag * hopSec);
+    while(bpm < BPM_MIN) bpm *= 2;
+    while(bpm > BPM_MAX) bpm /= 2;
+    candidates.push({lag, rawBpm:60 / (lag * hopSec), bpm, score});
+    if(score > bestScore){
+      bestScore = score;
+      bestLag = lag;
+    }
+  }
+
+  if(!Number.isFinite(bestScore) || !Number.isFinite(bestLag) || bestLag <= 0 || bestScore < TEMPO_MIN_CONFIDENCE){
+    return tempoFallback();
+  }
+
+  const selected = chooseTempoCandidate(candidates);
+  let bestOffset = 0;
+  let bestOffsetScore = -Infinity;
+  for(let o = 0; o < selected.lag; o++){
+    let score = 0;
+    for(let i = o; i < frames; i += selected.lag){
+      score += onset[i];
+    }
+    if(score > bestOffsetScore){
+      bestOffsetScore = score;
+      bestOffset = o;
+    }
+  }
+  const beatOffset = bestOffset * hopSec;
+  const measureOffset = estimateMeasureOffset(onset, frames, selected.lag, bestOffset, hopSec);
+
+  return {
+    bpm: Math.round(clamp(selected.bpm, BPM_MIN, BPM_MAX)),
+    confidence: selected.score,
+    beatOffset,
+    measureOffset: measureOffset.offset,
+    offset: measureOffset.offset,
+    downbeatConfidence: measureOffset.confidence,
+  };
+}
+
 function measureLength(){
-  return (60/state.bpm) * 4;
+  return (60 / clamp(state.bpm, BPM_MIN, BPM_MAX)) * BEATS_PER_MEASURE;
 }
 
 function beatLength(){
-  return measureLength() / 4;
+  return measureLength() / BEATS_PER_MEASURE;
 }
 
 function playbackOffset(sec){
@@ -668,10 +865,23 @@ function playbackOffset(sec){
   return Math.max(0, Math.min(safe, state.duration));
 }
 
-function snapLoopStart(currentSec){
-  const grid = beatLength();
-  if(!grid || !Number.isFinite(currentSec) || !state.duration) return 0;
-  return Math.floor((currentSec + 1e-6) / grid) * grid;
+function snapLoopStart(currentSec, loopLength=measureLength()){
+  const measure = measureLength();
+  if(!measure || !Number.isFinite(currentSec) || !state.duration) return 0;
+  const activeLength = Number.isFinite(loopLength) && loopLength > 0 ? loopLength : measure;
+  const grid = Math.min(measure, activeLength);
+  const offset = clamp(
+    Number.isFinite(state.measureOffset) ? state.measureOffset : (state.beatOffset || 0),
+    0,
+    Math.max(0, measure - 1e-6)
+  );
+  const boundary = offset + Math.floor((currentSec - offset) / grid) * grid;
+  const nextBoundary = boundary + grid;
+  const epsilon = Math.min(0.03, grid * 0.25);
+  if(boundary >= 0 && Math.abs(currentSec - boundary) <= epsilon){
+    return boundary;
+  }
+  return Math.max(0, nextBoundary);
 }
 
 function syncStemLoopSource(stem){
@@ -686,26 +896,43 @@ function syncStemLoopSource(stem){
   }
 }
 
+function clearStemLoop(stem, buttons){
+  state.loopDot[stem] = -1;
+  state.loopStart[stem] = 0;
+  state.loopEnd[stem] = 0;
+  document.getElementById(`varc-${stem}`).classList.remove('looping');
+  buttons.forEach((button)=>button.classList.toggle('on', false));
+}
+
+function clearAllLoops(){
+  STEMS.forEach((stem)=>{
+    const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
+    clearStemLoop(stem, buttons);
+    syncStemLoopSource(stem);
+  });
+}
+
 function setLoop(stem, idx){
   const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
 
   if(idx < 0){
-    state.loopDot[stem]=-1;
-    document.getElementById(`varc-${stem}`).classList.remove('looping');
-    buttons.forEach((button)=>button.classList.toggle('on', false));
-    syncStemLoopSource(stem);
+    const transportOffset = playbackOffset(currentTime());
+    clearStemLoop(stem, buttons);
+    if(state.playing)restartStemSource(stem, transportOffset);
+    else syncStemLoopSource(stem);
     return;
   }
 
   const transportOffset = playbackOffset(currentTime());
   const loopLength = LOOP_BARS[idx] * measureLength();
-  const start = snapLoopStart(transportOffset);
+  const start = snapLoopStart(transportOffset, loopLength);
   const end = start + loopLength;
 
   if(end > state.duration + 1e-6){
     alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
-    state.loopDot[stem] = -1;
-    buttons.forEach((button)=>button.classList.toggle('on', false));
+    clearStemLoop(stem, buttons);
+    if(state.playing)restartStemSource(stem, transportOffset);
+    else syncStemLoopSource(stem);
     return;
   }
 
@@ -714,7 +941,8 @@ function setLoop(stem, idx){
   state.loopDot[stem]=idx;
   buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
   document.getElementById(`varc-${stem}`).classList.add('looping');
-  syncStemLoopSource(stem);
+  if(state.playing)restartStemSource(stem, transportOffset);
+  else syncStemLoopSource(stem);
 }
 
 // ── FFT ──
@@ -892,8 +1120,19 @@ async function separateAudio(arrayBuf,onProg){
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
+  let tempoSignal = sigL;
+  if(nCh > 1){
+    tempoSignal = new Float32Array(sigL.length);
+    for(let i=0; i<sigL.length; i++) tempoSignal[i] = (sigL[i] + sigR[i]) * 0.5;
+  }
+  const tempo = estimateTempo(tempoSignal, raw.sampleRate || SR);
+  state.bpm = tempo.bpm || BPM_FALLBACK;
+  state.tempoConfidence = tempo.confidence;
+  state.downbeatConfidence = tempo.downbeatConfidence || 0;
+  state.beatOffset = clamp(tempo.beatOffset || 0, 0, Math.max(0, beatLength() - 1e-6));
+  state.measureOffset = clamp(tempo.measureOffset || tempo.offset || state.beatOffset || 0, 0, Math.max(0, measureLength() - 1e-6));
 
-  await step(8,'Audio decoded.');
+  await step(8,'Audio decoded. Tempo mapped.');
   const win=hann(FFT_SIZE);
   const stL=await stft(sigL,win,p=>step(10+12*p,'Computing left spectrogram…'));
   const stR=await stft(sigR,win,p=>step(22+12*p,'Computing right spectrogram…'));
@@ -1319,15 +1558,9 @@ async function handleFile(file){
     alert('Please drop an audio file (mp3, wav, flac, etc.).');
     return;
   }
-  stopPlayback();state.ready=false;state.pauseOffset=0;state.headphonesStem=null;updateHeadphonesUI();
+  stopPlayback();state.ready=false;state.pauseOffset=0;state.headphonesStem=null;state.bpm=BPM_FALLBACK;state.beatOffset=0;state.measureOffset=0;state.tempoConfidence=0;state.downbeatConfidence=0;updateHeadphonesUI();
   document.getElementById('filename').textContent=file.name;
-  STEMS.forEach(s=>{
-    state.loopDot[s]=-1;
-    state.loopStart[s]=0;
-    state.loopEnd[s]=0;
-    document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
-    document.getElementById('varc-'+s).classList.remove('looping');
-  });
+  clearAllLoops();
   try{
     if(!vSess||!aSess){
       showOverlay('Loading Model','Preparing stem model…',0);
