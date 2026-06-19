@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const STEMS = ['drums', 'vocals', 'bass', 'melody'];
+const LOOP_TARGETS = [...STEMS, 'all'];
 
 function loadHtml() {
   return readFileSync(new URL('../index.html', import.meta.url), 'utf8');
@@ -123,13 +124,17 @@ class FakeDocument {
       'btnStop', 'timeline', 'timelineFill', 'timelineHead', 'ringFill',
       'timeCur', 'timeTot', 'fileInput', 'device', 'overlay', 'ovTitle',
       'progWrap', 'progFill', 'ovMsg', 'sampleRows', 'filename', 'playbar',
-      'stems-panel', 'waveRow', 'hint', 'wDrums', 'wBass', 'wVocals', 'wMelody',
+      'stems-panel', 'hint', 'viewStartTime', 'viewEndTime', 'viewWindowLabel',
+      'btnMuteAll', 'loopAuditionMix', 'loopAuditionSolo',
+      'overlayCancel',
     ].forEach((id) => this.register(id));
 
     STEMS.forEach((stem) => {
       this.register(`lbl-${stem}`);
       this.register(`pct-${stem}`).textContent = '80';
       this.register(`mm-${stem}`);
+      this.register(`spec-${stem}`, 'canvas');
+      this.register(`cursor-${stem}`);
       const input = this.register(`vol-${stem}`, 'input');
       input.classList.add('vol');
       input.dataset.stem = stem;
@@ -157,6 +162,14 @@ class FakeDocument {
         button.textContent = String(idx);
         return button;
       });
+    });
+
+    this.loopButtons.all = [0, 1, 2, 3].map((idx) => {
+      const button = new FakeElement('button', this);
+      button.dataset.loop = String(idx);
+      button.dataset.stem = 'all';
+      button.textContent = String(idx);
+      return button;
     });
   }
 
@@ -247,6 +260,17 @@ class FakeAudioContext {
   resume() {
     return Promise.resolve();
   }
+
+  decodeAudioData() {
+    return Promise.resolve({
+      duration: 30,
+      numberOfChannels: 1,
+      sampleRate: 44100,
+      getChannelData() {
+        return new Float32Array(44100);
+      },
+    });
+  }
 }
 
 function loadApp() {
@@ -279,6 +303,7 @@ function loadApp() {
     File,
     Blob,
     URL,
+    AbortController,
     ort: { env: { wasm: {} } },
     __alerts: [],
   });
@@ -296,6 +321,10 @@ globalThis.__app = {
   chooseTempoCandidate: typeof chooseTempoCandidate === 'function' ? chooseTempoCandidate : undefined,
   measureLength: typeof measureLength === 'function' ? measureLength : undefined,
   snapLoopStart: typeof snapLoopStart === 'function' ? snapLoopStart : undefined,
+  audibleStemTime: typeof audibleStemTime === 'function' ? audibleStemTime : undefined,
+  spectralWindowFor: typeof spectralWindowFor === 'function' ? spectralWindowFor : undefined,
+  timeToSpectralPercent: typeof timeToSpectralPercent === 'function' ? timeToSpectralPercent : undefined,
+  spectralTimeFromClientX: typeof spectralTimeFromClientX === 'function' ? spectralTimeFromClientX : undefined,
   setLoop,
   startPlayback,
   stopPlayback,
@@ -304,10 +333,17 @@ globalThis.__app = {
   setMute,
   toggleMute,
   resumeAudioContextForDecode: typeof resumeAudioContextForDecode === 'function' ? resumeAudioContextForDecode : undefined,
+  decodeAudioDataWithTimeout: typeof decodeAudioDataWithTimeout === 'function' ? decodeAudioDataWithTimeout : undefined,
+  downloadModelFile: typeof downloadModelFile === 'function' ? downloadModelFile : undefined,
   setHeadphones: typeof setHeadphones === 'function' ? setHeadphones : undefined,
+  setAllMuted: typeof setAllMuted === 'function' ? setAllMuted : undefined,
+  toggleAllMuted: typeof toggleAllMuted === 'function' ? toggleAllMuted : undefined,
   resetAllTracks: typeof resetAllTracks === 'function' ? resetAllTracks : undefined,
   hasMutedTracks: typeof hasMutedTracks === 'function' ? hasMutedTracks : undefined,
+  areAllMuted: typeof areAllMuted === 'function' ? areAllMuted : undefined,
   clearAllLoops: typeof clearAllLoops === 'function' ? clearAllLoops : undefined,
+  updateSampleRowsVisibility: typeof updateSampleRowsVisibility === 'function' ? updateSampleRowsVisibility : undefined,
+  setLoopAuditionMode: typeof setLoopAuditionMode === 'function' ? setLoopAuditionMode : undefined,
   setAudioContext(ctx) { audioCtx = ctx; },
   getAudioContext() { return audioCtx; }
 };`;
@@ -367,11 +403,58 @@ test('loop buttons represent quarter, half, one, and two measure lengths', () =>
   assert.deepEqual(Array.from(app.LOOP_BARS), [0.25, 0.5, 1, 2]);
 });
 
+test('stem rows contain row-level spectrogram canvases and play cursors', () => {
+  const html = loadHtml();
+
+  for (const stem of STEMS) {
+    assert.match(html, new RegExp(`<canvas[^>]+class="stem-spectrum"[^>]+id="spec-${stem}"`));
+    assert.match(html, new RegExp(`<div[^>]+class="stem-cursor"[^>]+id="cursor-${stem}"`));
+  }
+});
+
+test('stem rows separate controls from dedicated spectrogram lanes', () => {
+  const html = loadHtml();
+
+  assert.match(html, /\.stem-control-strip\s*\{/);
+  assert.match(html, /\.stem-spec-lane\s*\{/);
+  assert.match(html, /\.stem-row\s*\{(?=[^}]*grid-template-areas:\s*"controls"\s*"spectrogram";)/s);
+  assert.match(html, /\.stem-control-strip\s*\{(?=[^}]*grid-template-areas:\s*"name slider actions loops";)/s);
+  assert.match(html, /\.stem-spec-lane\s*\{(?=[^}]*grid-area:\s*spectrogram;)(?=[^}]*cursor:\s*crosshair;)/s);
+
+  for (const stem of STEMS) {
+    assert.match(
+      html,
+      new RegExp(`<div class="stem-row" data-stem="${stem}"[\\s\\S]*?<div class="stem-control-strip">[\\s\\S]*?<div class="stem-action-group">[\\s\\S]*?</div>[\\s\\S]*?<div class="loop-row" data-stem="${stem}">[\\s\\S]*?</div>[\\s\\S]*?</div>\\s*<div class="stem-spec-lane" data-stem="${stem}"`),
+    );
+    assert.match(
+      html,
+      new RegExp(`<div class="stem-spec-lane" data-stem="${stem}"[^>]*>\\s*<canvas[^>]+class="stem-spectrum"[^>]+id="spec-${stem}"[\\s\\S]*?<div[^>]+class="stem-cursor"[^>]+id="cursor-${stem}"`),
+    );
+  }
+});
+
+test('stem panel is a full-width spectral stage instead of a narrow control stack', () => {
+  const html = loadHtml();
+
+  assert.match(html, /#stems-panel\s*\{(?=[^}]*width:\s*min\(1240px,\s*calc\(100vw - 32px\)\);)/s);
+  assert.match(html, /\.spectral-ruler\s*\{/s);
+  assert.match(html, /<div class="spectral-ruler"[^>]*>/);
+});
+
+test('global mute is exposed as one persistent toggle button', () => {
+  const html = loadHtml();
+
+  assert.match(html, /<button type="button" class="global-btn" id="btnMuteAll" disabled>mute all<\/button>/);
+  assert.doesNotMatch(html, /id="btnUnmuteAll"/);
+  assert.match(html, /\.stem-toolbar\s*\{(?=[^}]*grid-template-columns:\s*minmax\(180px,\s*280px\)\s+auto;)/s);
+});
+
 test('touch controls keep fixed hit areas when labels change', () => {
   const html = loadHtml();
 
   assert.match(html, /\.tbtn\s*\{(?=[^}]*width:\s*112px;)(?=[^}]*min-height:\s*48px;)/s);
-  assert.match(html, /\.stem-mute-btn,\s*\.stem-headphones-btn,\s*\.unsilence-btn\s*\{(?=[^}]*width:\s*76px;)(?=[^}]*min-height:\s*44px;)/s);
+  assert.match(html, /\.stem-mute-btn,\s*\.stem-headphones-btn\s*\{(?=[^}]*width:\s*52px;)(?=[^}]*min-height:\s*44px;)/s);
+  assert.match(html, /\.global-btn,\s*\.mode-btn\s*\{(?=[^}]*min-height:\s*42px;)/s);
   assert.match(html, /\.loop-row\s*\{(?=[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\);)/s);
   assert.match(html, /\.loop-btn\s*\{(?=[^}]*width:\s*100%;)(?=[^}]*min-height:\s*44px;)/s);
   assert.match(html, /\.timeline-wrap\s*\{(?=[^}]*height:\s*28px;)/s);
@@ -448,6 +531,67 @@ test('decode setup does not wait forever when Safari keeps AudioContext suspende
 
   assert.equal(resumeCalled, true);
   assert.ok(Date.now() - started < 100);
+});
+
+test('decode timeout rejects stalled audio decoding so processing can recover', async () => {
+  const { app } = loadApp();
+  const stalledContext = {
+    decodeAudioData() {
+      return new Promise(() => {});
+    },
+  };
+
+  assert.equal(typeof app.decodeAudioDataWithTimeout, 'function');
+  await assert.rejects(
+    () => app.decodeAudioDataWithTimeout(stalledContext, new ArrayBuffer(8), 5),
+    /timed out/i,
+  );
+});
+
+test('model download timeout rejects stalled streams so processing can recover', async () => {
+  const { app } = loadApp();
+  let abortCalled = false;
+  let cancelCalled = false;
+  const stalledFetch = async (_url, options = {}) => {
+    options.signal?.addEventListener('abort', () => {
+      abortCalled = true;
+    });
+    return {
+      ok: true,
+      headers: {
+        get(name) {
+          return name.toLowerCase() === 'content-length' ? '100' : null;
+        },
+      },
+      body: {
+        getReader() {
+          return {
+            read() {
+              return new Promise(() => {});
+            },
+            cancel() {
+              cancelCalled = true;
+              return Promise.resolve();
+            },
+          };
+        },
+      },
+    };
+  };
+
+  assert.equal(typeof app.downloadModelFile, 'function');
+  const started = Date.now();
+  await assert.rejects(
+    () => app.downloadModelFile('https://example.test/accompaniment.onnx', 52, 92, null, {
+      fetchFn: stalledFetch,
+      timeoutMs: 5,
+    }),
+    /stalled/i,
+  );
+
+  assert.ok(Date.now() - started < 100);
+  assert.equal(abortCalled, true);
+  assert.equal(cancelCalled, true);
 });
 
 test('play waits for a suspended AudioContext to resume before starting sources', async () => {
@@ -603,6 +747,73 @@ test('disabling a loop while playing replaces that stem to rejoin linear playbac
   assert.equal(original.melody.stopped, false);
 });
 
+test('looped stem audible time wraps independently of transport time', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.duration = 180;
+
+  assert.equal(typeof app.audibleStemTime, 'function');
+  app.state.loopDot.vocals = 0;
+  app.state.loopStart.vocals = 60;
+  app.state.loopEnd.vocals = 61;
+
+  assertAlmostEqual(app.audibleStemTime('vocals', 59.5), 59.5);
+  assertAlmostEqual(app.audibleStemTime('vocals', 60.25), 60.25);
+  assertAlmostEqual(app.audibleStemTime('vocals', 116.4), 60.4);
+  assertAlmostEqual(app.audibleStemTime('drums', 116.4), 116.4);
+});
+
+test('spectral window bounds earliest audible loop and current transport with padding', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.duration = 180;
+  app.state.loopDot.vocals = 0;
+  app.state.loopStart.vocals = 60;
+  app.state.loopEnd.vocals = 61;
+
+  assert.equal(typeof app.spectralWindowFor, 'function');
+  const window = app.spectralWindowFor(116);
+
+  assertAlmostEqual(window.start, 58);
+  assertAlmostEqual(window.end, 120);
+  assert.equal(window.mode, 'expanded');
+});
+
+test('spectral window follows transport in a partial rolling view with cursor to the right', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.duration = 180;
+
+  const window = app.spectralWindowFor(90);
+  const cursorRatio = (90 - window.start) / (window.end - window.start);
+
+  assert.equal(window.end - window.start, 16);
+  assert.ok(cursorRatio > 0.65, `expected cursor to sit right of center, got ${cursorRatio}`);
+  assert.ok(window.start > 0);
+  assert.ok(window.end < app.state.duration);
+});
+
+test('spectral click mapping seeks within the visible window', () => {
+  const { app } = loadApp();
+
+  assert.equal(typeof app.spectralTimeFromClientX, 'function');
+  assertAlmostEqual(
+    app.spectralTimeFromClientX(50, { left: 10, width: 80 }, { start: 58, end: 120 }),
+    89,
+  );
+  assertAlmostEqual(
+    app.spectralTimeFromClientX(-20, { left: 10, width: 80 }, { start: 58, end: 120 }),
+    58,
+  );
+  assertAlmostEqual(
+    app.spectralTimeFromClientX(200, { left: 10, width: 80 }, { start: 58, end: 120 }),
+    120,
+  );
+});
+
 test('rejecting a loop that extends past the track clears stale loop state', () => {
   const { app, document, context } = loadApp();
   const audioCtx = new FakeAudioContext();
@@ -651,6 +862,50 @@ test('loop reset clears loop state and UI for every stem', () => {
   }
 });
 
+test('all loop row applies one quantized loop across every stem', () => {
+  const { app, document } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.bpm = 120;
+  app.startPlayback(0);
+  const original = Object.fromEntries(STEMS.map((stem) => [stem, app.sources[stem]]));
+  audioCtx.currentTime = 3.1;
+
+  app.setLoop('all', 1);
+
+  assert.equal(app.state.loopDot.all, 1);
+  assert.deepEqual(document.loopButtons.all.map((button) => button.classList.contains('on')), [false, true, false, false]);
+  for (const stem of STEMS) {
+    assert.equal(app.state.loopDot[stem], 1);
+    assert.equal(app.state.loopStart[stem], 4);
+    assert.equal(app.state.loopEnd[stem], 5);
+    assert.notEqual(app.sources[stem], original[stem]);
+    assert.equal(original[stem].stopped, true);
+    assert.equal(app.sources[stem].loop, true);
+    assert.equal(app.sources[stem].loopStart, 4);
+    assert.equal(app.sources[stem].loopEnd, 5);
+  }
+});
+
+test('solo loop monitor uses headphones without mutating mute state', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.startPlayback(0);
+  app.setMute('drums', true);
+
+  assert.equal(typeof app.setLoopAuditionMode, 'function');
+  app.setLoopAuditionMode('solo');
+  app.setLoop('bass', 0);
+
+  assert.equal(app.state.headphonesStem, 'bass');
+  assert.equal(app.state.muted.drums, true);
+  assert.equal(app.state.muted.vocals, false);
+  assert.equal(app.gains.bass.gain.value, 0.8);
+  assert.equal(app.gains.drums.gain.value, 0);
+  assert.equal(app.gains.vocals.gain.value, 0);
+});
+
 test('headphones isolate one stem without changing mute or volume state', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
@@ -675,7 +930,61 @@ test('headphones isolate one stem without changing mute or volume state', () => 
   assert.equal(app.gains.vocals.gain.value, 0.8);
 });
 
-test('unsilence reset clears mutes, headphones, and restores default volume', () => {
+test('mute all toggle switches between mute and unmute states', () => {
+  const { app, document } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.startPlayback(0);
+  app.setVolume('bass', 0.25);
+  app.setHeadphones('vocals', true);
+  const button = document.getElementById('btnMuteAll');
+
+  assert.equal(typeof app.setAllMuted, 'function');
+  assert.equal(typeof app.toggleAllMuted, 'function');
+  assert.equal(typeof app.areAllMuted, 'function');
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, 'mute all');
+  assert.equal(button.getAttribute('aria-label'), 'Mute all stems');
+
+  app.toggleAllMuted();
+  assert.equal(app.areAllMuted(), true);
+  assert.equal(app.state.volume.bass, 0.25);
+  assert.equal(app.state.headphonesStem, null);
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, 'unmute all');
+  assert.equal(button.getAttribute('aria-label'), 'Unmute all stems');
+  assert.equal(button.getAttribute('aria-pressed'), 'true');
+  for (const stem of STEMS) assert.equal(app.state.muted[stem], true);
+
+  app.toggleAllMuted();
+  assert.equal(app.areAllMuted(), false);
+  assert.equal(button.disabled, false);
+  assert.equal(button.textContent, 'mute all');
+  assert.equal(button.getAttribute('aria-label'), 'Mute all stems');
+  assert.equal(button.getAttribute('aria-pressed'), 'false');
+  for (const stem of STEMS) assert.equal(app.state.muted[stem], false);
+});
+
+test('sample rows hide while processing or when audio is ready', () => {
+  const { app, document } = loadApp();
+
+  assert.equal(typeof app.updateSampleRowsVisibility, 'function');
+  app.state.ready = false;
+  app.state.processing = false;
+  app.updateSampleRowsVisibility();
+  assert.equal(document.getElementById('sampleRows').classList.contains('hidden'), false);
+
+  app.state.processing = true;
+  app.updateSampleRowsVisibility();
+  assert.equal(document.getElementById('sampleRows').classList.contains('hidden'), true);
+
+  app.state.processing = false;
+  app.state.ready = true;
+  app.updateSampleRowsVisibility();
+  assert.equal(document.getElementById('sampleRows').classList.contains('hidden'), true);
+});
+
+test('reset all tracks clears mutes, headphones, and restores default volume', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
   preparePlayback(app, audioCtx);
