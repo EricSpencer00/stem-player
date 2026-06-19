@@ -34,3 +34,7 @@ may glow a very muted warm amber when active — like a recessed LED behind fros
 - No numbers, no labels that feel like software.
 - Interactions should feel tactile: dragging adjusts volume like rubbing a surface.
 - Every pixel of chrome removed is a pixel of music added.
+
+## Loop Contract
+- Loop behavior is documented in [LOOP_SAMPLING.md](./LOOP_SAMPLING.md).
+- Treat loop timing, per-stem independence, and file-load resets as invariants.
