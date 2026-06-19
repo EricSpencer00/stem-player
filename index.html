@@ -318,10 +318,15 @@ canvas.wave { width: 100%; height: 26px; background: var(--wave-bg); border-radi
 .stem-row {
   display: grid;
   grid-template-columns: 52px 1fr auto auto;
-  align-items: center; gap: 14px;
+  grid-template-areas:
+    "name slider mute phones"
+    "loop loop loop loop";
+  align-items: center; gap: 8px 12px;
   padding: 10px 0; border-top: 1px solid var(--track);
 }
 .stem-name { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-soft); text-indent: 0.2em; }
+.stem-name { grid-area: name; }
+input.vol { grid-area: slider; }
 
 /* native range slider, themed */
 input.vol {
@@ -346,22 +351,37 @@ input.vol:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--ambe
 input.vol.muted::-webkit-slider-thumb { background: var(--ink-ghost); }
 input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 
-/* mute button */
-.stem-mute-btn {
+/* mute / headphones buttons */
+.stem-mute-btn,
+.stem-headphones-btn,
+.unsilence-btn {
   font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--ink-soft); background: none; border: 1px solid var(--track); border-radius: 999px;
   font-family: inherit; cursor: pointer; min-height: 34px; min-width: 56px; padding: 0 10px;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.stem-mute-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
-.stem-mute-btn[aria-pressed="true"] { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
+.stem-mute-btn { grid-area: mute; }
+.stem-headphones-btn { grid-area: phones; min-width: 62px; }
+.stem-mute-btn:hover,
+.stem-headphones-btn:hover,
+.unsilence-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+.stem-mute-btn[aria-pressed="true"],
+.stem-headphones-btn[aria-pressed="true"] { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
+.unsilence-btn {
+  width: 100%;
+  min-height: 36px;
+  border-color: var(--ink-faint);
+}
+.unsilence-btn[hidden] { display: none; }
 
 /* loop buttons */
 .loop-row {
+  grid-area: loop;
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 .loop-btn {
   font-family: inherit; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
@@ -382,11 +402,10 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 /* mobile */
 @media (max-width: 540px) {
   body { justify-content: flex-start; padding: 20px 14px 32px; }
-  .stem-row { grid-template-columns: 48px 1fr auto; grid-template-areas: "name slider mute" "loop loop loop"; row-gap: 8px; }
-  .stem-name { grid-area: name; }
-  input.vol { grid-area: slider; }
-  .stem-mute-btn { grid-area: mute; min-height: 40px; }
-  .loop-row { grid-area: loop; display: flex; align-items: center; gap: 8px; }
+  .stem-row { grid-template-columns: 48px 1fr auto auto; row-gap: 8px; }
+  .stem-mute-btn,
+  .stem-headphones-btn { min-height: 40px; }
+  .loop-row { display: flex; align-items: center; gap: 8px; }
   .tbtn { min-height: 44px; }
 }
 
@@ -488,48 +507,53 @@ footer a:hover { border-color: var(--ink-faint); }
 </div>
 
 <div id="stems-panel">
+  <button type="button" class="unsilence-btn" id="btnUnsilence" hidden>unsilence all</button>
   <div class="stem-row">
     <label class="stem-name" for="vol-drums">Drums</label>
     <input class="vol" type="range" id="vol-drums" data-stem="drums" min="0" max="100" value="80" aria-label="Drums volume">
     <button class="stem-mute-btn" data-stem="drums" aria-pressed="false" aria-label="Mute drums">mute</button>
+    <button class="stem-headphones-btn" data-stem="drums" aria-pressed="false" aria-label="Headphones drums only">phones</button>
     <div class="loop-row" data-stem="drums">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="drums" aria-label="Loop drums by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="drums" aria-label="Loop drums by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="drums" aria-label="Loop drums by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="drums" aria-label="Loop drums by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="drums" aria-label="Loop drums by 1/4 measure">1/4</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="drums" aria-label="Loop drums by 1/2 measure">1/2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="drums" aria-label="Loop drums by 1 measure">1</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="drums" aria-label="Loop drums by 2 measures">2</button>
     </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-bass">Bass</label>
     <input class="vol" type="range" id="vol-bass" data-stem="bass" min="0" max="100" value="80" aria-label="Bass volume">
     <button class="stem-mute-btn" data-stem="bass" aria-pressed="false" aria-label="Mute bass">mute</button>
+    <button class="stem-headphones-btn" data-stem="bass" aria-pressed="false" aria-label="Headphones bass only">phones</button>
     <div class="loop-row" data-stem="bass">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="bass" aria-label="Loop bass by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="bass" aria-label="Loop bass by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="bass" aria-label="Loop bass by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="bass" aria-label="Loop bass by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="bass" aria-label="Loop bass by 1/4 measure">1/4</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="bass" aria-label="Loop bass by 1/2 measure">1/2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="bass" aria-label="Loop bass by 1 measure">1</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="bass" aria-label="Loop bass by 2 measures">2</button>
     </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-vocals">Vocals</label>
     <input class="vol" type="range" id="vol-vocals" data-stem="vocals" min="0" max="100" value="80" aria-label="Vocals volume">
     <button class="stem-mute-btn" data-stem="vocals" aria-pressed="false" aria-label="Mute vocals">mute</button>
+    <button class="stem-headphones-btn" data-stem="vocals" aria-pressed="false" aria-label="Headphones vocals only">phones</button>
     <div class="loop-row" data-stem="vocals">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="vocals" aria-label="Loop vocals by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="vocals" aria-label="Loop vocals by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="vocals" aria-label="Loop vocals by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="vocals" aria-label="Loop vocals by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="vocals" aria-label="Loop vocals by 1/4 measure">1/4</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="vocals" aria-label="Loop vocals by 1/2 measure">1/2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="vocals" aria-label="Loop vocals by 1 measure">1</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="vocals" aria-label="Loop vocals by 2 measures">2</button>
     </div>
   </div>
   <div class="stem-row">
     <label class="stem-name" for="vol-melody">Melody</label>
     <input class="vol" type="range" id="vol-melody" data-stem="melody" min="0" max="100" value="80" aria-label="Melody volume">
     <button class="stem-mute-btn" data-stem="melody" aria-pressed="false" aria-label="Mute melody">mute</button>
+    <button class="stem-headphones-btn" data-stem="melody" aria-pressed="false" aria-label="Headphones melody only">phones</button>
     <div class="loop-row" data-stem="melody">
-      <button type="button" class="loop-btn" data-loop="0" data-stem="melody" aria-label="Loop melody by 1 bar">1</button>
-      <button type="button" class="loop-btn" data-loop="1" data-stem="melody" aria-label="Loop melody by 2 bars">2</button>
-      <button type="button" class="loop-btn" data-loop="2" data-stem="melody" aria-label="Loop melody by 4 bars">4</button>
-      <button type="button" class="loop-btn" data-loop="3" data-stem="melody" aria-label="Loop melody by 8 bars">8</button>
+      <button type="button" class="loop-btn" data-loop="0" data-stem="melody" aria-label="Loop melody by 1/4 measure">1/4</button>
+      <button type="button" class="loop-btn" data-loop="1" data-stem="melody" aria-label="Loop melody by 1/2 measure">1/2</button>
+      <button type="button" class="loop-btn" data-loop="2" data-stem="melody" aria-label="Loop melody by 1 measure">1</button>
+      <button type="button" class="loop-btn" data-loop="3" data-stem="melody" aria-label="Loop melody by 2 measures">2</button>
     </div>
   </div>
 </div>
@@ -555,7 +579,8 @@ const SR        = 44100;
 const TOT_BINS  = FFT_SIZE / 2 + 1;   // 2049
 const MODEL_BINS = 1024;              // spleeter uses first 1024 bins
 const SEG_FRAMES = 512;               // spleeter time-frames per segment
-const LOOP_BARS = [1, 2, 4, 8];
+const DEFAULT_VOLUME = 0.8;
+const LOOP_BARS = [0.25, 0.5, 1, 2];
 const SAMPLE_TRACKS = [
   {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
   {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
@@ -576,11 +601,11 @@ const Q_RANGE = {
 const state = {
   ready:false, playing:false,
   muted:  {drums:false,vocals:false,bass:false,melody:false},
-  volume: {drums:0.8,vocals:0.8,bass:0.8,melody:0.8},
+  volume: {drums:DEFAULT_VOLUME,vocals:DEFAULT_VOLUME,bass:DEFAULT_VOLUME,melody:DEFAULT_VOLUME},
+  headphonesStem:null,
   loopDot:{drums:-1,vocals:-1,bass:-1,melody:-1},
   loopStart:{drums:0,vocals:0,bass:0,melody:0},
   loopEnd:{drums:0,vocals:0,bass:0,melody:0},
-  loopBase:0,
   pauseOffset:0, startTime:0, duration:0, bpm:120, raf:null,
 };
 let audioCtx;
@@ -633,36 +658,39 @@ function measureLength(){
   return (60/state.bpm) * 4;
 }
 
-function snapLoopStart(currentSec){
-  const len = measureLength();
-  if(!len || !Number.isFinite(currentSec) || !state.duration) return 0;
-  const boundary = Math.floor(currentSec / len) * len;
-  const nextBoundary = boundary + len;
-  const epsilon = 0.03;
+function beatLength(){
+  return measureLength() / 4;
+}
 
-  if (Math.abs(currentSec - boundary) < epsilon) {
-    return boundary;
-  }
-  return nextBoundary;
+function playbackOffset(sec){
+  const safe = Number.isFinite(sec) ? sec : 0;
+  if(!state.duration) return Math.max(0, safe);
+  return Math.max(0, Math.min(safe, state.duration));
+}
+
+function snapLoopStart(currentSec){
+  const grid = beatLength();
+  if(!grid || !Number.isFinite(currentSec) || !state.duration) return 0;
+  return Math.floor((currentSec + 1e-6) / grid) * grid;
 }
 
 function setLoop(stem, idx){
-  state.loopDot[stem]=idx;
   const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
-  buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
 
   if(idx < 0){
+    state.loopDot[stem]=-1;
     document.getElementById(`varc-${stem}`).classList.remove('looping');
-    if(state.playing)startPlayback(currentTime()%state.duration);
+    buttons.forEach((button)=>button.classList.toggle('on', false));
+    if(state.playing)restartStemSource(stem, playbackOffset(currentTime()));
     return;
   }
 
-  const len = measureLength();
-  const start = snapLoopStart(currentTime()%state.duration);
-  const end = start + LOOP_BARS[idx] * len;
-  state.loopBase = start;
+  const transportOffset = playbackOffset(currentTime());
+  const loopLength = LOOP_BARS[idx] * measureLength();
+  const start = snapLoopStart(transportOffset);
+  const end = start + loopLength;
 
-  if(end > state.duration){
+  if(end > state.duration + 1e-6){
     alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
     state.loopDot[stem] = -1;
     buttons.forEach((button)=>button.classList.toggle('on', false));
@@ -671,8 +699,10 @@ function setLoop(stem, idx){
 
   state.loopStart[stem] = start;
   state.loopEnd[stem] = end;
+  state.loopDot[stem]=idx;
+  buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
   document.getElementById(`varc-${stem}`).classList.add('looping');
-  if(state.playing){startPlayback(state.loopStart[stem]);}
+  if(state.playing)restartStemSource(stem, transportOffset);
 }
 
 // ── FFT ──
@@ -805,12 +835,23 @@ async function loadModels(onProg){
   await step(100,'Models ready.');
 }
 
+function wait(ms){
+  return new Promise(resolve=>setTimeout(resolve,ms));
+}
+async function resumeAudioContextForDecode(ctx, timeoutMs=1000){
+  if(!ctx || ctx.state!=='suspended' || typeof ctx.resume!=='function') return;
+  await Promise.race([
+    ctx.resume().catch(()=>{}),
+    wait(timeoutMs),
+  ]);
+}
+
 // ── pipeline ──
 async function separateAudio(arrayBuf,onProg){
   const step=async(p,m)=>{if(onProg)await onProg(p,m);};
   await step(0,'Decoding audio…');
   audioCtx=audioCtx||new AudioContext({sampleRate:SR});
-  if(audioCtx.state==='suspended')await audioCtx.resume();
+  await resumeAudioContextForDecode(audioCtx);
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
   const sigL=raw.getChannelData(0), sigR=nCh>1?raw.getChannelData(1):sigL;
@@ -909,27 +950,55 @@ function drawWave(stem){
 }
 
 // ── playback ──
-function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();gains[s].gain.value=state.muted[s]?0:state.volume[s];gains[s].connect(audioCtx.destination);});}
+function effectiveVolume(stem){
+  if(state.headphonesStem) return state.headphonesStem===stem ? state.volume[stem] : 0;
+  return state.muted[stem] ? 0 : state.volume[stem];
+}
+function applyStemGain(stem){
+  if(gains[stem]) gains[stem].gain.value=effectiveVolume(stem);
+}
+function applyAllGains(){STEMS.forEach(applyStemGain);}
+function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();applyStemGain(s);gains[s].connect(audioCtx.destination);});}
+function stopStemSource(stem){
+  try{sources[stem]&&sources[stem].stop();}catch(e){}
+  sources[stem]=null;
+}
+function stemStartOffset(stem, off){
+  let startOffset = playbackOffset(off);
+  const loopStart = state.loopStart[stem];
+  const loopEnd = state.loopEnd[stem];
+  const loopLength = loopEnd - loopStart;
+  if(state.loopDot[stem] >= 0 && loopLength > 0){
+    if(startOffset >= loopEnd){
+      startOffset = loopStart + ((startOffset - loopStart) % loopLength);
+    }
+  }
+  return startOffset;
+}
+function startStemSource(stem, off=0){
+  stopStemSource(stem);
+  const src=audioCtx.createBufferSource();
+  src.buffer=buffers[stem];
+  src.connect(gains[stem]);
+  if(state.loopDot[stem]>=0 && state.loopEnd[stem] > state.loopStart[stem]){
+    src.loop=true;
+    src.loopStart=state.loopStart[stem];
+    src.loopEnd=state.loopEnd[stem];
+  }else{
+    src.loop=false;
+  }
+  src.start(0,stemStartOffset(stem, off));
+  sources[stem]=src;
+}
+function restartStemSource(stem, off=0){
+  if(!state.playing || !audioCtx || !gains[stem]) return;
+  startStemSource(stem, off);
+}
 function startPlayback(off=0){
   stopPlayback(); buildGains();
-  state.startTime=audioCtx.currentTime-off; state.playing=true;
-  STEMS.forEach(s=>{const src=audioCtx.createBufferSource();src.buffer=buffers[s];src.connect(gains[s]);
-    const d=state.loopDot[s];
-    let startOffset=off;
-    if(d>=0){
-      const loopStart=state.loopStart[s];
-      const loopEnd=state.loopEnd[s];
-      if(loopEnd > loopStart){
-        src.loop=true;
-        src.loopStart=loopStart;
-        src.loopEnd=loopEnd;
-        if(startOffset >= loopEnd){startOffset=loopStart;}
-      }
-    }else{
-      src.loop=false;
-    }
-    src.start(0,startOffset);
-    sources[s]=src;});
+  const offSafe=playbackOffset(off);
+  state.startTime=audioCtx.currentTime-offSafe; state.playing=true;
+  STEMS.forEach(s=>startStemSource(s, offSafe));
   document.getElementById('center').classList.add('playing');
   setGlyph('pause'); document.getElementById('btnPlay').textContent='pause';
   document.getElementById('centerHint').textContent='playing';
@@ -938,7 +1007,7 @@ function startPlayback(off=0){
 function stopPlayback(){
   if(state.raf){cancelAnimationFrame(state.raf);state.raf=null;}
   state.playing=false;
-  STEMS.forEach(s=>{try{sources[s]&&sources[s].stop();}catch(e){}sources[s]=null;});
+  STEMS.forEach(stopStemSource);
   STEMS.forEach(s=>{try{gains[s]&&gains[s].disconnect();}catch(e){}});
   document.getElementById('center').classList.remove('playing');
   if(state.ready){setGlyph('play');document.getElementById('btnPlay').textContent='play';document.getElementById('centerHint').textContent='play';}
@@ -970,14 +1039,14 @@ function setGlyph(kind){
 function setVolume(stem,v,fromSlider){
   v=Math.max(0,Math.min(1,v));
   state.volume[stem]=v;
-  if(gains[stem])gains[stem].gain.value=state.muted[stem]?0:v;
+  applyStemGain(stem);
   setVolArc(stem,v);
   document.getElementById('pct-'+stem).textContent=Math.round(v*100);
   if(!fromSlider){const sl=document.getElementById('vol-'+stem);if(sl)sl.value=Math.round(v*100);}
 }
 function setMute(stem, muted){
   state.muted[stem]=muted;
-  if(gains[stem])gains[stem].gain.value=muted?0:state.volume[stem];
+  applyStemGain(stem);
   document.getElementById('lbl-'+stem).classList.toggle('muted',muted);
   document.querySelector(`.quadrant[data-stem="${stem}"]`).classList.toggle('muted',muted);
   document.getElementById('mm-'+stem).classList.toggle('on',muted);
@@ -986,8 +1055,38 @@ function setMute(stem, muted){
   const btn=document.querySelector(`.stem-mute-btn[data-stem="${stem}"]`);
   btn.setAttribute('aria-pressed',String(muted));
   btn.textContent=muted?'muted':'mute';
+  updateUnsilenceButton();
 }
 function toggleMute(stem){ if(state.ready) setMute(stem,!state.muted[stem]); }
+function hasMutedTracks(){return STEMS.some(stem=>state.muted[stem]);}
+function updateUnsilenceButton(){
+  const btn=document.getElementById('btnUnsilence');
+  if(!btn)return;
+  btn.hidden=!hasMutedTracks();
+}
+function updateHeadphonesUI(){
+  document.querySelectorAll('.stem-headphones-btn').forEach(btn=>{
+    const on = state.headphonesStem===btn.dataset.stem;
+    btn.setAttribute('aria-pressed',String(on));
+    btn.textContent=on?'solo':'phones';
+  });
+}
+function setHeadphones(stem, active){
+  state.headphonesStem=active?stem:null;
+  updateHeadphonesUI();
+  applyAllGains();
+}
+function toggleHeadphones(stem){ if(state.ready) setHeadphones(stem, state.headphonesStem!==stem); }
+function resetAllTracks(){
+  state.headphonesStem=null;
+  STEMS.forEach(stem=>{
+    setVolume(stem,DEFAULT_VOLUME);
+    setMute(stem,false);
+  });
+  updateHeadphonesUI();
+  updateUnsilenceButton();
+  applyAllGains();
+}
 
 // quadrant: tap = mute, diagonal drag = volume (Pointer Events + capture)
 STEMS.forEach(stem=>{
@@ -1025,6 +1124,8 @@ STEMS.forEach(stem=>{
 // panel sliders / mute / loop
 document.querySelectorAll('input.vol').forEach(sl=>sl.addEventListener('input',()=>setVolume(sl.dataset.stem,sl.value/100,true)));
 document.querySelectorAll('.stem-mute-btn').forEach(b=>b.addEventListener('click',()=>toggleMute(b.dataset.stem)));
+document.querySelectorAll('.stem-headphones-btn').forEach(b=>b.addEventListener('click',()=>toggleHeadphones(b.dataset.stem)));
+document.getElementById('btnUnsilence').addEventListener('click',()=>{if(state.ready)resetAllTracks();});
 document.querySelectorAll('.loop-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     if(!state.ready) return;
@@ -1169,14 +1270,13 @@ async function handleFile(file){
     alert('Please drop an audio file (mp3, wav, flac, etc.).');
     return;
   }
-  stopPlayback();state.ready=false;state.pauseOffset=0;
+  stopPlayback();state.ready=false;state.pauseOffset=0;state.headphonesStem=null;updateHeadphonesUI();
   document.getElementById('filename').textContent=file.name;
   STEMS.forEach(s=>{
     state.loopDot[s]=-1;
-  state.loopStart[s]=0;
-  state.loopEnd[s]=0;
-  state.loopBase=0;
-  document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
+    state.loopStart[s]=0;
+    state.loopEnd[s]=0;
+    document.querySelectorAll(`.loop-row[data-stem="${s}"] .loop-btn`).forEach(btn=>btn.classList.remove('on'));
     document.getElementById('varc-'+s).classList.remove('looping');
   });
   try{
