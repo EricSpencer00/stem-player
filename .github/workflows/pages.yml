@@ -1,0 +1,95 @@
+name: Validate and Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify required site files exist
+        run: |
+          test -f index.html
+          test -f PRODUCT.md
+          test -f LOOP_SAMPLING.md
+          test -f samples/stem-sample-1.mp3
+          test -f samples/stem-sample-2.mp3
+          test -f samples/stem-sample-3.mp3
+          test -f tests/stem-player.test.mjs
+
+      - name: Check inline app script syntax
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const vm = require('vm');
+
+          const html = fs.readFileSync('index.html', 'utf8');
+          const match = html.match(/<script>\s*'use strict';([\s\S]*)<\/script>/);
+
+          if (!match) {
+            throw new Error('Unable to find the inline app script in index.html');
+          }
+
+          new vm.Script(`'use strict';${match[1]}`);
+          NODE
+
+      - name: Run regression tests
+        run: node --test tests/stem-player.test.mjs
+
+      - name: Prepare GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p dist
+          cp index.html dist/
+          cp -R samples dist/
+          touch dist/.nojekyll
+
+      - name: Configure GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    concurrency:
+      group: github-pages
+      cancel-in-progress: true
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
