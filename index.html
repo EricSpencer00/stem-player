@@ -674,6 +674,18 @@ function snapLoopStart(currentSec){
   return Math.floor((currentSec + 1e-6) / grid) * grid;
 }
 
+function syncStemLoopSource(stem){
+  const src = sources[stem];
+  if(!src) return;
+  if(state.loopDot[stem] >= 0 && state.loopEnd[stem] > state.loopStart[stem]){
+    src.loopStart = state.loopStart[stem];
+    src.loopEnd = state.loopEnd[stem];
+    src.loop = true;
+  }else{
+    src.loop = false;
+  }
+}
+
 function setLoop(stem, idx){
   const buttons = document.querySelectorAll(`.loop-row[data-stem="${stem}"] .loop-btn`);
 
@@ -681,7 +693,7 @@ function setLoop(stem, idx){
     state.loopDot[stem]=-1;
     document.getElementById(`varc-${stem}`).classList.remove('looping');
     buttons.forEach((button)=>button.classList.toggle('on', false));
-    if(state.playing)restartStemSource(stem, playbackOffset(currentTime()));
+    syncStemLoopSource(stem);
     return;
   }
 
@@ -702,7 +714,7 @@ function setLoop(stem, idx){
   state.loopDot[stem]=idx;
   buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
   document.getElementById(`varc-${stem}`).classList.add('looping');
-  if(state.playing)restartStemSource(stem, transportOffset);
+  syncStemLoopSource(stem);
 }
 
 // ── FFT ──
@@ -838,19 +850,44 @@ async function loadModels(onProg){
 function wait(ms){
   return new Promise(resolve=>setTimeout(resolve,ms));
 }
+function audioContextNeedsResume(ctx){
+  return !!ctx && (ctx.state==='suspended' || ctx.state==='interrupted') && typeof ctx.resume==='function';
+}
+function createAudioContext(){
+  const Ctor =
+    globalThis.AudioContext ||
+    globalThis.webkitAudioContext ||
+    (typeof window!=='undefined' ? (window.AudioContext || window.webkitAudioContext) : undefined);
+  if(!Ctor) throw new Error('Web Audio is not supported in this browser.');
+  return new Ctor({sampleRate:SR});
+}
+async function ensureAudioContextRunning(ctx, timeoutMs=1000){
+  if(!ctx) return false;
+  if(audioContextNeedsResume(ctx)){
+    await Promise.race([
+      Promise.resolve().then(()=>ctx.resume()).catch(()=>{}),
+      wait(timeoutMs),
+    ]);
+  }
+  return ctx.state==='running';
+}
 async function resumeAudioContextForDecode(ctx, timeoutMs=1000){
-  if(!ctx || ctx.state!=='suspended' || typeof ctx.resume!=='function') return;
-  await Promise.race([
-    ctx.resume().catch(()=>{}),
-    wait(timeoutMs),
-  ]);
+  await ensureAudioContextRunning(ctx, timeoutMs);
+}
+async function ensurePlaybackReady(timeoutMs=1500){
+  audioCtx=audioCtx||createAudioContext();
+  const ready=await ensureAudioContextRunning(audioCtx, timeoutMs);
+  if(!ready){
+    document.getElementById('hint').textContent='Audio is loaded, but playback is still locked by the browser. Tap play again.';
+  }
+  return ready;
 }
 
 // ── pipeline ──
 async function separateAudio(arrayBuf,onProg){
   const step=async(p,m)=>{if(onProg)await onProg(p,m);};
   await step(0,'Decoding audio…');
-  audioCtx=audioCtx||new AudioContext({sampleRate:SR});
+  audioCtx=audioCtx||createAudioContext();
   await resumeAudioContextForDecode(audioCtx);
   const raw=await audioCtx.decodeAudioData(arrayBuf.slice(0));
   const nCh=raw.numberOfChannels;
@@ -980,15 +1017,9 @@ function startStemSource(stem, off=0){
   const src=audioCtx.createBufferSource();
   src.buffer=buffers[stem];
   src.connect(gains[stem]);
-  if(state.loopDot[stem]>=0 && state.loopEnd[stem] > state.loopStart[stem]){
-    src.loop=true;
-    src.loopStart=state.loopStart[stem];
-    src.loopEnd=state.loopEnd[stem];
-  }else{
-    src.loop=false;
-  }
-  src.start(0,stemStartOffset(stem, off));
   sources[stem]=src;
+  syncStemLoopSource(stem);
+  src.start(0,stemStartOffset(stem, off));
 }
 function restartStemSource(stem, off=0){
   if(!state.playing || !audioCtx || !gains[stem]) return;
@@ -1136,16 +1167,34 @@ document.querySelectorAll('.loop-btn').forEach(btn=>{
 });
 
 // transport
-document.getElementById('btnPlay').addEventListener('click',()=>{
+document.getElementById('btnPlay').addEventListener('click',async()=>{
   if(!state.ready)return;
-  if(!audioCtx)audioCtx=new AudioContext({sampleRate:SR});
-  if(audioCtx.state==='suspended')audioCtx.resume();
   if(state.playing){state.pauseOffset=currentTime();stopPlayback();}
-  else startPlayback(state.pauseOffset);
+  else if(await ensurePlaybackReady()){
+    startPlayback(state.pauseOffset);
+    document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+  }
 });
-document.getElementById('btnRestart').addEventListener('click',()=>{if(!state.ready)return;state.pauseOffset=0;if(state.playing)startPlayback(0);else updateUI(0);});
+document.getElementById('btnRestart').addEventListener('click',async()=>{
+  if(!state.ready)return;
+  state.pauseOffset=0;
+  if(state.playing){
+    if(await ensurePlaybackReady()){
+      startPlayback(0);
+      document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+    }
+  }else updateUI(0);
+});
 document.getElementById('btnStop').addEventListener('click',()=>{if(!state.ready)return;stopPlayback();state.pauseOffset=0;updateUI(0);});
-function seekTo(t){t=Math.max(0,Math.min(state.duration,t));state.pauseOffset=t;if(state.playing)startPlayback(t);else updateUI(t);}
+async function seekTo(t){
+  t=Math.max(0,Math.min(state.duration,t));state.pauseOffset=t;
+  if(state.playing){
+    if(await ensurePlaybackReady()){
+      startPlayback(t);
+      document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+    }
+  }else updateUI(t);
+}
 document.getElementById('timeline').addEventListener('click',e=>{if(!state.ready)return;const r=e.currentTarget.getBoundingClientRect();seekTo((e.clientX-r.left)/r.width*state.duration);});
 document.getElementById('timeline').addEventListener('keydown',e=>{
   if(!state.ready)return;

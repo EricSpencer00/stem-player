@@ -342,25 +342,84 @@ test('decode setup does not wait forever when Safari keeps AudioContext suspende
   assert.ok(Date.now() - started < 100);
 });
 
+test('play waits for a suspended AudioContext to resume before starting sources', async () => {
+  const { app, document } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  const startStates = [];
+  const originalCreateBufferSource = audioCtx.createBufferSource.bind(audioCtx);
+
+  audioCtx.state = 'suspended';
+  audioCtx.resume = function resume() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        this.state = 'running';
+        resolve();
+      }, 5);
+    });
+  };
+  audioCtx.createBufferSource = function createBufferSource() {
+    const source = originalCreateBufferSource();
+    const originalStart = source.start.bind(source);
+    source.start = (when, offset) => {
+      startStates.push(audioCtx.state);
+      originalStart(when, offset);
+    };
+    return source;
+  };
+
+  preparePlayback(app, audioCtx);
+
+  const playHandler = document.getElementById('btnPlay').listeners.get('click')?.[0];
+  assert.equal(typeof playHandler, 'function');
+  await playHandler();
+
+  assert.deepEqual(startStates, ['running', 'running', 'running', 'running']);
+  assert.equal(app.state.playing, true);
+});
+
+test('play attempts to resume an interrupted AudioContext before starting playback', async () => {
+  const { app, document } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  let resumeCalled = false;
+
+  audioCtx.state = 'interrupted';
+  audioCtx.resume = function resume() {
+    resumeCalled = true;
+    this.state = 'running';
+    return Promise.resolve();
+  };
+
+  preparePlayback(app, audioCtx);
+
+  const playHandler = document.getElementById('btnPlay').listeners.get('click')?.[0];
+  assert.equal(typeof playHandler, 'function');
+  await playHandler();
+
+  assert.equal(resumeCalled, true);
+  assert.equal(app.state.playing, true);
+});
+
 test('enabling a loop captures the current beat partition and keeps playing from the current offset', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
   preparePlayback(app, audioCtx);
   app.state.bpm = 120;
   app.startPlayback(0);
+  const originalSource = app.sources.drums;
   audioCtx.currentTime = 2.26;
 
   app.setLoop('drums', 0);
 
   assert.equal(app.state.loopStart.drums, 2);
   assert.equal(app.state.loopEnd.drums, 2.5);
+  assert.equal(app.sources.drums, originalSource);
   assert.equal(app.sources.drums.loop, true);
   assert.equal(app.sources.drums.loopStart, 2);
   assert.equal(app.sources.drums.loopEnd, 2.5);
-  assert.equal(app.sources.drums.starts.at(-1).offset, 2.26);
+  assert.equal(app.sources.drums.starts.length, 1);
 });
 
-test('changing a loop while playing only replaces the selected stem source', () => {
+test('changing a loop while playing keeps the current stem source and only updates its loop points', () => {
   const { app } = loadApp();
   const audioCtx = new FakeAudioContext();
   preparePlayback(app, audioCtx);
@@ -372,8 +431,12 @@ test('changing a loop while playing only replaces the selected stem source', () 
 
   app.setLoop('vocals', 1);
 
-  assert.notEqual(app.sources.vocals, original.vocals);
-  assert.equal(original.vocals.stopped, true);
+  assert.equal(app.sources.vocals, original.vocals);
+  assert.equal(original.vocals.stopped, false);
+  assert.equal(app.sources.vocals.loop, true);
+  assert.equal(app.sources.vocals.loopStart, 3);
+  assert.equal(app.sources.vocals.loopEnd, 4);
+  assert.equal(app.sources.vocals.starts.length, 1);
   assert.equal(app.sources.drums, original.drums);
   assert.equal(app.sources.bass, original.bass);
   assert.equal(app.sources.melody, original.melody);
@@ -381,6 +444,23 @@ test('changing a loop while playing only replaces the selected stem source', () 
   assert.equal(original.bass.stopped, false);
   assert.equal(original.melody.stopped, false);
   assert.equal(app.state.startTime, originalStartTime);
+});
+
+test('disabling a loop while playing leaves the current stem source running in time', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.bpm = 120;
+  app.startPlayback(0);
+  const originalSource = app.sources.bass;
+
+  app.setLoop('bass', 2);
+  app.setLoop('bass', -1);
+
+  assert.equal(app.sources.bass, originalSource);
+  assert.equal(app.sources.bass.loop, false);
+  assert.equal(app.sources.bass.starts.length, 1);
+  assert.equal(originalSource.stopped, false);
 });
 
 test('headphones isolate one stem without changing mute or volume state', () => {
