@@ -637,26 +637,28 @@ footer a:hover { border-color: var(--ink-faint); }
 #fileInput { display: none; }
 
 .sample-rows {
-  width: min(480px, 88vw);
+  width: min(760px, calc(100vw - 32px));
   margin: 0 auto 10px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 8px;
 }
 .sample-rows.hidden { display: none; }
 .sample-rows button {
   font-size: 10px;
   letter-spacing: 0.06em;
+  line-height: 1.25;
   text-transform: none;
   color: var(--ink-soft);
   background: none;
   border: 1px solid var(--track);
   border-radius: 999px;
   min-height: 52px;
-  padding: 8px 10px;
+  padding: 8px 14px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   touch-action: manipulation;
 }
 .sample-rows button:hover { border-color: var(--ink-faint); }
@@ -1843,7 +1845,12 @@ function drawWave(stem, win=state.spectralWindow){
   ctx.globalAlpha=1;
 }
 
-const meterState = {bass:0, treble:0};
+const meterState = {bass:0, treble:0, wave:0};
+let levelAnalyser = null;
+let levelAnalyserContext = null;
+let levelAnalyserConnected = false;
+let levelWaveform = null;
+let levelFrequencies = null;
 
 function stemEnergyAt(stem, t){
   const buffer = buffers[stem];
@@ -1863,7 +1870,7 @@ function stemEnergyAt(stem, t){
   return Math.sqrt(sum / Math.max(1, end - start)) * effectiveVolume(stem);
 }
 
-function levelMeterBandsAt(t=currentTime()){
+function fallbackLevelMeterBandsAt(t=currentTime()){
   const bass = stemEnergyAt('bass', t);
   const treble = (
     stemEnergyAt('drums', t) * 0.42 +
@@ -1873,7 +1880,94 @@ function levelMeterBandsAt(t=currentTime()){
   return {
     bass: clamp(bass, 0, 1),
     treble: clamp(treble, 0, 1),
+    wave: clamp(Math.max(bass, treble), 0, 1),
+    waveform: null,
   };
+}
+
+function ensureLevelAnalyser(){
+  if(!audioCtx || typeof audioCtx.createAnalyser !== 'function') return null;
+  if(levelAnalyser && levelAnalyserContext === audioCtx) return levelAnalyser;
+  try{
+    levelAnalyser = audioCtx.createAnalyser();
+    levelAnalyser.fftSize = 2048;
+    levelAnalyser.smoothingTimeConstant = 0.72;
+    levelAnalyserContext = audioCtx;
+    levelAnalyserConnected = false;
+    levelWaveform = null;
+    levelFrequencies = null;
+    return levelAnalyser;
+  }catch(_){
+    return null;
+  }
+}
+
+function analyserOutputNode(){
+  const analyser = ensureLevelAnalyser();
+  if(!analyser) return audioCtx.destination;
+  if(!levelAnalyserConnected && typeof analyser.connect === 'function'){
+    analyser.connect(audioCtx.destination);
+    levelAnalyserConnected = true;
+  }
+  return analyser;
+}
+
+function ensureLevelAnalyserArrays(){
+  if(!levelAnalyser) return null;
+  const fftSize = levelAnalyser.fftSize || 2048;
+  const frequencyBins = levelAnalyser.frequencyBinCount || Math.max(1, fftSize / 2);
+  if(!levelWaveform || levelWaveform.length !== fftSize){
+    levelWaveform = new Uint8Array(fftSize);
+  }
+  if(!levelFrequencies || levelFrequencies.length !== frequencyBins){
+    levelFrequencies = new Uint8Array(frequencyBins);
+  }
+  return {waveform:levelWaveform, frequencies:levelFrequencies};
+}
+
+function frequencyEnergy(data, lowHz, highHz){
+  if(!data || !data.length) return 0;
+  const nyquist = (audioCtx?.sampleRate || SR) / 2;
+  const hzPerBin = nyquist / data.length;
+  const start = clamp(Math.floor(lowHz / hzPerBin), 0, Math.max(0, data.length - 1));
+  const end = clamp(Math.ceil(highHz / hzPerBin), start + 1, data.length);
+  let sum = 0;
+  for(let i=start;i<end;i++) sum += data[i] || 0;
+  return sum / Math.max(1, end - start) / 255;
+}
+
+function analyserLevelMeterBands(){
+  if(!state.playing || !levelAnalyser) return null;
+  if(typeof levelAnalyser.getByteTimeDomainData !== 'function') return null;
+  const arrays = ensureLevelAnalyserArrays();
+  if(!arrays) return null;
+  const {waveform, frequencies} = arrays;
+  levelAnalyser.getByteTimeDomainData(waveform);
+  if(typeof levelAnalyser.getByteFrequencyData === 'function'){
+    levelAnalyser.getByteFrequencyData(frequencies);
+  }else{
+    frequencies.fill(0);
+  }
+
+  let sum = 0, peak = 0;
+  for(let i=0;i<waveform.length;i++){
+    const v = Math.abs((waveform[i] - 128) / 128);
+    sum += v * v;
+    if(v > peak) peak = v;
+  }
+  const rms = Math.sqrt(sum / Math.max(1, waveform.length));
+  const bass = frequencyEnergy(frequencies, 20, 260);
+  const treble = frequencyEnergy(frequencies, 1400, 9000);
+  return {
+    bass: clamp(bass * 1.7, 0, 1),
+    treble: clamp(treble * 1.8, 0, 1),
+    wave: clamp((rms * 2.5) + (peak * 0.16), 0, 1),
+    waveform,
+  };
+}
+
+function levelMeterBandsAt(t=currentTime()){
+  return analyserLevelMeterBands() || fallbackLevelMeterBandsAt(t);
 }
 
 function drawLevelMeter(t=currentTime()){
@@ -1889,6 +1983,7 @@ function drawLevelMeter(t=currentTime()){
   const bands=levelMeterBandsAt(t);
   meterState.bass = meterState.bass * 0.78 + bands.bass * 0.22;
   meterState.treble = meterState.treble * 0.72 + bands.treble * 0.28;
+  meterState.wave = meterState.wave * 0.64 + (bands.wave || 0) * 0.36;
   const cs=getComputedStyle(document.documentElement);
   const ink=cs.getPropertyValue('--ink').trim()||'oklch(24% 0.012 64)';
   const faint=cs.getPropertyValue('--ink-faint').trim()||'oklch(54% 0.010 70)';
@@ -1901,15 +1996,17 @@ function drawLevelMeter(t=currentTime()){
     const angle = -Math.PI/2 + (i / bars) * Math.PI * 2;
     const lowSide = Math.cos(angle) < 0;
     const band = lowSide ? meterState.bass : meterState.treble;
-    const pulse = state.playing ? (0.5 + 0.5 * Math.sin(t * 8 + i * 0.37)) * 0.08 : 0.025;
-    const length = size * (0.035 + band * 0.16 + pulse);
+    const wave = bands.waveform?.length
+      ? Math.abs((bands.waveform[Math.floor((i / bars) * bands.waveform.length)] - 128) / 128)
+      : meterState.wave;
+    const length = size * (0.026 + band * 0.10 + wave * 0.19 + meterState.wave * 0.05);
     const inner = base;
     const outer = base + length;
     ctx.rotate(angle);
     ctx.beginPath();
     ctx.strokeStyle = lowSide ? ink : faint;
-    ctx.globalAlpha = lowSide ? 0.32 + band * 0.5 : 0.24 + band * 0.48;
-    ctx.lineWidth = i % 6 === 0 ? 2 : 1;
+    ctx.globalAlpha = lowSide ? 0.24 + band * 0.42 + wave * 0.22 : 0.20 + band * 0.38 + wave * 0.18;
+    ctx.lineWidth = (i % 6 === 0 ? 1.7 : 1) + wave * 1.15;
     ctx.moveTo(0, -inner);
     ctx.lineTo(0, -outer);
     ctx.stroke();
@@ -1959,7 +2056,14 @@ function applyStemGain(stem){
   if(gains[stem]) gains[stem].gain.value=effectiveVolume(stem);
 }
 function applyAllGains(){STEMS.forEach(applyStemGain);}
-function buildGains(){STEMS.forEach(s=>{gains[s]=audioCtx.createGain();applyStemGain(s);gains[s].connect(audioCtx.destination);});}
+function buildGains(){
+  const output = analyserOutputNode();
+  STEMS.forEach(s=>{
+    gains[s]=audioCtx.createGain();
+    applyStemGain(s);
+    gains[s].connect(output);
+  });
+}
 function stopStemSource(stem){
   try{sources[stem]&&sources[stem].stop();}catch(e){}
   sources[stem]=null;
@@ -2309,6 +2413,9 @@ function buildSampleButtons(){
   SAMPLE_TRACKS.forEach(track=>{
     const btn=document.createElement('button');
     btn.type='button';
+    btn.className='sample-track-btn';
+    btn.title=track.name;
+    btn.setAttribute('aria-label', `Load sample: ${track.name}`);
     btn.textContent=track.name;
     btn.addEventListener('click',()=>useSampleTrack(track, btn));
     container.appendChild(btn);

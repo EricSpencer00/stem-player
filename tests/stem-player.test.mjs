@@ -231,8 +231,10 @@ class FakeAudioContext {
     this.currentTime = 0;
     this.createdSources = [];
     this.createdGains = [];
+    this.createdAnalysers = [];
     this.destination = {};
     this.state = 'running';
+    this.sampleRate = 44100;
   }
 
   createGain() {
@@ -249,6 +251,30 @@ class FakeAudioContext {
     };
     this.createdGains.push(gain);
     return gain;
+  }
+
+  createAnalyser() {
+    const analyser = {
+      fftSize: 2048,
+      frequencyBinCount: 1024,
+      smoothingTimeConstant: 0,
+      connectedTo: null,
+      timeData: null,
+      frequencyData: null,
+      connect(destination) {
+        this.connectedTo = destination;
+      },
+      getByteTimeDomainData(target) {
+        const source = this.timeData || new Uint8Array(target.length).fill(128);
+        for (let i = 0; i < target.length; i++) target[i] = source[i % source.length];
+      },
+      getByteFrequencyData(target) {
+        const source = this.frequencyData || new Uint8Array(target.length);
+        for (let i = 0; i < target.length; i++) target[i] = source[i % source.length];
+      },
+    };
+    this.createdAnalysers.push(analyser);
+    return analyser;
   }
 
   createBufferSource() {
@@ -475,6 +501,14 @@ test('top circle is a passive level meter instead of quadrant controls', () => {
   assert.match(html, /<canvas class="level-meter" id="levelMeter" aria-hidden="true"><\/canvas>/);
   assert.match(html, /\.level-meter\s*\{(?=[^}]*border-radius:\s*50%;)(?=[^}]*pointer-events:\s*none;)/s);
   assert.match(html, /\.quadrant,\s*\.q-label,\s*\.q-mute-mark\s*\{(?=[^}]*display:\s*none;)/s);
+});
+
+test('sample track titles fit inside responsive multi-line buttons', () => {
+  const html = loadHtml();
+
+  assert.match(html, /\.sample-rows\s*\{(?=[^}]*width:\s*min\(760px,\s*calc\(100vw - 32px\)\);)(?=[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(220px,\s*100%\),\s*1fr\)\);)/s);
+  assert.match(html, /\.sample-rows button\s*\{(?=[^}]*line-height:\s*1\.25;)(?=[^}]*white-space:\s*normal;)(?=[^}]*overflow-wrap:\s*anywhere;)/s);
+  assert.match(html, /btn\.title\s*=\s*track\.name;/);
 });
 
 test('footer credits Eric Spencer without external UI inspiration copy', () => {
@@ -889,6 +923,34 @@ test('level meter bands are derived from active stem buffers and volume', () => 
 
   assert.ok(early.bass > early.treble, `expected early bass dominance, got ${JSON.stringify(early)}`);
   assert.ok(late.treble > late.bass, `expected late treble dominance, got ${JSON.stringify(late)}`);
+});
+
+test('level meter uses a live Web Audio analyser during playback', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+
+  app.startPlayback(0);
+
+  assert.equal(audioCtx.createdAnalysers.length, 1);
+  const analyser = audioCtx.createdAnalysers[0];
+  assert.equal(analyser.connectedTo, audioCtx.destination);
+  audioCtx.createdGains.forEach((gain) => {
+    assert.equal(gain.connectedTo, analyser);
+  });
+
+  const timeData = new Uint8Array(analyser.fftSize).fill(128);
+  for (let i = 0; i < timeData.length; i += 2) timeData[i] = 232;
+  const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+  frequencyData.fill(212, 0, 14);
+  frequencyData.fill(36, 64);
+  analyser.timeData = timeData;
+  analyser.frequencyData = frequencyData;
+
+  const bands = app.levelMeterBandsAt(0.25);
+
+  assert.ok(bands.wave > 0.2, `expected waveform energy from analyser, got ${JSON.stringify(bands)}`);
+  assert.ok(bands.bass > bands.treble, `expected analyser bass dominance, got ${JSON.stringify(bands)}`);
 });
 
 test('rejecting a loop that extends past the track clears stale loop state', () => {
