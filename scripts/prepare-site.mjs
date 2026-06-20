@@ -29,31 +29,10 @@ await writeFile(join(outDir, '_headers'), [
 ].join('\n'));
 await writeFile(join(outDir, '_redirects'), [
   '/app  https://stemacle.com/app  301',
-  '/app/* https://stemacle.com/app/:splat  301',
+  '/app/* https://stemacle.com/app/:splat 301',
   '/stem-player  https://stemacle.com/app  301',
   '/stem-player/* https://stemacle.com/app/:splat 301',
 ].join('\n'));
-await writeFile(join(outDir, 'app', 'index.html'), `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="robots" content="noindex" />
-    <meta http-equiv="refresh" content="0; url=https://stemacle.com/app" />
-    <script>
-      (function redirectAppEntry() {
-        const path = window.location.pathname || '';
-        const tail = path.replace(/^\\/app\\/?/, '');
-        const suffix = tail ? '/' + tail : '';
-        const destination = `https://stemacle.com/app${suffix}${window.location.search}${window.location.hash}`;
-        window.location.replace(destination);
-      })();
-    </script>
-    <title>Redirecting to Stemacle Web App</title>
-  </head>
-  <body>
-    <p>Redirecting to <a href="https://stemacle.com/app">stemacle.com/app</a>.</p>
-  </body>
-</html>`);
 await cp(join(root, '404.html'), join(outDir, '404.html'));
 await mkdir(join(outDir, 'stem-player'), { recursive: true });
 await writeFile(join(outDir, 'stem-player', 'index.html'), `<!doctype html>
@@ -65,6 +44,26 @@ await writeFile(join(outDir, 'stem-player', 'index.html'), `<!doctype html>
     <script>
       (function redirectStemPlayer() {
         const tail = window.location.pathname.replace(/^\\/stem-player\\/?/, '');
+        const suffix = tail ? '/' + tail : '';
+        const destination = 'https://stemacle.com/app' + suffix + window.location.search + window.location.hash;
+        window.location.replace(destination);
+      })();
+    </script>
+    <title>Redirecting to Stemacle Web App</title>
+  </head>
+  <body>
+    <p>Redirecting to <a href="https://stemacle.com/app">stemacle.com/app</a>.</p>
+  </body>
+</html>`);
+await writeFile(join(outDir, 'app', 'index.html'), `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content="0; url=https://stemacle.com/app" />
+    <script>
+      (function redirectAppRoot() {
+        const tail = window.location.pathname.replace(/^\\/app\\/?/, '');
         const suffix = tail ? '/' + tail : '';
         const destination = 'https://stemacle.com/app' + suffix + window.location.search + window.location.hash;
         window.location.replace(destination);
