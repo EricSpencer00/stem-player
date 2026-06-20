@@ -43,7 +43,7 @@ await writeFile(join(outDir, 'app', 'index.html'), `<!doctype html>
       (function redirectAppEntry() {
         const path = window.location.pathname || '';
         const tail = path.replace(/^\\/app\\/?/, '');
-        const suffix = tail ? `/${tail}` : '';
+        const suffix = tail ? '/' + tail : '';
         const destination = `https://stemacle.com/app${suffix}${window.location.search}${window.location.hash}`;
         window.location.replace(destination);
       })();
