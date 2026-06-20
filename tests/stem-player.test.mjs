@@ -34,18 +34,28 @@ function loadIosProject() {
   return readFileSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url), 'utf8');
 }
 
-function loadIosReleaseScript() {
-  return readFileSync(new URL('../scripts/ios-release.sh', import.meta.url), 'utf8');
-}
-
-test('landing page links to the web app and desktop repository without old naming', () => {
+test('landing page exposes current web, repo, and GitHub download links without premature iOS claims', () => {
   const html = loadLandingHtml();
+  const version = loadPackageJson().version;
+  const versionPattern = version.replaceAll('.', '\\.');
 
   assert.match(html, /<title>Stemacle<\/title>/);
   assert.match(html, /href="\/app\/"/);
   assert.match(html, /EricSpencer00\/stem-player/);
+  assert.match(html, /https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
+  assert.match(html, new RegExp(`https://github\\.com/EricSpencer00/stem-player/releases/download/v${versionPattern}/Stemacle-${versionPattern}-arm64\\.dmg`));
+  assert.match(html, new RegExp(`https://github\\.com/EricSpencer00/stem-player/releases/download/v${versionPattern}/Stemacle-${versionPattern}-arm64-mac\\.zip`));
+  assert.match(html, new RegExp(`https://github\\.com/EricSpencer00/stem-player/releases/download/v${versionPattern}/stemacle-ios-project-${versionPattern}\\.zip`));
   assert.doesNotMatch(html, /EricSpencer00\/stem-workstation/);
   assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
+  assert.doesNotMatch(html, /desktop next/i);
+  assert.doesNotMatch(html, /iOS tonight/i);
+  assert.doesNotMatch(html, /soon on iOS/i);
+  assert.doesNotMatch(html, /TestFlight is the next surface/i);
+  assert.doesNotMatch(html, /One repo, four surfaces/i);
+  assert.doesNotMatch(html, /Windows x64/i);
+  assert.doesNotMatch(html, /Linux x64/i);
+  assert.doesNotMatch(html, /CLI binaries/i);
   assert.doesNotMatch(html, new RegExp(`${'Stem'} ${'Player'}|${'stem'} ${'player'}`));
 });
 
@@ -68,6 +78,12 @@ test('browser splitter can consume a pending desktop-library track through the n
   assert.match(html, /stemacle:pendingTrackId/);
   assert.match(html, /window\.stemacleNative\?\.readTrackFile/);
   assert.match(html, /Opening Library Track/);
+  assert.match(html, /Reading audio from the desktop library/i);
+
+  if (/stemacle:lastLibraryTrack/.test(html)) {
+    assert.match(html, /indexedDB/);
+    assert.match(html, /Loading audio from on-device storage/i);
+  }
 });
 
 test('desktop and ios packaging wrap the existing static app', () => {
@@ -78,42 +94,18 @@ test('desktop and ios packaging wrap the existing static app', () => {
   assert.equal(pkg.scripts['native:prepare'], 'node scripts/prepare-native.mjs');
   assert.equal(pkg.scripts['desktop:dev'], 'npm run native:prepare && electron .');
   assert.equal(pkg.scripts['ios:sync'], 'npm run native:prepare && cap sync ios');
-  assert.equal(pkg.scripts['ios:archive'], 'bash scripts/ios-release.sh archive');
-  assert.equal(pkg.scripts['ios:testflight'], 'bash scripts/ios-release.sh testflight');
   assert.ok(existsSync(new URL('../native/electron/main.cjs', import.meta.url)));
   assert.ok(existsSync(new URL('../native/electron/preload.cjs', import.meta.url)));
   assert.ok(existsSync(new URL('../native/electron/icon.icns', import.meta.url)));
   assert.ok(existsSync(new URL('../native/electron/icon.png', import.meta.url)));
   assert.ok(existsSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url)));
-  assert.ok(
-    existsSync(
-      new URL(
-        '../native/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved',
-        import.meta.url,
-      ),
-    ),
-  );
   assert.ok(existsSync(new URL('../native/ios/App/App/Info.plist', import.meta.url)));
-  assert.ok(existsSync(new URL('../native/ios/App/App/Assets.xcassets/AppIcon.appiconset/stemacle-tentacle-1024.png', import.meta.url)));
-  assert.ok(existsSync(new URL('../native/ios/testflight-export-options.plist', import.meta.url)));
-  assert.ok(existsSync(new URL('../scripts/ios-release.sh', import.meta.url)));
   assert.equal(pkg.build.mac.icon, 'native/electron/icon.icns');
   assert.equal(pkg.build.linux.icon, 'native/electron/icon.png');
   assert.equal(cap.appId, 'com.stemacle.app');
   assert.equal(cap.appName, 'Stemacle');
   assert.equal(cap.webDir, 'dist/native');
-  assert.match(project, /DEVELOPMENT_TEAM = QAWD9U9CF6;/);
-  assert.match(project, /CURRENT_PROJECT_VERSION = 2026062001;/);
-  assert.match(project, /MARKETING_VERSION = 1\.0\.0;/);
-});
-
-test('ios release script resolves packages without keychain-backed github auth', () => {
-  const script = loadIosReleaseScript();
-
-  assert.match(script, /-packageAuthorizationProvider netrc/);
-  assert.match(script, /-allowProvisioningUpdates/);
-  assert.match(script, /native\/ios\/testflight-export-options\.plist/);
-  assert.match(script, /npm run ios:sync/);
+  assert.match(project, /PRODUCT_BUNDLE_IDENTIFIER = com\.stemacle\.app;/);
 });
 
 test('cloudflare pages build publishes the complete Stemacle site', () => {
