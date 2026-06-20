@@ -9,7 +9,17 @@
 <link rel="apple-touch-icon" href="/assets/stemacle-tentacle.png">
 <meta property="og:title" content="Stemacle">
 <meta property="og:description" content="A warm, tactile stem splitter for the web and macOS, with direct GitHub downloads and iOS work in progress.">
-<meta property="og:image" content="/assets/stemacle-tentacle-cutout.png">
+
+<script>
+  (() => {
+    if (window.location.pathname.startsWith('/stem-player')) {
+      const tail = window.location.pathname.replace(/^/stem-player/?/, '');
+      const suffix = tail ? '/' + tail : '';
+      const destination = 'https://stemacle.com/app' + suffix + window.location.search + window.location.hash;
+      window.location.replace(destination);
+    }
+  })();
+</script>
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://stemacle.com/">
 <style>
@@ -689,7 +699,7 @@ footer {
       <span>local stems</span>
     </a>
     <div class="nav-links">
-      <a href="/app/">web app</a>
+      <a href="https://stemacle.com/app/">web app</a>
       <a href="#desktop">desktop</a>
       <a href="#downloads">downloads</a>
       <a href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">workflow</a>
@@ -704,7 +714,7 @@ footer {
         <p class="dek">Split songs into stems, lock loops to tempo, shuffle compatible tracks, and export everything without uploading your music.</p>
         <p class="body-copy">The web app is instant. The desktop app adds indexed libraries, model caches, higher-quality local splitting, downloads, background jobs, and export queues. iOS is in progress, and the public release path stays tied to the stem-player repository instead of a separate workspace.</p>
         <div class="actions" aria-label="Stemacle actions">
-          <a class="cta primary" href="/app/">open web app</a>
+          <a class="cta primary" href="https://stemacle.com/app/">open web app</a>
           <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">download mac app</a>
           <a class="cta" href="https://github.com/EricSpencer00/stem-player">view repo</a>
         </div>
@@ -732,7 +742,7 @@ footer {
 
     <section class="route-strip" aria-label="Stemacle routes">
       <div class="route-grid">
-        <a class="route" href="/app/">
+        <a class="route" href="https://stemacle.com/app/">
           <span class="route-label">web</span>
           <strong>browser instrument</strong>
           <p>Drop a track and split it locally with tempo-locked loop controls.</p>
@@ -855,7 +865,7 @@ v0.1.0</code></pre>
   <footer>
     <span>Stemacle by Eric Spencer. Local-first music tools with warm hardware manners.</span>
     <div class="footer-links">
-      <a href="/app/">web app</a>
+      <a href="https://stemacle.com/app/">web app</a>
       <a href="#downloads">downloads</a>
       <a href="https://github.com/EricSpencer00/stem-player">github</a>
     </div>
