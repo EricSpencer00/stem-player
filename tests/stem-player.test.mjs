@@ -521,7 +521,10 @@ test('vocals headphones control gets a one-off pulse affordance', () => {
   const html = loadHtml();
 
   assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]\s*\{(?=[^}]*position:\s*relative;)(?=[^}]*overflow:\s*visible;)/s);
-  assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]::after\s*\{(?=[^}]*animation:\s*vocalPhonesPulse\s+[^;]+;)(?=[^}]*border:\s*1px solid var\(--amber-glow\);)/s);
+  assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]\s+svg\s*\{(?=[^}]*animation:\s*vocalPhonesIconPulse\s+[^;]+;)(?=[^}]*transform-box:\s*fill-box;)/s);
+  assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]::after\s*\{(?=[^}]*animation:\s*vocalPhonesPulse\s+[^;]+;)(?=[^}]*border:\s*2px solid var\(--ink\);)/s);
+  assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]\[aria-pressed="true"\]\s+svg\s*\{[^}]*animation:\s*none;[^}]*\}/s);
+  assert.match(html, /@keyframes vocalPhonesIconPulse\s*\{(?=[\s\S]*filter:\s*[\s\S]*drop-shadow\()/);
   assert.match(html, /@keyframes vocalPhonesPulse\s*\{/);
 });
 
