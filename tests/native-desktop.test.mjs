@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -16,21 +16,50 @@ async function importDesktopModule() {
   return import(`${moduleUrl.href}?t=${Date.now()}`);
 }
 
-test('desktop service persists library records and derives stable cache paths', async () => {
+test('desktop service indexes roots, metadata, tool state, and stable cache paths', async () => {
   const desktop = await importDesktopModule();
   const tempRoot = mkdtempSync(join(tmpdir(), 'stemacle-desktop-'));
-  const audioPath = join(tempRoot, 'track one.wav');
+  const crateRoot = join(tempRoot, 'crate');
+  mkdirSync(crateRoot, { recursive: true });
+  const audioPath = join(crateRoot, 'track one.wav');
   writeFileSync(audioPath, 'not real audio, good enough for cache identity');
 
   try {
-    const store = desktop.createDesktopStore(tempRoot);
-    const [track] = store.addLibraryPaths([audioPath]);
+    const store = desktop.createDesktopStore(tempRoot, {
+      toolState: {
+        ffmpeg: { available: true, command: '/fake/ffmpeg' },
+        ffprobe: { available: true, command: '/fake/ffprobe' },
+        demucs: { available: true, command: '/fake/demucs' },
+        ytDlp: { available: true, command: '/fake/yt-dlp' },
+      },
+      adapters: {
+        readMetadata: async () => ({
+          duration: 91.2,
+          sampleRate: 44100,
+          channels: 2,
+          bpm: 126,
+          key: 'Am',
+        }),
+      },
+    });
+    const [track] = await store.addLibraryPaths([crateRoot]);
     const reloaded = desktop.createDesktopStore(tempRoot);
+    const state = store.getState();
 
     assert.equal(track.name, 'track one.wav');
     assert.equal(track.sourceKind, 'desktop');
+    assert.equal(track.duration, 91.2);
+    assert.equal(track.bpm, 126);
+    assert.equal(track.key, 'Am');
     assert.match(track.cache.stemDir, /stem-cache/);
     assert.match(track.cache.analysisFile, /analysis-cache/);
+    assert.match(track.cache.manifestFile, /analysis-cache/);
+    assert.match(state.paths.downloadRoot, /downloads/);
+    assert.equal(state.libraryRoots.length, 1);
+    assert.equal(state.libraryRoots[0].path, crateRoot);
+    assert.equal(state.tools.demucs.available, true);
+    assert.equal(state.tools.ytDlp.available, true);
+    assert.ok(state.modelCache.models.some((model) => model.id === 'mdx-extra-q'));
     assert.equal(reloaded.getState().library.length, 1);
     assert.equal(reloaded.getState().library[0].id, track.id);
   } finally {
@@ -38,40 +67,131 @@ test('desktop service persists library records and derives stable cache paths', 
   }
 });
 
-test('desktop service exposes model quality catalog, queue, sessions, and export plans', async () => {
+test('desktop service runs analysis, download, export, and file-read jobs through adapters', async () => {
   const desktop = await importDesktopModule();
   const tempRoot = mkdtempSync(join(tmpdir(), 'stemacle-desktop-'));
   const audioPath = join(tempRoot, 'source.mp3');
   writeFileSync(audioPath, 'audio bytes');
 
   try {
-    const store = desktop.createDesktopStore(tempRoot);
-    const [track] = store.addLibraryPaths([audioPath]);
-    const job = store.enqueueAnalysis(track.id, { quality: 'demucs-4stem' });
+    const store = desktop.createDesktopStore(tempRoot, {
+      toolState: {
+        ffmpeg: { available: true, command: '/fake/ffmpeg' },
+        ffprobe: { available: true, command: '/fake/ffprobe' },
+        demucs: { available: true, command: '/fake/demucs' },
+        ytDlp: { available: true, command: '/fake/yt-dlp' },
+      },
+      adapters: {
+        readMetadata: async (filePath) => ({
+          duration: filePath.endsWith('source.mp3') ? 88.4 : 76.1,
+          sampleRate: 44100,
+          channels: 2,
+          bpm: 122,
+          key: 'C',
+        }),
+        runDemucs: async ({ outputDir }) => {
+          mkdirSync(outputDir, { recursive: true });
+          for (const stem of ['vocals', 'drums', 'bass', 'other']) {
+            writeFileSync(join(outputDir, `${stem}.wav`), `${stem} audio`);
+          }
+          return {
+            stemFiles: {
+              vocals: join(outputDir, 'vocals.wav'),
+              drums: join(outputDir, 'drums.wav'),
+              bass: join(outputDir, 'bass.wav'),
+              other: join(outputDir, 'other.wav'),
+            },
+          };
+        },
+        runDownload: async ({ outputDir }) => {
+          mkdirSync(outputDir, { recursive: true });
+          const filePath = join(outputDir, 'downloaded-track.mp3');
+          writeFileSync(filePath, 'downloaded audio');
+          return { filePath, title: 'Downloaded track' };
+        },
+        convertAudio: async ({ inputPath, outputPath }) => {
+          mkdirSync(join(outputPath, '..'), { recursive: true });
+          copyFileSync(inputPath, outputPath);
+          return { outputPath };
+        },
+      },
+    });
+    const [track] = await store.addLibraryPaths([audioPath]);
+    const analysisJob = store.enqueueAnalysis(track.id, { quality: 'demucs-4stem' });
+    const downloadJob = store.enqueueDownload('https://example.com/watch?v=abc123');
+    await store.waitForIdle();
     const session = store.saveSession({
       name: 'late night loop',
       trackIds: [track.id],
       mixer: { drums: 0.8, vocals: 1 },
     });
-    const stemPack = store.planExport(track.id, { kind: 'stem-pack', format: 'wav' });
-    const loop = store.planExport(track.id, { kind: 'current-loop', format: 'flac' });
+    const exportJob = store.enqueueExport(track.id, { kind: 'stem-pack', format: 'wav', quality: 'demucs-4stem' });
+    await store.waitForIdle();
+    const filePayload = store.readTrackFile(track.id);
+    const state = store.getState();
+    const updatedTrack = state.library.find((entry) => entry.id === track.id);
+    const completedAnalysis = state.queue.find((job) => job.id === analysisJob.id);
+    const completedDownload = state.queue.find((job) => job.id === downloadJob.id);
+    const completedExport = state.queue.find((job) => job.id === exportJob.id);
 
     assert.ok(desktop.MODEL_QUALITY_CATALOG.some((model) => model.id === 'fast-preview'));
     assert.ok(desktop.MODEL_QUALITY_CATALOG.some((model) => model.id === 'demucs-4stem' && model.stems === 4));
-    assert.ok(desktop.MODEL_QUALITY_CATALOG.some((model) => model.id === 'demucs-6stem' && model.optional));
-    assert.equal(job.status, 'queued');
-    assert.equal(job.quality, 'demucs-4stem');
+    assert.ok(desktop.MODEL_QUALITY_CATALOG.some((model) => model.id === 'mdx-extra-q'));
+    assert.equal(completedAnalysis.status, 'completed');
+    assert.equal(completedDownload.status, 'completed');
+    assert.equal(completedExport.status, 'completed');
+    assert.equal(analysisJob.quality, 'demucs-4stem');
     assert.equal(session.trackIds[0], track.id);
-    assert.equal(stemPack.kind, 'stem-pack');
-    assert.equal(stemPack.format, 'wav');
-    assert.equal(loop.kind, 'current-loop');
-    assert.match(store.getState().modelCache.cacheRoot, /model-cache/);
+    assert.equal(updatedTrack.stemAvailability.demucs4, true);
+    assert.ok(existsSync(join(updatedTrack.cache.stemDir, 'demucs-4stem', 'vocals.wav')));
+    assert.match(state.modelCache.cacheRoot, /model-cache/);
+    assert.ok(state.library.some((entry) => entry.sourceKind === 'download'));
+    assert.equal(state.exports[0].status, 'completed');
+    assert.equal(state.exports[0].kind, 'stem-pack');
+    assert.equal(state.exports[0].format, 'wav');
+    assert.ok(existsSync(join(updatedTrack.cache.exportDir, 'stem-pack', 'vocals.wav')));
+    assert.equal(filePayload.name, 'source.mp3');
+    assert.equal(filePayload.mimeType, 'audio/mpeg');
+    assert.equal(Buffer.from(filePayload.bytes).toString('utf8'), 'audio bytes');
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 
-test('desktop shell surfaces cache, queue, session, export, shortcuts, and model controls', () => {
+test('desktop service fails demucs and download jobs cleanly when native tools are unavailable', async () => {
+  const desktop = await importDesktopModule();
+  const tempRoot = mkdtempSync(join(tmpdir(), 'stemacle-desktop-'));
+  const audioPath = join(tempRoot, 'source.wav');
+  writeFileSync(audioPath, 'audio bytes');
+
+  try {
+    const store = desktop.createDesktopStore(tempRoot, {
+      toolState: {
+        ffmpeg: { available: false, command: null },
+        ffprobe: { available: false, command: null },
+        demucs: { available: false, command: null },
+        ytDlp: { available: false, command: null },
+      },
+    });
+    const [track] = await store.addLibraryPaths([audioPath]);
+    const analysisJob = store.enqueueAnalysis(track.id, { quality: 'demucs-4stem' });
+    const downloadJob = store.enqueueDownload('https://example.com/watch?v=abc123');
+    await store.waitForIdle();
+
+    const state = store.getState();
+    const failedAnalysis = state.queue.find((job) => job.id === analysisJob.id);
+    const failedDownload = state.queue.find((job) => job.id === downloadJob.id);
+
+    assert.equal(failedAnalysis.status, 'failed');
+    assert.match(failedAnalysis.error, /demucs/i);
+    assert.equal(failedDownload.status, 'failed');
+    assert.match(failedDownload.error, /yt-dlp/i);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('desktop shell surfaces downloads, roots, caches, queue, session, export, shortcuts, and model controls', () => {
   const html = readRepo('native/index.html');
 
   assert.match(html, /id="commandPalette"/);
@@ -79,11 +199,20 @@ test('desktop shell surfaces cache, queue, session, export, shortcuts, and model
   assert.match(html, /id="modelCacheList"/);
   assert.match(html, /id="exportPanel"/);
   assert.match(html, /id="sessionList"/);
+  assert.match(html, /id="downloadUrlInput"/);
+  assert.match(html, /id="libraryRoots"/);
+  assert.match(html, /id="toolStatusList"/);
+  assert.match(html, /id="cacheRootList"/);
+  assert.match(html, /id="recentProjectsList"/);
   assert.match(html, /data-quality="fast-preview"/);
   assert.match(html, /data-quality="demucs-4stem"/);
   assert.match(html, /data-quality="demucs-6stem"/);
+  assert.match(html, /data-quality="mdx-extra-q"/);
   assert.match(html, /window\.stemacleNative\.enqueueAnalysis/);
+  assert.match(html, /window\.stemacleNative\.enqueueDownload/);
   assert.match(html, /window\.stemacleNative\.exportTrack/);
+  assert.match(html, /window\.stemacleNative\.rescanLibrary/);
+  assert.match(html, /window\.stemacleNative\.onStateChanged/);
   assert.match(html, /meta\+k/i);
 });
 
@@ -96,11 +225,15 @@ test('electron bridge exposes native desktop operations and menu handlers', () =
     'pickAudioFiles',
     'pickAudioFolder',
     'addLibraryPaths',
+    'rescanLibrary',
     'enqueueAnalysis',
+    'enqueueDownload',
     'saveSession',
     'exportTrack',
+    'readTrackFile',
     'revealPath',
     'clearDesktopState',
+    'onStateChanged',
   ]) {
     assert.match(preload, new RegExp(`${api}:`));
   }
@@ -109,9 +242,12 @@ test('electron bridge exposes native desktop operations and menu handlers', () =
     'stemacle:get-desktop-state',
     'stemacle:pick-audio-folder',
     'stemacle:add-library-paths',
+    'stemacle:rescan-library',
     'stemacle:enqueue-analysis',
+    'stemacle:enqueue-download',
     'stemacle:save-session',
     'stemacle:export-track',
+    'stemacle:read-track-file',
     'stemacle:reveal-path',
   ]) {
     assert.match(main, new RegExp(channel));

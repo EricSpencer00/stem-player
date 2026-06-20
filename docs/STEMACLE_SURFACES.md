@@ -20,14 +20,19 @@ The desktop app is the local workbench. It wraps the existing Stem Splitter and 
 Desktop adds:
 
 - persistent music library with file path, size, modification time, analysis status, and cache paths
+- persistent indexed folder roots and rescans
+- direct handoff from the library into the Stem Splitter route without reopening a file manually
 - offline model cache manifest for fast preview, Demucs high quality four-stem, and optional Demucs six-stem
+- optional Demucs `mdx_extra_q` model row for alternate four-stem work
 - stable per-track stem cache and analysis cache paths so playback and shuffle do not reprocess the same track every time
 - background analysis queue records with selectable separation quality
-- export planning for individual stems, stem packs, mixdowns, loops, and deck transitions
+- desktop download queue for URL-based intake when `yt-dlp` is installed
+- export queue for stem packs and future mixdown-oriented desktop exports
+- ffprobe and ffmpeg capability detection for metadata and conversion work
 - command palette, menu commands, keyboard shortcuts, OS file and folder dialogs, and desktop notifications
 - Stem Shuffle as a first-class route for compatibility-aware pair picking, deck rate matching, crossfader, lead A/B, blend, flip, queue, and history
 
-The high-quality model path is local Demucs. Fast preview stays available without extra setup. When Demucs is installed on the machine, the desktop cache is ready for `htdemucs_ft` four-stem jobs and the optional `htdemucs_6s` six-stem path. When Demucs is not installed, the app still keeps the library, preview cache, queue records, sessions, and exports usable.
+The high-quality model path is local Demucs. Fast preview stays available without extra setup. When Demucs is installed on the machine, the desktop cache is ready for `htdemucs_ft` four-stem jobs, the optional `htdemucs_6s` six-stem path, and the optional `mdx_extra_q` alternate four-stem path. When Demucs is not installed, the app still keeps the library, metadata cache, queue records, sessions, downloads, and exports usable.
 
 ## iOS App
 
