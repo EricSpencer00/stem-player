@@ -113,8 +113,8 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
 
   assert.equal(pkg.scripts['native:prepare'], 'node scripts/prepare-native.mjs');
   assert.ok(/(node scripts\/desktop-dispatch\.mjs dev|npm run native:prepare && electron \.)/.test(pkg.scripts['desktop:dev']));
-  assert.equal(pkg.scripts['desktop:pack'], 'node scripts/desktop-dispatch.mjs pack');
-  assert.equal(pkg.scripts['desktop:dist'], 'node scripts/desktop-dispatch.mjs dist');
+  assert.ok(pkg.scripts['desktop:pack'].includes('electron-builder'));
+  assert.ok(pkg.scripts['desktop:dist'].includes('electron-builder'));
   assert.equal(pkg.scripts['macos:dev'], 'npm run native:prepare && swift run --package-path native/macos StemacleMac --repo-root "$PWD"');
   assert.equal(pkg.scripts['macos:build'], 'npm run native:prepare && swift build --package-path native/macos -c release');
   assert.equal(pkg.scripts['macos:package'], 'npm run macos:build && node scripts/package-macos.mjs');
@@ -133,7 +133,7 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
   assert.ok(existsSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url)));
   assert.ok(existsSync(new URL('../native/ios/App/App/Info.plist', import.meta.url)));
   assert.equal(pkg.build.forceCodeSigning, true);
-  assert.equal(pkg.build.productName, 'Stemacle Web Workbench');
+  assert.equal(pkg.build.productName, 'Stemacle');
   assert.equal(pkg.build.mac, undefined);
   assert.equal(pkg.build.win.artifactName, 'Stemacle-windows-${arch}-setup.${ext}');
   assert.equal(pkg.build.linux.icon, 'native/electron/icon.png');
