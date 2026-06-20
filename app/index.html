@@ -971,6 +971,7 @@ const SAMPLE_TRACKS = [
   {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
   {name:'Pyramid — 7OOP3D feat. Mr Yesterday', url:'./samples/stem-sample-3.mp3'},
 ];
+const PENDING_NATIVE_TRACK_KEY = 'stemacle:pendingTrackId';
 const STEMS = ['drums','vocals','bass','melody'];
 const LOOP_TARGETS = [...STEMS, 'all'];
 const HF = 'https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/';
@@ -2580,6 +2581,26 @@ function buildSampleButtons(){
   });
 }
 
+async function openPendingNativeTrack(){
+  if(!window.stemacleNative?.readTrackFile) return;
+  const pendingTrackId = sessionStorage.getItem(PENDING_NATIVE_TRACK_KEY);
+  if(!pendingTrackId) return;
+  sessionStorage.removeItem(PENDING_NATIVE_TRACK_KEY);
+  try{
+    showOverlay('Opening Library Track','Reading audio from the desktop library…',4);
+    const payload = await window.stemacleNative.readTrackFile(pendingTrackId);
+    if(!payload?.bytes) throw new Error('Desktop track payload was empty.');
+    const bytes = payload.bytes instanceof Uint8Array ? payload.bytes : new Uint8Array(payload.bytes);
+    const file = new File([bytes], payload.name || 'Desktop Track', {type: payload.mimeType || 'application/octet-stream'});
+    await handleFile(file);
+  }catch(e){
+    hideOverlay();
+    state.processing = false;
+    updateSampleRowsVisibility();
+    alert('Unable to open desktop library track: ' + e.message);
+  }
+}
+
 // file handling
 async function handleFile(file){
   const isAudioType = file && file.type ? file.type.startsWith('audio/') : false;
@@ -2644,6 +2665,7 @@ const center=document.getElementById('center'), device=document.getElementById('
 // init
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically
 buildSampleButtons();
+openPendingNativeTrack();
 STEMS.forEach(stem=>setMute(stem, state.muted[stem]));
 updateHeadphonesUI();
 updateLoopAuditionUI();
