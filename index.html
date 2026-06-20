@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stemacle</title>
-<meta name="description" content="Stemacle splits, loops, shuffles, and downloads music stems locally in the browser, on desktop, and soon on iOS.">
+<meta name="description" content="Stemacle splits, loops, shuffles, and downloads music stems locally in the browser and on desktop, with iOS work in progress.">
 <link rel="icon" type="image/png" href="/assets/stemacle-tentacle.png">
 <link rel="apple-touch-icon" href="/assets/stemacle-tentacle.png">
 <meta property="og:title" content="Stemacle">
-<meta property="og:description" content="A warm, tactile stem splitter and shuffle instrument for browser, desktop, CLI, and soon iOS.">
+<meta property="og:description" content="A warm, tactile stem splitter for the web and macOS, with direct GitHub downloads and iOS work in progress.">
 <meta property="og:image" content="/assets/stemacle-tentacle-cutout.png">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://stemacle.com/">
@@ -568,7 +568,7 @@ footer {
     </a>
     <div class="nav-links">
       <a href="/app/">web app</a>
-      <a href="https://github.com/EricSpencer00/stem-player/releases/latest">download</a>
+      <a href="#downloads">download</a>
       <a href="https://github.com/EricSpencer00/stem-player">github</a>
     </div>
   </nav>
@@ -576,14 +576,14 @@ footer {
   <main>
     <section class="hero" aria-labelledby="title">
       <div class="hero-copy">
-        <span class="eyebrow">browser now · desktop next · iOS tonight</span>
+        <span class="eyebrow">browser live · mac download · ios in progress</span>
         <h1 id="title">Stemacle</h1>
         <p class="dek">Split songs into stems, lock loops to tempo, shuffle compatible tracks, and export everything without uploading your music.</p>
-        <p class="body-copy">The web app is instant. The desktop app adds a private library, better local splitting, downloads, background jobs, and a CLI for people who would rather type than tap.</p>
+        <p class="body-copy">The web app is instant. The desktop app adds indexed libraries, model caches, higher-quality local splitting, downloads, background jobs, and export queues. iOS is still in progress.</p>
         <div class="actions" aria-label="Stemacle actions">
           <a class="cta primary" href="/app/">open web app</a>
-          <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/latest">download desktop</a>
-          <a class="cta" href="https://github.com/EricSpencer00/stem-player">view repo</a>
+          <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">download mac app</a>
+          <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/latest">latest release</a>
         </div>
       </div>
       <div class="object" aria-hidden="true">
@@ -600,15 +600,15 @@ footer {
           <strong>browser instrument</strong>
           <p>Drop a track and split it locally with tempo-locked loop controls.</p>
         </a>
-        <a class="route" href="https://github.com/EricSpencer00/stem-player/releases/latest">
+        <a class="route" href="#downloads">
           <span class="route-label">desktop</span>
-          <strong>downloads and library</strong>
-          <p>Mac, Windows, Linux, high-quality separation, export, and Stem Shuffle.</p>
+          <strong>direct GitHub downloads</strong>
+          <p>Apple Silicon DMG and ZIP are live today, with the rest landing as they actually ship.</p>
         </a>
-        <a class="route" href="#cli">
-          <span class="route-label">terminal</span>
-          <strong>CLI for hard mode</strong>
-          <p>Run checks, plan Demucs splits, and export stems from shell scripts.</p>
+        <a class="route" href="#ios-status">
+          <span class="route-label">ios</span>
+          <strong>native build in progress</strong>
+          <p>The shell and project scaffolding exist, but mobile install links are not public yet.</p>
         </a>
       </div>
     </section>
@@ -617,64 +617,61 @@ footer {
       <div class="desktop-copy">
         <span class="eyebrow">desktop app</span>
         <h2>Quiet power around the same physical control.</h2>
-        <p>Stemacle Desktop keeps the circle, then adds the things a browser should not pretend to own: file dialogs, local state, background splitting, native exports, and release builds.</p>
+        <p>Stemacle Desktop keeps the circle, then adds the things a browser should not pretend to own: indexed folders, persistent caches, background splitting, native exports, and release builds.</p>
       </div>
       <dl class="spec-list">
+        <dt>index</dt>
+        <dd>Track local folders, keep metadata on disk, and rescan without rebuilding the library by hand.</dd>
         <dt>split</dt>
         <dd>Preview stems are built in. High-quality mode plans and runs Demucs locally when installed.</dd>
-        <dt>shuffle</dt>
-        <dd>Analyze local tracks, rank compatible pairs by tempo and key, and move between Deck A and Deck B.</dd>
+        <dt>cache</dt>
+        <dd>Model, analysis, and export caches stay on disk so repeat work is fast and predictable.</dd>
         <dt>download</dt>
-        <dd>Export manifest-backed stem packs for use in other tools or future Stemacle sessions.</dd>
+        <dd>Pull compatible audio into the same queue, then export manifest-backed stem packs for future sessions.</dd>
         <dt>private</dt>
         <dd>Files stay on your machine. No upload account sits between you and the track.</dd>
       </dl>
     </section>
 
-    <section class="section release" id="cli">
+    <section class="section release">
       <div>
         <span class="eyebrow">repo and releases</span>
-        <h2>GitHub releases carry the desktop app and CLI.</h2>
-        <p>Artifacts are built for Apple Silicon, Intel Mac, Windows, and Linux. The CLI is named `stemacle`.</p>
+        <h2>Direct GitHub artifacts, not placeholders.</h2>
+        <p>Current public artifacts come from the `EricSpencer00/stem-player` releases page. Right now that means Apple Silicon macOS builds, an iOS project snapshot, and the site bundle. Windows, Linux, and CLI links show up here when those artifacts actually exist.</p>
         <div class="actions">
           <a class="mini-link" href="https://github.com/EricSpencer00/stem-player/releases/latest">latest release</a>
           <a class="mini-link" href="https://github.com/EricSpencer00/stem-player">source</a>
         </div>
       </div>
-      <div class="terminal" aria-label="Stemacle CLI examples">
+      <div class="terminal" aria-label="Stemacle release artifacts">
         <header>
-          <span class="caption">terminal</span>
-          <span class="caption">stemacle</span>
+          <span class="caption">release</span>
+          <span class="caption">v0.1.0</span>
         </header>
-        <pre><code><span class="dim">$</span> stemacle doctor
-Stemacle CLI
-Demucs: available
-Preview splitter: available
-
-<span class="dim">$</span> stemacle split track.mp3 --out ./stems
-./stems/manifest.json
-
-<span class="dim">$</span> stemacle split track.mp3 --out ./stems --dry-run</code></pre>
+        <pre><code>Stemacle-0.1.0-arm64.dmg       macOS app (Apple Silicon)
+Stemacle-0.1.0-arm64-mac.zip   macOS app zip
+stemacle-ios-project-0.1.0.zip iOS project snapshot
+stemacle-site-0.1.0.zip        site bundle</code></pre>
       </div>
     </section>
 
-    <section class="section release">
+    <section class="section release" id="downloads">
       <div>
         <span class="eyebrow">download targets</span>
-        <h2>One repo, four surfaces.</h2>
-        <p>The web app is live at `/app/`. Desktop installers and CLI artifacts are published from the Stemacle repo.</p>
+        <h2>Current public artifacts.</h2>
+        <p>Use the web app now, grab the mac build directly from GitHub Releases, or pull the iOS project snapshot while native mobile work is still underway.</p>
       </div>
       <div class="os-links" aria-label="Download targets">
-        <a href="https://github.com/EricSpencer00/stem-player/releases/latest">macOS universal</a>
-        <a href="https://github.com/EricSpencer00/stem-player/releases/latest">Windows x64</a>
-        <a href="https://github.com/EricSpencer00/stem-player/releases/latest">Linux x64</a>
-        <a href="https://github.com/EricSpencer00/stem-player/releases/latest">CLI binaries</a>
+        <a href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">macOS dmg (Apple Silicon)</a>
+        <a href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64-mac.zip">macOS zip (Apple Silicon)</a>
+        <a href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/stemacle-ios-project-0.1.0.zip">iOS project zip</a>
+        <a href="https://github.com/EricSpencer00/stem-player/releases/latest">latest release notes</a>
       </div>
     </section>
 
-    <section class="ios-note">
+    <section class="ios-note" id="ios-status">
       <span class="eyebrow">iOS</span>
-      <p>TestFlight is the next surface. The mobile build keeps the same local-first idea, with a smaller touch layout and the same Stemacle identity.</p>
+      <p>iOS work is still in progress. The native shell and project files are in the repo, but there is not a public App Store or TestFlight install link yet.</p>
     </section>
   </main>
 
