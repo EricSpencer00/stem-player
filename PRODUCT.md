@@ -17,9 +17,9 @@ independently playable, mutable, and loopable. No accounts, no uploads, no serve
 - Load bundled sample tracks from the local `samples/` directory for same-origin playback.
 - Decode and separate tracks entirely in the browser using ONNX Runtime Web plus browser DSP fallback behavior.
 - Recover from stalled remote model downloads by timing out the stream and continuing with browser DSP fallback.
-- Render four playable stems: drums, bass, vocals, and melody, with a full-width visible-window audio overview and per-stem play cursor.
+- Render four playable stems: drums, bass, vocals, and melody, with a full-width visible-window audio overview, per-stem play cursor, and quarter/half/measure grid markers.
 - Play, pause, restart, stop, seek, and view elapsed/total time.
-- Control each stem from the device surface: tap to mute, drag diagonally to adjust volume.
+- Keep the top circle as a passive physical display: center load/play control plus a bass/treble level meter, not a hidden mixer surface.
 - Control each stem from the panel: volume slider, icon mute, icon headphones/solo isolation, and a dedicated spectrogram rail.
 - Mute or unmute all stems from one persistent global toggle without resetting individual volume choices.
 - Loop each stem independently with `1/4`, `1/2`, `1`, and `2` measure buttons, or use the All row to apply one linked loop across every stem.

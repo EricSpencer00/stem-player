@@ -86,6 +86,16 @@ body {
     0 22px 64px oklch(24% 0.012 70 / 0.24),
     0 6px 16px oklch(24% 0.012 70 / 0.14);
 }
+.level-meter {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
+  mix-blend-mode: multiply;
+}
 
 /* SVG overlay for rings + arcs */
 .svg-layer {
@@ -106,6 +116,9 @@ body {
 .vol-fill.muted { stroke: var(--ink-ghost); }
 .vol-fill.looping { stroke: var(--amber); }
 .divider    { stroke: var(--track); stroke-width: 1; }
+.divider,
+.vol-track,
+.vol-fill { display: none; }
 
 /* ── quadrant hit areas ── */
 .quadrant {
@@ -121,6 +134,11 @@ body {
   -webkit-user-select: none;
   border-radius: 0;
   transition: background 0.18s;
+}
+.quadrant,
+.q-label,
+.q-mute-mark {
+  display: none;
 }
 .quadrant:active { cursor: grabbing; }
 .device:hover .quadrant:hover { background: oklch(100% 0 0 / 0.05); }
@@ -161,7 +179,7 @@ body {
   text-indent: 0.1em;
 }
 
-/* muted quadrant gets a faint diagonal wash */
+/* passive quadrant state remains hidden while panel controls drive stem state */
 .quadrant.muted { background: oklch(20% 0.01 60 / 0.05); }
 
 /* small mute glyph shown over a muted quadrant */
@@ -652,6 +670,7 @@ footer a:hover { border-color: var(--ink-faint); }
 
 <div class="device-wrap" id="deviceWrap">
   <div class="device" id="device"></div>
+  <canvas class="level-meter" id="levelMeter" aria-hidden="true"></canvas>
 
   <svg class="svg-layer" id="svg" viewBox="0 0 1000 1000" aria-hidden="true">
     <!-- progress ring -->
@@ -821,7 +840,7 @@ footer a:hover { border-color: var(--ink-faint); }
 </div>
 
 <footer>
-  UI inspired by <a href="https://krystalgamer.github.io/stem-player-emulator/" target="_blank" rel="noopener">krystalgamer</a>
+  made by <a href="https://ericspencer.us" target="_blank" rel="noopener">ericspencer.us</a>
   &nbsp;·&nbsp; ML: Spleeter / Deezer &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
 </footer>
 
@@ -851,6 +870,7 @@ const SPECTRAL_CURSOR_RATIO = 0.72;
 const SPECTRAL_PAD_BEFORE_SEC = 2;
 const SPECTRAL_PAD_AFTER_SEC = 4;
 const SPECTRAL_REDRAW_EPSILON = 0.12;
+const READY_HINT = 'Use the mixer rows to mute, solo, change volume, and loop stems';
 const SAMPLE_TRACKS = [
   {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
   {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
@@ -1201,6 +1221,11 @@ function spectralTimeFromClientX(clientX, rect, win=state.spectralWindow){
 }
 
 function snapLoopStart(currentSec, loopLength=measureLength()){
+  const end = snapLoopEnd(currentSec, loopLength);
+  return Math.max(0, end - (Number.isFinite(loopLength) && loopLength > 0 ? loopLength : measureLength()));
+}
+
+function snapLoopEnd(currentSec, loopLength=measureLength()){
   const measure = measureLength();
   if(!measure || !Number.isFinite(currentSec) || !state.duration) return 0;
   const activeLength = Number.isFinite(loopLength) && loopLength > 0 ? loopLength : measure;
@@ -1217,6 +1242,17 @@ function snapLoopStart(currentSec, loopLength=measureLength()){
     return boundary;
   }
   return Math.max(0, nextBoundary);
+}
+
+function loopRangeFor(currentSec, loopLength=measureLength()){
+  const length = Number.isFinite(loopLength) && loopLength > 0 ? loopLength : measureLength();
+  let end = snapLoopEnd(currentSec, length);
+  let start = end - length;
+  if(start < 0){
+    start = 0;
+    end = Math.min(state.duration || length, length);
+  }
+  return {start, end};
 }
 
 function syncStemLoopSource(stem){
@@ -1297,8 +1333,7 @@ function setStemLoop(stem, idx, options={}){
 
   const transportOffset = playbackOffset(currentTime());
   const loopLength = LOOP_BARS[idx] * measureLength();
-  const start = snapLoopStart(transportOffset, loopLength);
-  const end = start + loopLength;
+  const {start, end} = loopRangeFor(transportOffset, loopLength);
 
   if(end > state.duration + 1e-6){
     alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
@@ -1326,8 +1361,7 @@ function setAllLoop(idx){
   }
 
   const loopLength = LOOP_BARS[idx] * measureLength();
-  const start = snapLoopStart(transportOffset, loopLength);
-  const end = start + loopLength;
+  const {start, end} = loopRangeFor(transportOffset, loopLength);
 
   if(end > state.duration + 1e-6){
     alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
@@ -1599,7 +1633,7 @@ function cancelProcessingJob(){
   hideOverlay();
   updateSampleRowsVisibility();
   document.getElementById('hint').textContent = state.ready
-    ? 'Tap a quarter to mute · drag in a diagonal direction to set its level'
+    ? READY_HINT
     : 'Drop a track to begin';
 }
 function finishProcessingJob(job){
@@ -1710,6 +1744,60 @@ async function separateAudio(arrayBuf,onProg){
 }
 
 // ── row audio overviews ──
+function spectralGridMarkers(win=state.spectralWindow){
+  const measure = measureLength();
+  if(!measure || !Number.isFinite(measure)) return [];
+  const quarter = measure / BEATS_PER_MEASURE;
+  if(!quarter) return [];
+  const start = Number.isFinite(win.start) ? win.start : 0;
+  const end = Number.isFinite(win.end) ? win.end : start;
+  const offset = clamp(
+    Number.isFinite(state.measureOffset) ? state.measureOffset : (state.beatOffset || 0),
+    0,
+    Math.max(0, measure - 1e-6)
+  );
+  const first = Math.floor((start - offset) / quarter);
+  const markers = [];
+  for(let i=first; ; i++){
+    const time = offset + i * quarter;
+    if(time > end + 1e-6) break;
+    if(time < start - 1e-6) continue;
+    const phase = ((i % BEATS_PER_MEASURE) + BEATS_PER_MEASURE) % BEATS_PER_MEASURE;
+    let label = '1/4';
+    let weight = 0.18;
+    if(phase === 0){label = '1'; weight = 0.42;}
+    else if(phase === 2){label = '1/2'; weight = 0.28;}
+    markers.push({time, label, weight});
+  }
+  return markers;
+}
+
+function drawSpectralGridMarkers(ctx, w, h, win){
+  const markers = spectralGridMarkers(win);
+  const span = win.end - win.start;
+  if(!markers.length || span <= 0) return;
+  const cs=getComputedStyle(document.documentElement);
+  const ink=cs.getPropertyValue('--ink').trim()||'oklch(24% 0.012 64)';
+  ctx.save();
+  ctx.font='8px Helvetica Neue, Arial, sans-serif';
+  ctx.textAlign='center';
+  ctx.textBaseline='top';
+  markers.forEach((marker)=>{
+    const x = (marker.time - win.start) / span * w;
+    ctx.globalAlpha = marker.weight;
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = marker.label === '1' ? 1.5 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+    ctx.globalAlpha = Math.min(0.68, marker.weight + 0.16);
+    ctx.fillStyle = ink;
+    ctx.fillText(marker.label, x, 6);
+  });
+  ctx.restore();
+}
+
 function drawWave(stem, win=state.spectralWindow){
   const c=document.getElementById(`spec-${stem}`);
   if(!c || !buffers[stem] || typeof buffers[stem].getChannelData !== 'function') return;
@@ -1751,6 +1839,89 @@ function drawWave(stem, win=state.spectralWindow){
       ctx.fillStyle=faint;
     }
   }
+  drawSpectralGridMarkers(ctx, w, h, {start:viewStart, end:viewEnd});
+  ctx.globalAlpha=1;
+}
+
+const meterState = {bass:0, treble:0};
+
+function stemEnergyAt(stem, t){
+  const buffer = buffers[stem];
+  if(!buffer || typeof buffer.getChannelData !== 'function') return 0;
+  const data = buffer.getChannelData(0);
+  if(!data || !data.length) return 0;
+  const duration = buffer.duration || state.duration || (data.length / SR);
+  const center = clamp(Math.floor((playbackOffset(t) / Math.max(0.001, duration)) * data.length), 0, data.length - 1);
+  const span = Math.max(2, Math.floor(data.length * Math.min(0.04, duration) / Math.max(0.001, duration)));
+  const start = Math.max(0, center - Math.floor(span / 2));
+  const end = Math.min(data.length, start + span);
+  let sum = 0;
+  for(let i=start;i<end;i++){
+    const v = data[i] || 0;
+    sum += v * v;
+  }
+  return Math.sqrt(sum / Math.max(1, end - start)) * effectiveVolume(stem);
+}
+
+function levelMeterBandsAt(t=currentTime()){
+  const bass = stemEnergyAt('bass', t);
+  const treble = (
+    stemEnergyAt('drums', t) * 0.42 +
+    stemEnergyAt('vocals', t) * 0.28 +
+    stemEnergyAt('melody', t) * 0.30
+  );
+  return {
+    bass: clamp(bass, 0, 1),
+    treble: clamp(treble, 0, 1),
+  };
+}
+
+function drawLevelMeter(t=currentTime()){
+  const c=document.getElementById('levelMeter');
+  if(!c || typeof c.getContext !== 'function') return;
+  const ctx=c.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const w=Math.max(180, c.offsetWidth||480);
+  const h=Math.max(180, c.offsetHeight||480);
+  const size=Math.min(w,h);
+  c.width=Math.floor(w*dpr); c.height=Math.floor(h*dpr); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  const bands=levelMeterBandsAt(t);
+  meterState.bass = meterState.bass * 0.78 + bands.bass * 0.22;
+  meterState.treble = meterState.treble * 0.72 + bands.treble * 0.28;
+  const cs=getComputedStyle(document.documentElement);
+  const ink=cs.getPropertyValue('--ink').trim()||'oklch(24% 0.012 64)';
+  const faint=cs.getPropertyValue('--ink-faint').trim()||'oklch(54% 0.010 70)';
+  const cx=w/2, cy=h/2;
+  const base=size*0.31;
+  const bars=72;
+  ctx.save();
+  ctx.translate(cx, cy);
+  for(let i=0;i<bars;i++){
+    const angle = -Math.PI/2 + (i / bars) * Math.PI * 2;
+    const lowSide = Math.cos(angle) < 0;
+    const band = lowSide ? meterState.bass : meterState.treble;
+    const pulse = state.playing ? (0.5 + 0.5 * Math.sin(t * 8 + i * 0.37)) * 0.08 : 0.025;
+    const length = size * (0.035 + band * 0.16 + pulse);
+    const inner = base;
+    const outer = base + length;
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.strokeStyle = lowSide ? ink : faint;
+    ctx.globalAlpha = lowSide ? 0.32 + band * 0.5 : 0.24 + band * 0.48;
+    ctx.lineWidth = i % 6 === 0 ? 2 : 1;
+    ctx.moveTo(0, -inner);
+    ctx.lineTo(0, -outer);
+    ctx.stroke();
+    ctx.rotate(-angle);
+  }
+  ctx.globalAlpha=0.18;
+  ctx.strokeStyle=ink;
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.arc(0,0,base,0,Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
   ctx.globalAlpha=1;
 }
 
@@ -1850,6 +2021,7 @@ function updateUI(t){
   document.getElementById('timeCur').textContent=fmt(t);
   document.getElementById('timeTot').textContent=fmt(state.duration);
   updateSpectralViewport(t);
+  drawLevelMeter(t);
 }
 function fmt(s){const m=Math.floor(s/60),ss=Math.floor(s%60);return`${m}:${ss.toString().padStart(2,'0')}`;}
 
@@ -1963,39 +2135,6 @@ function resetAllTracks(){
   applyAllGains();
 }
 
-// quadrant: tap = mute, diagonal drag = volume (Pointer Events + capture)
-STEMS.forEach(stem=>{
-  const q=document.querySelector(`.quadrant[data-stem="${stem}"]`);
-  let id=null,x0=0,y0=0,v0=0,moved=false;
-  q.addEventListener('pointerdown',e=>{
-    if(!state.ready)return;
-    id=e.pointerId; x0=e.clientX; y0=e.clientY; v0=state.volume[stem]; moved=false;
-    q.setPointerCapture(id);
-  });
-  q.addEventListener('pointermove',e=>{
-    if(id!==e.pointerId)return;
-    const dx=e.clientX-x0, dy=y0-e.clientY;            // diagonal motion: +dx and +dy increase
-    const dv=(dx+dy)/220;
-    if(Math.abs(dx)>4 || Math.abs(dy)>4) moved=true;
-    if(moved) setVolume(stem,v0+dv);
-  });
-  function release(e){
-    if(id!==e.pointerId)return;
-    try{q.releasePointerCapture(id);}catch(_){}
-    if(!moved) toggleMute(stem);            // it was a tap
-    id=null;
-  }
-  q.addEventListener('pointerup',release);
-  q.addEventListener('pointercancel',release);
-  // keyboard: Enter/Space = mute, arrows = volume
-  q.addEventListener('keydown',e=>{
-    if(!state.ready)return;
-    if(e.key==='ArrowUp'||e.key==='ArrowRight'){setVolume(stem,state.volume[stem]+0.05);e.preventDefault();}
-    else if(e.key==='ArrowDown'||e.key==='ArrowLeft'){setVolume(stem,state.volume[stem]-0.05);e.preventDefault();}
-    else if(e.key==='Enter'||e.key===' '){toggleMute(stem);e.preventDefault();}
-  });
-});
-
 // panel sliders / mute / loop
 document.querySelectorAll('input.vol').forEach(sl=>sl.addEventListener('input',()=>setVolume(sl.dataset.stem,sl.value/100,true)));
 document.querySelectorAll('.stem-mute-btn').forEach(b=>b.addEventListener('click',()=>toggleMute(b.dataset.stem)));
@@ -2018,7 +2157,7 @@ document.getElementById('btnPlay').addEventListener('click',async()=>{
   if(state.playing){state.pauseOffset=currentTime();stopPlayback();}
   else if(await ensurePlaybackReady()){
     startPlayback(state.pauseOffset);
-    document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+    document.getElementById('hint').textContent=READY_HINT;
   }
 });
 document.getElementById('btnRestart').addEventListener('click',async()=>{
@@ -2027,7 +2166,7 @@ document.getElementById('btnRestart').addEventListener('click',async()=>{
   if(state.playing){
     if(await ensurePlaybackReady()){
       startPlayback(0);
-      document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+      document.getElementById('hint').textContent=READY_HINT;
     }
   }else updateUI(0);
 });
@@ -2037,7 +2176,7 @@ async function seekTo(t){
   if(state.playing){
     if(await ensurePlaybackReady()){
       startPlayback(t);
-      document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+      document.getElementById('hint').textContent=READY_HINT;
     }
   }else updateUI(t);
 }
@@ -2212,7 +2351,7 @@ async function handleFile(file){
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     setGlyph('play');document.getElementById('centerHint').textContent='play';
-    document.getElementById('hint').textContent='Tap a quarter to mute · drag in a diagonal direction to set its level';
+    document.getElementById('hint').textContent=READY_HINT;
     updateMuteAllControls();
     updateSampleRowsVisibility();
     updateUI(0);
@@ -2222,7 +2361,7 @@ async function handleFile(file){
     updateMuteAllControls();
     if(isProcessingCanceled(e)){
       document.getElementById('hint').textContent = state.ready
-        ? 'Tap a quarter to mute · drag in a diagonal direction to set its level'
+        ? READY_HINT
         : 'Drop a track to begin';
       return;
     }
@@ -2245,6 +2384,7 @@ updateHeadphonesUI();
 updateLoopAuditionUI();
 updateMuteAllControls();
 updateSampleRowsVisibility();
+drawLevelMeter(0);
 let rT;window.addEventListener('resize',()=>{clearTimeout(rT);rT=setTimeout(()=>{if(state.ready)updateSpectralViewport(currentTime(), true);},150);});
 </script>
 </body>
