@@ -28,7 +28,6 @@
   --violet: oklch(54% 0.112 315);
   --paper: oklch(96% 0.009 84);
   --line: oklch(70% 0.01 70 / 0.42);
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --font-body: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -44,7 +43,8 @@ body {
   margin: 0;
   min-height: 100svh;
   background:
-    radial-gradient(110% 72% at 14% -12%, oklch(81% 0.04 320 / 0.28) 0%, oklch(81% 0.04 320 / 0) 46%),
+    radial-gradient(120% 76% at 72% -8%, oklch(98% 0.006 84 / 0.72) 0%, transparent 52%),
+    radial-gradient(92% 80% at 10% -10%, oklch(70% 0.05 320 / 0.24) 0%, transparent 48%),
     radial-gradient(120% 90% at 50% 0%, var(--page) 0%, var(--page-2) 100%);
   color: var(--ink);
   font-family: var(--font-body);
@@ -86,12 +86,23 @@ button:focus-visible {
   mix-blend-mode: multiply;
 }
 
+.site::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 26% at 66% 28%, oklch(100% 0 0 / 0.42), transparent 70%),
+    linear-gradient(90deg, transparent, oklch(24% 0.012 64 / 0.025), transparent);
+  mix-blend-mode: soft-light;
+}
+
 .tentacle {
   position: absolute;
-  left: max(-210px, -15vw);
-  top: -92px;
-  width: min(620px, 58vw);
-  opacity: 0.82;
+  left: max(-190px, -13vw);
+  top: -116px;
+  width: min(700px, 62vw);
+  opacity: 0.9;
   pointer-events: none;
   user-select: none;
 }
@@ -191,12 +202,11 @@ button:focus-visible {
 
 h1 {
   margin: 0;
-  font-family: var(--font-display);
   color: var(--plum);
-  font-size: clamp(76px, 13vw, 172px);
-  font-weight: 600;
-  line-height: 0.82;
-  letter-spacing: -0.04em;
+  font-size: clamp(78px, 12vw, 158px);
+  font-weight: 500;
+  line-height: 0.84;
+  letter-spacing: 0;
   text-wrap: balance;
 }
 
@@ -277,24 +287,25 @@ h1 {
   display: grid;
   place-items: center;
   min-height: 500px;
+  filter: drop-shadow(0 18px 54px oklch(24% 0.012 70 / 0.16));
 }
 
 .device {
   position: relative;
-  width: min(430px, 78vw);
+  width: min(470px, 82vw);
   aspect-ratio: 1;
   border-radius: 50%;
   background:
+    radial-gradient(16% 14% at 36% 27%, oklch(98% 0.006 84 / 0.54), transparent 68%),
     radial-gradient(80% 80% at 38% 32%, var(--device-in) 0%, var(--device-out) 78%);
   box-shadow:
     inset 0 3px 6px oklch(98% 0 0 / 0.5),
     inset 0 -4px 9px oklch(20% 0.01 60 / 0.10),
-    0 20px 62px oklch(24% 0.012 70 / 0.20),
+    0 28px 78px oklch(24% 0.012 70 / 0.20),
     0 4px 12px oklch(24% 0.012 70 / 0.12);
 }
 
-.device::before,
-.device::after {
+.device::before {
   content: "";
   position: absolute;
   inset: 8%;
@@ -302,11 +313,73 @@ h1 {
   border-radius: 50%;
 }
 
-.device::after {
-  inset: 49% 8% auto;
-  height: 1px;
-  border: 0;
+.device-meter {
+  position: absolute;
+  inset: 17%;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 224deg,
+      var(--ink) 0deg 58deg,
+      transparent 58deg 76deg,
+      var(--track) 76deg 103deg,
+      transparent 103deg 137deg,
+      var(--ink) 137deg 195deg,
+      transparent 195deg 213deg,
+      var(--track) 213deg 240deg,
+      transparent 240deg 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+}
+
+.device-cross,
+.device-cross::after {
+  position: absolute;
+  display: block;
   background: var(--track);
+  content: "";
+}
+
+.device-cross {
+  left: 13%;
+  right: 13%;
+  top: 50%;
+  height: 1px;
+}
+
+.device-cross::after {
+  left: 50%;
+  top: calc(-37vw + 1px);
+  width: 1px;
+  height: min(348px, 74vw);
+  transform: translateX(-50%);
+}
+
+.device-label {
+  position: absolute;
+  color: var(--ink-soft);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.device-label small {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-faint);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.device-label-drums { left: 18%; top: 20%; }
+.device-label-vocals { right: 16%; top: 20%; }
+.device-label-bass { left: 18%; bottom: 19%; }
+.device-label-melody { right: 14%; bottom: 19%; }
+
+@media (min-width: 700px) {
+  .device-cross::after {
+    top: -174px;
+    height: 348px;
+  }
 }
 
 .center {
@@ -360,15 +433,22 @@ h1 {
   border-left: 1px solid var(--line);
 }
 
-.route strong,
+.route strong {
+  color: var(--ink);
+  font-size: clamp(28px, 3.3vw, 50px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
 .section h2,
 .release h2 {
-  font-family: var(--font-display);
   color: var(--ink);
   font-size: clamp(28px, 4.4vw, 64px);
-  font-weight: 600;
+  font-weight: 500;
   line-height: 0.96;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   text-wrap: balance;
 }
 
@@ -481,11 +561,10 @@ h1 {
 .manifest-row strong {
   display: block;
   margin-top: 7px;
-  font-family: var(--font-display);
   color: var(--ink);
   font-size: clamp(24px, 3vw, 38px);
   line-height: 0.98;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   text-wrap: balance;
 }
 
@@ -567,6 +646,7 @@ footer {
   }
 
   .object {
+    order: -1;
     min-height: auto;
     padding: 12px 0 20px;
   }
@@ -725,6 +805,12 @@ footer {
       </div>
       <div class="object" aria-hidden="true">
         <div class="device">
+          <span class="device-meter"></span>
+          <span class="device-cross"></span>
+          <span class="device-label device-label-drums">drums<small>80</small></span>
+          <span class="device-label device-label-vocals">vocals<small>80</small></span>
+          <span class="device-label device-label-bass">bass<small>80</small></span>
+          <span class="device-label device-label-melody">melody<small>80</small></span>
           <span class="center"><span>drop audio</span></span>
         </div>
       </div>
