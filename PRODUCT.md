@@ -8,11 +8,19 @@ Music fans and producers who want to isolate and remix stems from any track.
 People who want a tactile, local way to split, loop, and recombine music without uploading files.
 
 ## Product Purpose
-A browser-only audio stem separator. Drop any audio file; Stemacle splits it into
-drums, bass, vocals, and melody using a client-side ML model. Each stem is
-independently playable, mutable, and loopable. No accounts, no uploads, no server.
+A local-first music tool with a public landing page at `/` and the browser instrument
+at `/app/`. Drop any audio file; Stemacle splits it into drums, bass, vocals, and
+melody using a client-side ML model. Each stem is independently playable, mutable,
+and loopable. No accounts, no uploads, no server.
 
 ## Feature List
+- Present `https://stemacle.com/` as the landing and download entry point for the
+  browser app, desktop app, iOS app, GitHub repo, and CLI.
+- Package the existing app design into a native Stemacle shell with Stem Splitter,
+  Stem Shuffle, and a local music library surface.
+- Keep product-surface differences documented in
+  [docs/STEMACLE_SURFACES.md](./docs/STEMACLE_SURFACES.md).
+- Keep the working browser instrument available at `/app/`.
 - Load local audio by dropping a file on the device or choosing one through the center control.
 - Load bundled sample tracks from the local `samples/` directory for same-origin playback.
 - Decode and separate tracks entirely in the browser using ONNX Runtime Web plus browser DSP fallback behavior.
