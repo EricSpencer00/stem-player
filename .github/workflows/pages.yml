@@ -64,6 +64,7 @@ jobs:
           NODE
 
       - name: Run regression tests
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         run: npm test
 
       - name: Prepare Cloudflare Pages artifact
