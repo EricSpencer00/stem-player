@@ -567,6 +567,28 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 .stem-headphones-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
 .stem-mute-btn[aria-pressed="true"],
 .stem-headphones-btn[aria-pressed="true"] { color: var(--page); background: var(--ink-soft); border-color: var(--ink-soft); }
+.stem-headphones-btn[data-stem="vocals"] {
+  position: relative;
+  overflow: visible;
+}
+.stem-headphones-btn[data-stem="vocals"]::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1px solid var(--amber-glow);
+  border-radius: inherit;
+  opacity: 0.36;
+  pointer-events: none;
+  transform: scale(0.86);
+  animation: vocalPhonesPulse 2.15s cubic-bezier(0.22,1,0.36,1) infinite;
+}
+.stem-headphones-btn[data-stem="vocals"][aria-pressed="true"]::after { opacity: 0; }
+@keyframes vocalPhonesPulse {
+  0%   { opacity: 0; transform: scale(0.86); }
+  18%  { opacity: 0.42; }
+  68%  { opacity: 0; transform: scale(1.18); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
 
 /* loop buttons */
 .loop-row {
@@ -594,6 +616,7 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
+  .stem-headphones-btn[data-stem="vocals"]::after { opacity: 0; }
 }
 
 /* mobile */
@@ -1970,6 +1993,90 @@ function levelMeterBandsAt(t=currentTime()){
   return analyserLevelMeterBands() || fallbackLevelMeterBandsAt(t);
 }
 
+function waveformSampleAt(waveform, index, count){
+  if(!waveform?.length) return 0;
+  const pos = (index / Math.max(1, count)) * waveform.length;
+  const i0 = Math.floor(pos) % waveform.length;
+  const i1 = (i0 + 1) % waveform.length;
+  const mix = pos - Math.floor(pos);
+  const v0 = Math.abs((waveform[i0] - 128) / 128);
+  const v1 = Math.abs((waveform[i1] - 128) / 128);
+  return v0 + (v1 - v0) * mix;
+}
+
+function meterWavePoints(bands, size, count=112){
+  const base = size * 0.31;
+  const innerBase = base - size * 0.036;
+  const outer = [];
+  const inner = [];
+  const mid = [];
+  for(let i=0;i<count;i++){
+    const angle = -Math.PI / 2 + (i / count) * Math.PI * 2;
+    const lowSide = Math.cos(angle) < 0;
+    const band = lowSide ? (bands.bass || 0) : (bands.treble || 0);
+    const rawWave = bands.waveform?.length ? waveformSampleAt(bands.waveform, i, count) : (bands.wave || 0);
+    const wave = clamp(rawWave * 0.78 + (bands.wave || 0) * 0.22, 0, 1);
+    const displacement = size * (0.008 + band * 0.026 + wave * 0.072);
+    const thickness = size * (0.034 + wave * 0.012);
+    const outerR = base + displacement;
+    const innerR = Math.min(outerR - thickness, innerBase - wave * size * 0.008);
+    const midR = (outerR + innerR) / 2;
+    outer.push({x:Math.cos(angle) * outerR, y:Math.sin(angle) * outerR, r:outerR});
+    inner.push({x:Math.cos(angle) * innerR, y:Math.sin(angle) * innerR, r:innerR});
+    mid.push({x:Math.cos(angle) * midR, y:Math.sin(angle) * midR, r:midR});
+  }
+  if(outer.length){
+    outer.push({...outer[0]});
+    inner.push({...inner[0]});
+    mid.push({...mid[0]});
+  }
+  return {outer, inner, mid, base};
+}
+
+function traceMeterWave(ctx, points, close=true){
+  if(!points.length) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for(let i=1;i<points.length;i++) ctx.lineTo(points[i].x, points[i].y);
+  if(close) ctx.closePath();
+}
+
+function traceMeterWaveBand(ctx, wave){
+  ctx.beginPath();
+  ctx.moveTo(wave.outer[0].x, wave.outer[0].y);
+  for(let i=1;i<wave.outer.length;i++) ctx.lineTo(wave.outer[i].x, wave.outer[i].y);
+  for(let i=wave.inner.length-1;i>=0;i--) ctx.lineTo(wave.inner[i].x, wave.inner[i].y);
+  ctx.closePath();
+}
+
+function drawMeterWaveBand(ctx, wave, colors, size){
+  traceMeterWaveBand(ctx, wave);
+  ctx.fillStyle = colors.fill;
+  ctx.globalAlpha = 1;
+  ctx.fill();
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  traceMeterWave(ctx, wave.mid);
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = Math.max(2, size * 0.005);
+  ctx.stroke();
+  ctx.restore();
+
+  traceMeterWave(ctx, wave.outer);
+  ctx.strokeStyle = colors.ink;
+  ctx.globalAlpha = 0.58;
+  ctx.lineWidth = Math.max(2.4, size * 0.0068);
+  ctx.stroke();
+
+  traceMeterWave(ctx, wave.inner);
+  ctx.strokeStyle = colors.faint;
+  ctx.globalAlpha = 0.42;
+  ctx.lineWidth = Math.max(1.4, size * 0.0036);
+  ctx.stroke();
+}
+
 function drawLevelMeter(t=currentTime()){
   const c=document.getElementById('levelMeter');
   if(!c || typeof c.getContext !== 'function') return;
@@ -1987,36 +2094,17 @@ function drawLevelMeter(t=currentTime()){
   const cs=getComputedStyle(document.documentElement);
   const ink=cs.getPropertyValue('--ink').trim()||'oklch(24% 0.012 64)';
   const faint=cs.getPropertyValue('--ink-faint').trim()||'oklch(54% 0.010 70)';
+  const fill='oklch(54% 0.010 70 / 0.20)';
   const cx=w/2, cy=h/2;
-  const base=size*0.31;
-  const bars=72;
+  const wave = meterWavePoints(bands, size);
   ctx.save();
   ctx.translate(cx, cy);
-  for(let i=0;i<bars;i++){
-    const angle = -Math.PI/2 + (i / bars) * Math.PI * 2;
-    const lowSide = Math.cos(angle) < 0;
-    const band = lowSide ? meterState.bass : meterState.treble;
-    const wave = bands.waveform?.length
-      ? Math.abs((bands.waveform[Math.floor((i / bars) * bands.waveform.length)] - 128) / 128)
-      : meterState.wave;
-    const length = size * (0.026 + band * 0.10 + wave * 0.19 + meterState.wave * 0.05);
-    const inner = base;
-    const outer = base + length;
-    ctx.rotate(angle);
-    ctx.beginPath();
-    ctx.strokeStyle = lowSide ? ink : faint;
-    ctx.globalAlpha = lowSide ? 0.24 + band * 0.42 + wave * 0.22 : 0.20 + band * 0.38 + wave * 0.18;
-    ctx.lineWidth = (i % 6 === 0 ? 1.7 : 1) + wave * 1.15;
-    ctx.moveTo(0, -inner);
-    ctx.lineTo(0, -outer);
-    ctx.stroke();
-    ctx.rotate(-angle);
-  }
+  drawMeterWaveBand(ctx, wave, {ink, faint, fill}, size);
   ctx.globalAlpha=0.18;
   ctx.strokeStyle=ink;
   ctx.lineWidth=1;
   ctx.beginPath();
-  ctx.arc(0,0,base,0,Math.PI*2);
+  ctx.arc(0,0,wave.base,0,Math.PI*2);
   ctx.stroke();
   ctx.restore();
   ctx.globalAlpha=1;
