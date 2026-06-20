@@ -27,5 +27,30 @@ await writeFile(join(outDir, '_headers'), [
   '  Cross-Origin-Opener-Policy: same-origin',
   '',
 ].join('\n'));
+await writeFile(join(outDir, '_redirects'), [
+  '/stem-player  https://stemacle.com/app  301',
+  '/stem-player/* https://stemacle.com/app/:splat 301',
+].join('\n'));
+await mkdir(join(outDir, 'stem-player'), { recursive: true });
+await writeFile(join(outDir, 'stem-player', 'index.html'), `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content="0; url=https://stemacle.com/app" />
+    <script>
+      (function redirectStemPlayer() {
+        const tail = window.location.pathname.replace(/^\\/stem-player\\/?/, '');
+        const suffix = tail ? '/' + tail : '';
+        const destination = 'https://stemacle.com/app' + suffix + window.location.search + window.location.hash;
+        window.location.replace(destination);
+      })();
+    </script>
+    <title>Redirecting to Stemacle Web App</title>
+  </head>
+  <body>
+    <p>Redirecting to <a href="https://stemacle.com/app">stemacle.com/app</a>.</p>
+  </body>
+</html>`);
 
 console.log(`Prepared Stemacle Pages bundle at ${outDir}`);
