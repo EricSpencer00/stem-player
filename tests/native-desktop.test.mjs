@@ -216,6 +216,27 @@ test('desktop shell surfaces downloads, roots, caches, queue, session, export, s
   assert.match(html, /meta\+k/i);
 });
 
+test('native shell keeps desktop controls while optionally layering iOS affordances', () => {
+  const html = readRepo('native/index.html');
+
+  assert.match(html, /<span>iOS<\/span>/);
+  assert.match(html, /data-native-action="pick-library"/);
+  assert.match(html, /data-native-action="pick-folder"/);
+  assert.match(html, /data-native-action="enqueue-download"/);
+
+  if (/data-surface-only="ios"/.test(html)) {
+    assert.match(html, /window\.Capacitor\?\.getPlatform\?\.\(\)/);
+    assert.match(html, /<span[^>]*data-surface-only="desktop"[^>]*>desktop<\/span>/);
+    assert.match(html, /data-surface-only="desktop"/);
+    assert.match(html, /body\[data-surface="ios"\]/);
+    assert.match(html, /Split tracks on your phone/i);
+    assert.match(html, /local files · splitter · shuffle/i);
+    assert.match(html, /Keep stems on-device, move fast between splitting and shuffle/i);
+    assert.match(html, /data-native-action="pick-folder"[^>]*data-surface-only="desktop"/);
+    assert.match(html, /data-native-action="enqueue-download"[^>]*data-surface-only="desktop"/);
+  }
+});
+
 test('electron bridge exposes native desktop operations and menu handlers', () => {
   const preload = readRepo('native/electron/preload.cjs');
   const main = readRepo('native/electron/main.cjs');
