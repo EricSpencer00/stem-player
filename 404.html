@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex" />
+  <script>
+    (function stemPlayerFallbackRedirect() {
+      const path = window.location.pathname || '';
+
+      if (path === '/stem-player' || path.startsWith('/stem-player/')) {
+        const tail = path.replace(/^\/stem-player\/?/, '');
+        const suffix = tail ? `/${tail}` : '';
+        const destination = `https://stemacle.com/app${suffix}${window.location.search}${window.location.hash}`;
+        window.location.replace(destination);
+        return;
+      }
+
+      if (path === '/app' || path.startsWith('/app/')) {
+        const tail = path.replace(/^\/app\/?/, '');
+        const suffix = tail ? `/${tail}` : '';
+        const destination = `https://stemacle.com/app${suffix}${window.location.search}${window.location.hash}`;
+        window.location.replace(destination);
+        return;
+      }
+
+      if (window.location.pathname) {
+        window.location.replace('https://ericspencer.us');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <p>Not found. Redirecting to Stemacle.</p>
+</body>
+</html>
