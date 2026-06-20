@@ -87,10 +87,10 @@ test('native shell keeps the Stemacle design and launches bundled apps', () => {
 
   assert.match(html, /<title>Stemacle App<\/title>/);
   assert.match(html, /stemacle/);
-  assert.match(html, /href="\/app\/index\.html"/);
-  assert.match(html, /href="\/apps\/stem-shuffle\/index\.html"/);
-  assert.match(html, /window\.location\.href = '\/app\/index\.html'/);
-  assert.match(html, /window\.location\.href = '\/apps\/stem-shuffle\/index\.html'/);
+  assert.match(html, /href="\/app\/"/);
+  assert.match(html, /href="\/apps\/stem-shuffle\/"/);
+  assert.match(html, /window\.location\.href = '\/app\/'/);
+  assert.match(html, /window\.location\.href = '\/apps\/stem-shuffle\/'/);
   assert.match(html, /id="libraryDropzone"/);
   assert.match(html, /id="libraryList"/);
   assert.match(html, /data-native-action="pick-library"/);
