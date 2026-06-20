@@ -57,13 +57,11 @@ test('landing page exposes current web, repo, and durable multi-platform release
   assert.match(html, /href="https:\/\/stemacle\.com\/app\/"/);
   assert.match(html, /EricSpencer00\/stem-player/);
   assert.match(html, /https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
-  assert.match(html, /id="downloadCta"/);
-  assert.match(html, /releases\/latest\/download\/Stemacle-mac-arm64\.zip/);
-  assert.match(html, /releases\/latest\/download\/Stemacle-windows-x64-setup\.exe/);
-  assert.match(html, /releases\/latest\/download\/Stemacle-linux-x64\.AppImage/);
-  assert.match(html, /releases\/latest\/download\/Stemacle-linux-x64\.deb/);
-  assert.doesNotMatch(html, /Stemacle-mac-arm64\.dmg/);
-  assert.doesNotMatch(html, /Stemacle-mac-x64/);
+  assert.match(html, /open web app/);
+  assert.match(html, /releases\/latest\/download\/Stemacle-0\.1\.0-arm64\.dmg/);
+  assert.match(html, /releases\/latest\/download\/Stemacle-0\.1\.0-arm64-mac\.zip/);
+  assert.match(html, /releases\/latest\/download\/stemacle-ios-project-0\.1\.0\.zip/);
+  assert.doesNotMatch(html, /href=\"\/app\//);
   assert.doesNotMatch(html, /EricSpencer00\/stem-workstation/);
   assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
   assert.doesNotMatch(html, /desktop next/i);
