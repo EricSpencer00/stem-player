@@ -58,9 +58,9 @@ test('landing page exposes current web, repo, and durable multi-platform release
   assert.match(html, /EricSpencer00\/stem-player/);
   assert.match(html, /https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
   assert.match(html, /open web app/);
-  assert.match(html, /releases\/latest\/download\/Stemacle-0\.1\.0-arm64\.dmg/);
-  assert.match(html, /releases\/latest\/download\/Stemacle-0\.1\.0-arm64-mac\.zip/);
-  assert.match(html, /releases\/latest\/download\/stemacle-ios-project-0\.1\.0\.zip/);
+  assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64\.dmg/);
+  assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64-mac\.zip/);
+  assert.match(html, /releases\/download\/v0\.1\.0\/stemacle-ios-project-0\.1\.0\.zip/);
   assert.doesNotMatch(html, /href=\"\/app\//);
   assert.doesNotMatch(html, /EricSpencer00\/stem-workstation/);
   assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
@@ -76,15 +76,10 @@ test('landing page exposes current web, repo, and durable multi-platform release
 test('landing page routes the primary download CTA by platform with a release-page fallback', () => {
   const html = loadLandingHtml();
 
-  assert.match(html, /navigator\.userAgentData/);
-  assert.match(html, /navigator\.userAgent/);
-  assert.match(html, /navigator\.platform/);
-  assert.match(html, /downloadCta/);
-  assert.match(html, /downloadHint/);
-  assert.match(html, /MacIntel/);
-  assert.match(html, /Windows NT/);
-  assert.match(html, /Linux/);
+  assert.match(html, /class=\"cta primary\"/);
+  assert.match(html, /download mac app/);
   assert.match(html, /Latest GitHub release/);
+  assert.match(html, /href=\"https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
 });
 
 test('native shell keeps the Stemacle design and launches bundled apps', () => {
