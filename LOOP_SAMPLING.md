@@ -12,9 +12,10 @@ Each stem can be looped independently with the `1/4`, `1/2`, `1`, and `2` measur
 - Loop length is measured in fractions of a 4/4 measure, using the detected tempo-derived measure length.
 - The app assumes common-time `4/4` for loop math through the `BEATS_PER_MEASURE` constant.
 - Tempo detection separates beat period, beat phase, and 4/4 measure phase. If the downbeat is ambiguous, measure phase falls back to the detected beat phase instead of inventing a bar line.
-- When a loop is enabled, the start point snaps to the next selected subdivision on the detected measure grid: `1/4` to the next beat, `1/2` to the next half-measure, and `1` / `2` to the next measure boundary.
+- When a loop is enabled, the end point snaps to the next selected subdivision on the detected measure grid: `1/4` to the next beat, `1/2` to the next half-measure, and `1` / `2` to the next measure boundary.
+- The looped region is the selected-length segment that is already playing: `loopStart = loopEnd - selectedLength`, clamped to the beginning of the track when needed.
 - The stem keeps playing from its current offset when a loop is enabled, then wraps to `loopStart` only after reaching `loopEnd`.
-- Loop end is computed as `loopStart + measureCount * measureLength()`.
+- Loop start is computed from the snapped end, so pressing a loop button partway through a segment lets the current segment play out before repeating that same segment.
 
 ## Runtime Behavior
 
@@ -43,6 +44,6 @@ Keep these invariants intact when touching loop code:
 
 - `measureLength()` derives a 4/4 measure from detected `state.bpm`, clamped to the supported tempo range.
 - `state.beatOffset` stores the detected beat-grid phase; `state.measureOffset` stores the selected 4/4 bar phase used by loop snapping.
-- The snap logic intentionally chooses the next selected subdivision boundary, with a small epsilon so taps already on-grid stay on that boundary.
+- The snap logic intentionally chooses the next selected subdivision boundary as the loop end, with a small epsilon so taps already on-grid stay on that boundary.
 - The abstract timing invariants are modeled in `specs/LoopTiming.tla`.
 - Sample loading and loop clearing live together in the file-load path, so changes there can break both sample selection and looping at once.

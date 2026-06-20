@@ -94,8 +94,25 @@ class FakeElement {
     return {
       clearRect() {},
       fillRect() {},
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      arc() {},
+      stroke() {},
+      fill() {},
+      fillText() {},
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
       scale() {},
       set fillStyle(_) {},
+      set strokeStyle(_) {},
+      set lineWidth(_) {},
+      set font(_) {},
+      set textAlign(_) {},
+      set textBaseline(_) {},
+      set globalAlpha(_) {},
     };
   }
 }
@@ -125,7 +142,7 @@ class FakeDocument {
       'timeCur', 'timeTot', 'fileInput', 'device', 'overlay', 'ovTitle',
       'progWrap', 'progFill', 'ovMsg', 'sampleRows', 'filename', 'playbar',
       'stems-panel', 'hint', 'viewStartTime', 'viewEndTime', 'viewWindowLabel',
-      'btnMuteAll', 'loopAuditionMix', 'loopAuditionSolo',
+      'btnMuteAll', 'loopAuditionMix', 'loopAuditionSolo', 'levelMeter',
       'overlayCancel',
     ].forEach((id) => this.register(id));
 
@@ -321,10 +338,13 @@ globalThis.__app = {
   chooseTempoCandidate: typeof chooseTempoCandidate === 'function' ? chooseTempoCandidate : undefined,
   measureLength: typeof measureLength === 'function' ? measureLength : undefined,
   snapLoopStart: typeof snapLoopStart === 'function' ? snapLoopStart : undefined,
+  snapLoopEnd: typeof snapLoopEnd === 'function' ? snapLoopEnd : undefined,
   audibleStemTime: typeof audibleStemTime === 'function' ? audibleStemTime : undefined,
   spectralWindowFor: typeof spectralWindowFor === 'function' ? spectralWindowFor : undefined,
+  spectralGridMarkers: typeof spectralGridMarkers === 'function' ? spectralGridMarkers : undefined,
   timeToSpectralPercent: typeof timeToSpectralPercent === 'function' ? timeToSpectralPercent : undefined,
   spectralTimeFromClientX: typeof spectralTimeFromClientX === 'function' ? spectralTimeFromClientX : undefined,
+  levelMeterBandsAt: typeof levelMeterBandsAt === 'function' ? levelMeterBandsAt : undefined,
   setLoop,
   startPlayback,
   stopPlayback,
@@ -449,6 +469,22 @@ test('global mute is exposed as one persistent toggle button', () => {
   assert.match(html, /\.stem-toolbar\s*\{(?=[^}]*grid-template-columns:\s*minmax\(180px,\s*280px\)\s+auto;)/s);
 });
 
+test('top circle is a passive level meter instead of quadrant controls', () => {
+  const html = loadHtml();
+
+  assert.match(html, /<canvas class="level-meter" id="levelMeter" aria-hidden="true"><\/canvas>/);
+  assert.match(html, /\.level-meter\s*\{(?=[^}]*border-radius:\s*50%;)(?=[^}]*pointer-events:\s*none;)/s);
+  assert.match(html, /\.quadrant,\s*\.q-label,\s*\.q-mute-mark\s*\{(?=[^}]*display:\s*none;)/s);
+});
+
+test('footer credits Eric Spencer without external UI inspiration copy', () => {
+  const html = loadHtml();
+
+  assert.match(html, /made by <a href="https:\/\/ericspencer\.us"[^>]*>ericspencer\.us<\/a>/i);
+  assert.doesNotMatch(html, /UI inspired by/i);
+  assert.doesNotMatch(html, /krystalgamer/i);
+});
+
 test('touch controls keep fixed hit areas when labels change', () => {
   const html = loadHtml();
 
@@ -501,17 +537,17 @@ test('tempo candidate selection avoids near-tie half-time loop grids', () => {
   assert.equal(selected.lag, 66);
 });
 
-test('loop start snaps to the next selected subdivision on the measured bar grid', () => {
+test('loop end snaps to the next selected subdivision on the measured bar grid', () => {
   const { app } = loadApp();
   app.state.duration = 30;
   app.state.bpm = 100;
   app.state.measureOffset = 0.25;
 
-  assert.equal(typeof app.snapLoopStart, 'function');
+  assert.equal(typeof app.snapLoopEnd, 'function');
   assertAlmostEqual(app.measureLength(), 2.4);
-  assertAlmostEqual(app.snapLoopStart(3.0, 0.6), 3.25);
-  assertAlmostEqual(app.snapLoopStart(2.651, 0.6), 2.65);
-  assertAlmostEqual(app.snapLoopStart(4.7), 5.05);
+  assertAlmostEqual(app.snapLoopEnd(3.0, 0.6), 3.25);
+  assertAlmostEqual(app.snapLoopEnd(2.651, 0.6), 2.65);
+  assertAlmostEqual(app.snapLoopEnd(4.7), 5.05);
 });
 
 test('decode setup does not wait forever when Safari keeps AudioContext suspended', async () => {
@@ -662,16 +698,16 @@ test('enabling a loop uses the tempo grid and reschedules only that stem', () =>
 
   app.setLoop('drums', 0);
 
-  assertAlmostEqual(app.state.loopStart.drums, 8 / 3);
-  assertAlmostEqual(app.state.loopEnd.drums, (8 / 3) + (60 / 90));
+  assertAlmostEqual(app.state.loopStart.drums, 2);
+  assertAlmostEqual(app.state.loopEnd.drums, 8 / 3);
   assert.notEqual(app.sources.drums, original.drums);
   assert.equal(original.drums.stopped, true);
   assert.equal(app.sources.vocals, original.vocals);
   assert.equal(app.sources.bass, original.bass);
   assert.equal(app.sources.melody, original.melody);
   assert.equal(app.sources.drums.loop, true);
-  assertAlmostEqual(app.sources.drums.loopStart, 8 / 3);
-  assertAlmostEqual(app.sources.drums.loopEnd, (8 / 3) + (60 / 90));
+  assertAlmostEqual(app.sources.drums.loopStart, 2);
+  assertAlmostEqual(app.sources.drums.loopEnd, 8 / 3);
   assert.equal(app.sources.drums.starts.length, 1);
   assert.equal(app.sources.drums.starts.at(-1).offset, 2.26);
 });
@@ -686,8 +722,8 @@ test('short loops snap to the next beat subdivision instead of the next bar', ()
 
   app.setLoop('drums', 0);
 
-  assertAlmostEqual(app.state.loopStart.drums, 4);
-  assertAlmostEqual(app.state.loopEnd.drums, 14 / 3);
+  assertAlmostEqual(app.state.loopStart.drums, 10 / 3);
+  assertAlmostEqual(app.state.loopEnd.drums, 4);
   assert.equal(app.sources.drums.starts.at(-1).offset, 3.5);
 });
 
@@ -706,8 +742,8 @@ test('changing a loop while playing only replaces the selected stem source', () 
   assert.notEqual(app.sources.vocals, original.vocals);
   assert.equal(original.vocals.stopped, true);
   assert.equal(app.sources.vocals.loop, true);
-  assert.equal(app.sources.vocals.loopStart, 4);
-  assert.equal(app.sources.vocals.loopEnd, 5);
+  assert.equal(app.sources.vocals.loopStart, 3);
+  assert.equal(app.sources.vocals.loopEnd, 4);
   assert.equal(app.sources.vocals.starts.length, 1);
   assert.equal(app.sources.vocals.starts.at(-1).offset, 3.1);
   assert.equal(app.sources.drums, original.drums);
@@ -814,6 +850,47 @@ test('spectral click mapping seeks within the visible window', () => {
   );
 });
 
+test('spectral grid markers expose quarter, half, and measure positions', () => {
+  const { app } = loadApp();
+  app.state.duration = 30;
+  app.state.bpm = 120;
+  app.state.measureOffset = 0;
+
+  assert.equal(typeof app.spectralGridMarkers, 'function');
+  const markers = app.spectralGridMarkers({ start: 0, end: 2 });
+  const labels = Array.from(markers, (marker) => marker.label);
+
+  assert.deepEqual(labels.slice(0, 5), ['1', '1/4', '1/2', '1/4', '1']);
+  assert.deepEqual(Array.from(markers.slice(0, 5), (marker) => marker.time), [0, 0.5, 1, 1.5, 2]);
+});
+
+test('level meter bands are derived from active stem buffers and volume', () => {
+  const { app } = loadApp();
+  app.state.ready = true;
+  app.state.duration = 1;
+  app.state.volume.bass = 0.5;
+  app.state.volume.melody = 1;
+  app.buffers.bass = {
+    duration: 1,
+    getChannelData() {
+      return Float32Array.from([0, 1, 1, 1, 0, 0, 0, 0]);
+    },
+  };
+  app.buffers.melody = {
+    duration: 1,
+    getChannelData() {
+      return Float32Array.from([0, 0, 0, 0, 1, 1, 1, 1]);
+    },
+  };
+
+  assert.equal(typeof app.levelMeterBandsAt, 'function');
+  const early = app.levelMeterBandsAt(0.25);
+  const late = app.levelMeterBandsAt(0.75);
+
+  assert.ok(early.bass > early.treble, `expected early bass dominance, got ${JSON.stringify(early)}`);
+  assert.ok(late.treble > late.bass, `expected late treble dominance, got ${JSON.stringify(late)}`);
+});
+
 test('rejecting a loop that extends past the track clears stale loop state', () => {
   const { app, document, context } = loadApp();
   const audioCtx = new FakeAudioContext();
@@ -826,6 +903,7 @@ test('rejecting a loop that extends past the track clears stale loop state', () 
   const loopedSource = app.sources.melody;
   assert.equal(loopedSource.loop, true);
 
+  app.state.measureOffset = 1;
   audioCtx.currentTime = 29.2;
   app.setLoop('melody', 3);
 
@@ -877,13 +955,13 @@ test('all loop row applies one quantized loop across every stem', () => {
   assert.deepEqual(document.loopButtons.all.map((button) => button.classList.contains('on')), [false, true, false, false]);
   for (const stem of STEMS) {
     assert.equal(app.state.loopDot[stem], 1);
-    assert.equal(app.state.loopStart[stem], 4);
-    assert.equal(app.state.loopEnd[stem], 5);
+    assert.equal(app.state.loopStart[stem], 3);
+    assert.equal(app.state.loopEnd[stem], 4);
     assert.notEqual(app.sources[stem], original[stem]);
     assert.equal(original[stem].stopped, true);
     assert.equal(app.sources[stem].loop, true);
-    assert.equal(app.sources[stem].loopStart, 4);
-    assert.equal(app.sources[stem].loopEnd, 5);
+    assert.equal(app.sources[stem].loopStart, 3);
+    assert.equal(app.sources[stem].loopEnd, 4);
   }
 });
 
