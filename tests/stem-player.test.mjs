@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
@@ -7,8 +7,83 @@ const STEMS = ['drums', 'vocals', 'bass', 'melody'];
 const LOOP_TARGETS = [...STEMS, 'all'];
 
 function loadHtml() {
+  return readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+}
+
+function loadLandingHtml() {
   return readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 }
+
+function loadNativeShellHtml() {
+  return readFileSync(new URL('../native/index.html', import.meta.url), 'utf8');
+}
+
+function loadPackageJson() {
+  return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+}
+
+function loadCapacitorConfig() {
+  return JSON.parse(readFileSync(new URL('../capacitor.config.json', import.meta.url), 'utf8'));
+}
+
+function loadWranglerConfig() {
+  return readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+}
+
+test('landing page links to the web app and desktop repository without old naming', () => {
+  const html = loadLandingHtml();
+
+  assert.match(html, /<title>Stemacle<\/title>/);
+  assert.match(html, /href="\/app\/"/);
+  assert.match(html, /EricSpencer00\/stem-player/);
+  assert.doesNotMatch(html, /EricSpencer00\/stem-workstation/);
+  assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
+  assert.doesNotMatch(html, new RegExp(`${'Stem'} ${'Player'}|${'stem'} ${'player'}`));
+});
+
+test('native shell keeps the Stemacle design and launches bundled apps', () => {
+  const html = loadNativeShellHtml();
+
+  assert.match(html, /<title>Stemacle App<\/title>/);
+  assert.match(html, /stemacle/);
+  assert.match(html, /href="\/app\/"/);
+  assert.match(html, /href="\/apps\/stem-shuffle\/"/);
+  assert.match(html, /id="libraryDropzone"/);
+  assert.match(html, /id="libraryList"/);
+  assert.match(html, /data-native-action="pick-library"/);
+  assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
+});
+
+test('desktop and ios packaging wrap the existing static app', () => {
+  const pkg = loadPackageJson();
+  const cap = loadCapacitorConfig();
+
+  assert.equal(pkg.scripts['native:prepare'], 'node scripts/prepare-native.mjs');
+  assert.equal(pkg.scripts['desktop:dev'], 'npm run native:prepare && electron .');
+  assert.equal(pkg.scripts['ios:sync'], 'npm run native:prepare && cap sync ios');
+  assert.ok(existsSync(new URL('../native/electron/main.cjs', import.meta.url)));
+  assert.ok(existsSync(new URL('../native/electron/preload.cjs', import.meta.url)));
+  assert.ok(existsSync(new URL('../native/electron/icon.icns', import.meta.url)));
+  assert.ok(existsSync(new URL('../native/electron/icon.png', import.meta.url)));
+  assert.ok(existsSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url)));
+  assert.ok(existsSync(new URL('../native/ios/App/App/Info.plist', import.meta.url)));
+  assert.ok(existsSync(new URL('../native/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', import.meta.url)));
+  assert.equal(pkg.build.mac.icon, 'native/electron/icon.icns');
+  assert.equal(pkg.build.linux.icon, 'native/electron/icon.png');
+  assert.equal(cap.appId, 'com.stemacle.app');
+  assert.equal(cap.appName, 'Stemacle');
+  assert.equal(cap.webDir, 'dist/native');
+});
+
+test('cloudflare pages build publishes the complete Stemacle site', () => {
+  const pkg = loadPackageJson();
+  const wrangler = loadWranglerConfig();
+
+  assert.equal(pkg.scripts['site:prepare'], 'node scripts/prepare-site.mjs');
+  assert.match(wrangler, /^name = "stemacle"$/m);
+  assert.match(wrangler, /^pages_build_output_dir = "dist\/site"$/m);
+  assert.doesNotMatch(wrangler, /ericspencer\.us\/stem-player/);
+});
 
 class FakeClassList {
   constructor() {
@@ -1040,6 +1115,26 @@ test('rejecting a loop that extends past the track clears stale loop state', () 
   assert.equal(app.sources.melody.loop, false);
   assert.equal(app.sources.melody.starts.length, 1);
   assert.equal(app.sources.melody.starts.at(-1).offset, 29.2);
+});
+
+test('rejecting a loop longer than the track does not shrink it into a shorter loop', () => {
+  const { app, document, context } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx, 0.2);
+  app.state.bpm = 120;
+  app.state.duration = 1;
+  STEMS.forEach((stem) => {
+    app.buffers[stem].duration = 1;
+  });
+
+  app.setLoop('drums', 3);
+
+  assert.equal(context.__alerts.length, 1);
+  assert.equal(app.state.loopDot.drums, -1);
+  assert.equal(app.state.loopStart.drums, 0);
+  assert.equal(app.state.loopEnd.drums, 0);
+  assert.equal(document.getElementById('varc-drums').classList.contains('looping'), false);
+  assert.deepEqual(document.loopButtons.drums.map((button) => button.classList.contains('on')), [false, false, false, false]);
 });
 
 test('loop reset clears loop state and UI for every stem', () => {

@@ -1,0 +1,75 @@
+{
+  "name": "stemacle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Stemacle local-first stem splitter, shuffle instrument, desktop shell, and iOS wrapper.",
+  "main": "native/electron/main.cjs",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "site:prepare": "node scripts/prepare-site.mjs",
+    "native:prepare": "node scripts/prepare-native.mjs",
+    "desktop:dev": "npm run native:prepare && electron .",
+    "desktop:pack": "npm run native:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "desktop:dist": "npm run native:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
+    "ios:add": "npm run native:prepare && cap add ios",
+    "ios:sync": "npm run native:prepare && cap sync ios",
+    "ios:open": "npm run ios:sync && cap open ios"
+  },
+  "keywords": [
+    "audio",
+    "stems",
+    "electron",
+    "capacitor"
+  ],
+  "author": "Eric Spencer",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor/core": "^8.4.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/ios": "^8.4.1",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.stemacle.app",
+    "productName": "Stemacle",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "index.html",
+      "app/**/*",
+      "apps/**/*",
+      "assets/**/*",
+      "samples/**/*",
+      "native/**/*",
+      "scripts/**/*",
+      "capacitor.config.json",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "icon": "native/electron/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "category": "Audio",
+      "icon": "native/electron/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  }
+}
