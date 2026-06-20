@@ -28,6 +28,8 @@
   --violet: oklch(54% 0.112 315);
   --paper: oklch(96% 0.009 84);
   --line: oklch(70% 0.01 70 / 0.42);
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --font-body: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -45,8 +47,12 @@ body {
     radial-gradient(110% 72% at 14% -12%, oklch(81% 0.04 320 / 0.28) 0%, oklch(81% 0.04 320 / 0) 46%),
     radial-gradient(120% 90% at 50% 0%, var(--page) 0%, var(--page-2) 100%);
   color: var(--ink);
-  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-body);
   overflow-x: hidden;
+}
+
+::selection {
+  background: oklch(78% 0.028 316 / 0.42);
 }
 
 a {
@@ -57,6 +63,12 @@ a {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--plum);
+  outline-offset: 3px;
 }
 
 .site {
@@ -108,7 +120,7 @@ a {
 .spec-list dt,
 .caption,
 .mini-link,
-.os-links a,
+.manifest-kicker,
 .route-label {
   color: var(--ink-soft);
   font-size: 10px;
@@ -179,11 +191,13 @@ a {
 
 h1 {
   margin: 0;
+  font-family: var(--font-display);
   color: var(--plum);
   font-size: clamp(76px, 13vw, 172px);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 0.82;
-  letter-spacing: 0;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
 }
 
 .dek {
@@ -193,6 +207,7 @@ h1 {
   font-size: clamp(20px, 2.5vw, 34px);
   line-height: 1.08;
   letter-spacing: 0;
+  text-wrap: balance;
 }
 
 .body-copy {
@@ -201,6 +216,7 @@ h1 {
   color: var(--ink-soft);
   font-size: 16px;
   line-height: 1.62;
+  text-wrap: pretty;
 }
 
 .actions {
@@ -228,6 +244,32 @@ h1 {
 .cta.primary:hover {
   background: var(--plum);
   border-color: var(--plum);
+}
+
+.signal-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 760px;
+  margin: 34px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.signal-item dt,
+.signal-item dd {
+  margin: 0;
+}
+
+.signal-item .eyebrow {
+  margin-bottom: 0;
+}
+
+.signal-item dd {
+  margin-top: 9px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .object {
@@ -300,7 +342,7 @@ h1 {
 
 .route-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -321,11 +363,13 @@ h1 {
 .route strong,
 .section h2,
 .release h2 {
+  font-family: var(--font-display);
   color: var(--ink);
   font-size: clamp(28px, 4.4vw, 64px);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 0.96;
-  letter-spacing: 0;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 
 .route p,
@@ -335,6 +379,7 @@ h1 {
   margin: 0;
   color: var(--ink-soft);
   line-height: 1.55;
+  text-wrap: pretty;
 }
 
 .section {
@@ -415,24 +460,59 @@ h1 {
   align-items: start;
 }
 
-.os-links {
+.manifest-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 1px solid var(--line);
 }
 
-.os-links a {
-  min-height: 88px;
-  padding: 18px 16px;
+.manifest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 0;
   border-bottom: 1px solid var(--line);
 }
 
-.os-links a:nth-child(odd) {
-  border-right: 1px solid var(--line);
+.manifest-row:hover {
+  background: oklch(96% 0.008 84 / 0.42);
 }
 
-.os-links a:hover {
-  background: oklch(96% 0.008 84 / 0.46);
+.manifest-row strong {
+  display: block;
+  margin-top: 7px;
+  font-family: var(--font-display);
+  color: var(--ink);
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.manifest-row p {
+  margin-top: 9px;
+}
+
+.manifest-cta {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.support-note {
+  margin-top: 18px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .ios-note {
@@ -443,11 +523,31 @@ h1 {
 }
 
 footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
   padding: 22px 0 30px;
   color: var(--ink-soft);
   font-size: 12px;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.footer-links a {
+  border-bottom: 1px solid transparent;
+}
+
+.footer-links a:hover {
+  border-color: var(--ink-faint);
 }
 
 @media (max-width: 900px) {
@@ -471,13 +571,27 @@ footer {
     padding: 12px 0 20px;
   }
 
-  .route-grid {
+  .signal-list {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
-  .route + .route {
-    border-left: 0;
+  .route-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .route:nth-child(3),
+  .route:nth-child(4) {
     border-top: 1px solid var(--line);
+  }
+
+  .route:nth-child(3) {
+    border-left: 0;
+  }
+
+  footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
@@ -533,12 +647,16 @@ footer {
     flex: 1 1 100%;
   }
 
-  .os-links {
+  .manifest-row,
+  .route-grid {
     grid-template-columns: 1fr;
   }
 
-  .os-links a:nth-child(odd) {
-    border-right: 0;
+  .route + .route,
+  .route:nth-child(3),
+  .route:nth-child(4) {
+    border-left: 0;
+    border-top: 1px solid var(--line);
   }
 
   .spec-list {
@@ -552,6 +670,10 @@ footer {
 
   .spec-list dd {
     padding-top: 0;
+  }
+
+  .manifest-cta {
+    justify-self: start;
   }
 }
 </style>
@@ -568,8 +690,9 @@ footer {
     </a>
     <div class="nav-links">
       <a href="/app/">web app</a>
-      <a href="#downloads">download</a>
-      <a href="https://github.com/EricSpencer00/stem-player">github</a>
+      <a href="#desktop">desktop</a>
+      <a href="#downloads">downloads</a>
+      <a href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">workflow</a>
     </div>
   </nav>
 
@@ -579,12 +702,26 @@ footer {
         <span class="eyebrow">browser live · mac download · ios in progress</span>
         <h1 id="title">Stemacle</h1>
         <p class="dek">Split songs into stems, lock loops to tempo, shuffle compatible tracks, and export everything without uploading your music.</p>
-        <p class="body-copy">The web app is instant. The desktop app adds indexed libraries, model caches, higher-quality local splitting, downloads, background jobs, and export queues. iOS is still in progress.</p>
+        <p class="body-copy">The web app is instant. The desktop app adds indexed libraries, model caches, higher-quality local splitting, downloads, background jobs, and export queues. iOS is in progress, and the public release path stays tied to the stem-player repository instead of a separate workspace.</p>
         <div class="actions" aria-label="Stemacle actions">
           <a class="cta primary" href="/app/">open web app</a>
           <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">download mac app</a>
-          <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/latest">latest release</a>
+          <a class="cta" href="https://github.com/EricSpencer00/stem-player">view repo</a>
         </div>
+        <dl class="signal-list" aria-label="Current release signal">
+          <div class="signal-item">
+            <dt class="eyebrow">repo</dt>
+            <dd>EricSpencer00/stem-player</dd>
+          </div>
+          <div class="signal-item">
+            <dt class="eyebrow">checks</dt>
+            <dd>`npm test` · `site:prepare` · `native:prepare`</dd>
+          </div>
+          <div class="signal-item">
+            <dt class="eyebrow">public now</dt>
+            <dd>macOS dmg/zip plus the iOS project zip</dd>
+          </div>
+        </dl>
       </div>
       <div class="object" aria-hidden="true">
         <div class="device">
@@ -600,20 +737,25 @@ footer {
           <strong>browser instrument</strong>
           <p>Drop a track and split it locally with tempo-locked loop controls.</p>
         </a>
-        <a class="route" href="#downloads">
+        <a class="route" href="#desktop">
           <span class="route-label">desktop</span>
-          <strong>direct GitHub downloads</strong>
-          <p>Apple Silicon DMG and ZIP are live today, with the rest landing as they actually ship.</p>
+          <strong>local workbench</strong>
+          <p>Keep the same circle, then add libraries, cache roots, exports, and background jobs.</p>
         </a>
-        <a class="route" href="#ios-status">
-          <span class="route-label">ios</span>
-          <strong>native build in progress</strong>
-          <p>The shell and project scaffolding exist, but mobile install links are not public yet.</p>
+        <a class="route" href="#downloads">
+          <span class="route-label">release</span>
+          <strong>direct public artifacts</strong>
+          <p>Download the files that are already on GitHub Releases, not placeholders for later platforms.</p>
+        </a>
+        <a class="route" href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">
+          <span class="route-label">workflow</span>
+          <strong>actions validate it</strong>
+          <p>The public `stem-player` workflow runs tests plus site and native bundle prep before deploy.</p>
         </a>
       </div>
     </section>
 
-    <section class="section desktop-grid">
+    <section class="section desktop-grid" id="desktop">
       <div class="desktop-copy">
         <span class="eyebrow">desktop app</span>
         <h2>Quiet power around the same physical control.</h2>
@@ -633,50 +775,90 @@ footer {
       </dl>
     </section>
 
-    <section class="section release">
+    <section class="section release" id="workflow">
       <div>
-        <span class="eyebrow">repo and releases</span>
-        <h2>Direct GitHub artifacts, not placeholders.</h2>
-        <p>Current public artifacts come from the `EricSpencer00/stem-player` releases page. Right now that means Apple Silicon macOS builds, an iOS project snapshot, and the site bundle. Windows, Linux, and CLI links show up here when those artifacts actually exist.</p>
+        <span class="eyebrow">public repo, public workflow</span>
+        <h2>Built from stem-player, not a private workspace.</h2>
+        <p>The landing page points to the public repository and the public release artifacts. The Validate workflow runs on pull requests to main, pushes to main, and manual dispatch, then prepares the same site and native bundles the release path depends on.</p>
         <div class="actions">
-          <a class="mini-link" href="https://github.com/EricSpencer00/stem-player/releases/latest">latest release</a>
-          <a class="mini-link" href="https://github.com/EricSpencer00/stem-player">source</a>
+          <a class="mini-link" href="https://github.com/EricSpencer00/stem-player">repo</a>
+          <a class="mini-link" href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">workflow</a>
+          <a class="mini-link" href="https://github.com/EricSpencer00/stem-player/releases/latest">release</a>
         </div>
       </div>
-      <div class="terminal" aria-label="Stemacle release artifacts">
+      <div class="terminal" aria-label="Stemacle validation workflow">
         <header>
-          <span class="caption">release</span>
-          <span class="caption">v0.1.0</span>
+          <span class="caption">workflow</span>
+          <span class="caption">Validate</span>
         </header>
-        <pre><code>Stemacle-0.1.0-arm64.dmg       macOS app (Apple Silicon)
-Stemacle-0.1.0-arm64-mac.zip   macOS app zip
-stemacle-ios-project-0.1.0.zip iOS project snapshot
-stemacle-site-0.1.0.zip        site bundle</code></pre>
+        <pre><code><span class="dim">$</span> npm test
+<span class="dim">$</span> npm run site:prepare
+<span class="dim">$</span> npm run native:prepare
+
+repo
+EricSpencer00/stem-player
+
+release
+v0.1.0</code></pre>
       </div>
     </section>
 
     <section class="section release" id="downloads">
       <div>
-        <span class="eyebrow">download targets</span>
-        <h2>Current public artifacts.</h2>
-        <p>Use the web app now, grab the mac build directly from GitHub Releases, or pull the iOS project snapshot while native mobile work is still underway.</p>
+        <span class="eyebrow">download manifest</span>
+        <h2>Current public artifacts, linked directly.</h2>
+        <p>If a file is listed here, it exists on the public stem-player release page right now. If a platform is not listed here, it is not public yet.</p>
+        <p class="support-note">The current release is Apple Silicon only on desktop. Windows, Linux, and public iOS install links appear here once they actually ship.</p>
       </div>
-      <div class="os-links" aria-label="Download targets">
-        <a href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">macOS dmg (Apple Silicon)</a>
-        <a href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64-mac.zip">macOS zip (Apple Silicon)</a>
-        <a href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/stemacle-ios-project-0.1.0.zip">iOS project zip</a>
-        <a href="https://github.com/EricSpencer00/stem-player/releases/latest">latest release notes</a>
+      <div class="manifest-list" aria-label="Download manifest">
+        <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">
+          <div>
+            <span class="manifest-kicker">macOS dmg</span>
+            <strong>Stemacle desktop for Apple Silicon</strong>
+            <p>Installer image for the current native desktop build.</p>
+          </div>
+          <span class="manifest-cta">download</span>
+        </a>
+        <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64-mac.zip">
+          <div>
+            <span class="manifest-kicker">macOS zip</span>
+            <strong>Portable macOS app bundle</strong>
+            <p>Zipped app bundle for the same Apple Silicon release.</p>
+          </div>
+          <span class="manifest-cta">download</span>
+        </a>
+        <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/stemacle-ios-project-0.1.0.zip">
+          <div>
+            <span class="manifest-kicker">iOS project zip</span>
+            <strong>Native project snapshot</strong>
+            <p>Open the iOS shell in Xcode or Simulator while public install links are still in progress.</p>
+          </div>
+          <span class="manifest-cta">download</span>
+        </a>
+        <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/latest">
+          <div>
+            <span class="manifest-kicker">release notes</span>
+            <strong>Latest GitHub release</strong>
+            <p>See the full public asset list and the current release notes in one place.</p>
+          </div>
+          <span class="manifest-cta">open</span>
+        </a>
       </div>
     </section>
 
     <section class="ios-note" id="ios-status">
       <span class="eyebrow">iOS</span>
-      <p>iOS work is still in progress. The native shell and project files are in the repo, but there is not a public App Store or TestFlight install link yet.</p>
+      <p>iOS work is still in progress. The native shell and project files are in the repo, and the current public artifact is the project zip. App Store and TestFlight install links belong here only when they are real.</p>
     </section>
   </main>
 
   <footer>
-    Stemacle by Eric Spencer. Local-first music tools with warm hardware manners.
+    <span>Stemacle by Eric Spencer. Local-first music tools with warm hardware manners.</span>
+    <div class="footer-links">
+      <a href="/app/">web app</a>
+      <a href="#downloads">downloads</a>
+      <a href="https://github.com/EricSpencer00/stem-player">github</a>
+    </div>
   </footer>
 </div>
 </body>
