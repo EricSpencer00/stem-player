@@ -42,7 +42,7 @@ Keep these invariants intact when touching loop code:
 
 ## Notes For Future Changes
 
-- `measureLength()` derives a 4/4 measure from detected `state.bpm`, clamped to the supported tempo range.
+- `measureLength()` derives a 4/4 measure from precise detected `state.bpm`, clamped to the supported tempo range. Do not round BPM before loop math.
 - `state.beatOffset` stores the detected beat-grid phase; `state.measureOffset` stores the selected 4/4 bar phase used by loop snapping.
 - The snap logic intentionally chooses the next selected subdivision boundary as the loop end, with a small epsilon so taps already on-grid stay on that boundary.
 - The abstract timing invariants are modeled in `specs/LoopTiming.tla`.

@@ -567,6 +567,17 @@ test('tempo estimator recovers beat tempo and beat-grid offset', () => {
   assert.ok(Math.abs(tempo.offset - 0.18) <= 0.04, `expected offset near 0.18, got ${tempo.offset}`);
 });
 
+test('tempo estimator preserves precise bpm for loop timing', () => {
+  const { app } = loadApp();
+  const targetBpm = 60 / (49 * 0.01);
+  const { signal, sampleRate } = makePulseTrain({ bpm: targetBpm, offset: 0.18 });
+
+  const tempo = app.estimateTempo(signal, sampleRate);
+
+  assert.ok(Math.abs(tempo.bpm - targetBpm) < 0.01, `expected precise bpm ${targetBpm}, got ${tempo.bpm}`);
+  assert.notEqual(tempo.bpm, Math.round(tempo.bpm));
+});
+
 test('tempo estimator prefers the 4/4 downbeat when one beat phase is accented', () => {
   const { app } = loadApp();
   const { signal, sampleRate } = makeFourFourPulseTrain({
