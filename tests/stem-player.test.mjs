@@ -87,9 +87,9 @@ test('native shell keeps the Stemacle design and launches bundled apps', () => {
 
   assert.match(html, /<title>Stemacle App<\/title>/);
   assert.match(html, /stemacle/);
-  assert.match(html, /href="(?:https:\/\/stemacle\.com\/app\/?|\/app\/?|\/app\/index\.html)"/);
+  assert.match(html, /href="https:\/\/stemacle\.com\/app\/?/);
   assert.match(html, /href="\/apps\/stem-shuffle\/(?:index\.html)?"/);
-  assert.match(html, /window\.location\.href = '(?:\/app\/?|\/app\/index\.html)'/);
+  assert.match(html, /window\.location\.href = 'https:\/\/stemacle\.com\/app'/);
   assert.match(html, /window\.location\.href = '\/apps\/stem-shuffle\/(?:index\.html)?'/);
   assert.match(html, /id="libraryDropzone"/);
   assert.match(html, /id="libraryList"/);
@@ -161,6 +161,8 @@ test('site prepare publishes the browser app at /app/ and /stem-player/', () => 
   assert.match(script, /copyIntoSite\('apps'\)/);
   assert.match(script, /\/app\b/);
   assert.match(script, /\/app\/\*/);
+  assert.match(script, /'\/app  https:\/\/stemacle\.com\/app  301'/);
+  assert.match(script, /'\/app\/\* https:\/\/stemacle\.com\/app\/:splat  301'/);
   assert.match(script, /\/stem-player\b/);
   assert.match(script, /\/stem-player\/\*/);
   assert.match(script, /Cross-Origin-Embedder-Policy: credentialless/);

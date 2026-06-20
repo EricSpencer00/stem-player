@@ -28,6 +28,8 @@ await writeFile(join(outDir, '_headers'), [
   '',
 ].join('\n'));
 await writeFile(join(outDir, '_redirects'), [
+  '/app  https://stemacle.com/app  301',
+  '/app/* https://stemacle.com/app/:splat  301',
   '/stem-player  https://stemacle.com/app  301',
   '/stem-player/* https://stemacle.com/app/:splat 301',
 ].join('\n'));
