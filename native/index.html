@@ -420,6 +420,22 @@ h1 {
   gap: 10px;
 }
 
+.download-strip {
+  display: grid;
+  gap: 10px;
+}
+
+.download-strip input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: oklch(92% 0.012 84);
+  color: var(--ink);
+  padding: 0 16px;
+  outline: none;
+}
+
 .track {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -884,7 +900,18 @@ h1 {
           </div>
           <input class="sr-only" id="libraryInput" type="file" accept="audio/*" multiple>
         </div>
+        <div class="download-strip">
+          <input id="downloadUrlInput" type="url" placeholder="Paste a YouTube or audio URL for desktop download" aria-label="Download URL">
+          <div class="command-row">
+            <button class="library-btn secondary" type="button" data-native-action="enqueue-download">download</button>
+            <button class="library-btn secondary" type="button" data-native-action="rescan-library">rescan</button>
+          </div>
+        </div>
+        <h3>Library roots</h3>
+        <div class="system-stack" id="libraryRoots"></div>
         <div class="library-list" id="libraryList" aria-live="polite"></div>
+        <h3>Recent tracks</h3>
+        <div class="system-stack" id="recentProjectsList"></div>
       </div>
     </section>
 
@@ -906,11 +933,19 @@ h1 {
             <strong>optional 6-stem</strong>
             <span>Experimental Demucs model for guitar and piano-aware work.</span>
           </button>
+          <button class="quality-choice" type="button" data-quality="mdx-extra-q" aria-pressed="false">
+            <strong>mdx extra q</strong>
+            <span>Alternative Demucs model for sharper 4-stem detail when installed.</span>
+          </button>
         </div>
       </div>
       <div class="surface-panel">
         <h3>Model cache</h3>
         <div id="modelCacheList" class="system-stack"></div>
+        <h3>Native tools</h3>
+        <div id="toolStatusList" class="system-stack"></div>
+        <h3>Cache roots</h3>
+        <div id="cacheRootList" class="system-stack"></div>
       </div>
     </section>
 
@@ -938,13 +973,19 @@ h1 {
 
 <script>
 (() => {
+  const pendingTrackKey = 'stemacle:pendingTrackId';
   const storeKey = 'stemacle.library.v1';
   const stateKey = 'stemacle.desktop.preview.v1';
   const list = document.getElementById('libraryList');
+  const libraryRoots = document.getElementById('libraryRoots');
+  const toolStatusList = document.getElementById('toolStatusList');
+  const cacheRootList = document.getElementById('cacheRootList');
+  const recentProjectsList = document.getElementById('recentProjectsList');
   const count = document.getElementById('libraryCount');
   const status = document.getElementById('nativeStatus');
   const input = document.getElementById('libraryInput');
   const dropzone = document.getElementById('libraryDropzone');
+  const downloadUrlInput = document.getElementById('downloadUrlInput');
   const modelCacheList = document.getElementById('modelCacheList');
   const analysisQueue = document.getElementById('analysisQueue');
   const exportPanel = document.getElementById('exportPanel');
@@ -964,17 +1005,31 @@ h1 {
     { id: 'fast-preview', label: 'Fast Preview', stems: 4, status: 'ready', cachePath: 'browser cache' },
     { id: 'demucs-4stem', label: 'High Quality 4-Stem', stems: 4, status: 'desktop only', cachePath: 'model-cache/demucs-4stem' },
     { id: 'demucs-6stem', label: 'Experimental 6-Stem', stems: 6, status: 'optional', cachePath: 'model-cache/demucs-6stem' },
+    { id: 'mdx-extra-q', label: 'MDX Extra Q', stems: 4, status: 'optional', cachePath: 'model-cache/mdx-extra-q' },
   ];
 
   function emptyDesktopState() {
     return {
       library: loadTracks(),
+      libraryRoots: [],
       queue: [],
       exports: [],
       sessions: [],
       recentProjects: [],
+      tools: {
+        ffmpeg: { label: 'ffmpeg', available: false, command: null },
+        ffprobe: { label: 'ffprobe', available: false, command: null },
+        demucs: { label: 'Demucs', available: false, command: null },
+        ytDlp: { label: 'yt-dlp', available: false, command: null },
+      },
+      paths: {
+        modelCacheRoot: 'localStorage/model-cache',
+        stemCacheRoot: 'localStorage/stem-cache',
+        analysisCacheRoot: 'localStorage/analysis-cache',
+        exportRoot: 'localStorage/exports',
+        downloadRoot: 'localStorage/downloads',
+      },
       modelCache: {
-        demucsAvailable: false,
         cacheRoot: 'localStorage',
         models: previewModels,
       },
@@ -1018,6 +1073,14 @@ h1 {
     return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
   }
 
+  function formatDuration(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return 'duration pending';
+    const whole = Math.round(seconds);
+    const minutes = Math.floor(whole / 60);
+    const remainder = String(whole % 60).padStart(2, '0');
+    return `${minutes}:${remainder}`;
+  }
+
   function trackKey(track) {
     return [track.path || track.name, track.size, track.lastModified || 0].join(':');
   }
@@ -1036,20 +1099,40 @@ h1 {
     });
   }
 
+  function openTrackInSplitter(track) {
+    if (!track) return;
+    if (window.stemacleNative?.readTrackFile && track.id) {
+      sessionStorage.setItem(pendingTrackKey, track.id);
+    } else {
+      sessionStorage.setItem('stemacle:lastLibraryTrack', JSON.stringify(track));
+    }
+    window.location.href = '/app/';
+  }
+
   function render() {
     const tracks = currentTracks();
     count.textContent = `${tracks.length} ${tracks.length === 1 ? 'track' : 'tracks'}`;
     desktopLibraryStatus.textContent = tracks.length
       ? `${tracks.length} indexed, ${tracks.filter((track) => track.analysisStatus === 'queued').length} queued`
       : 'Add files or a folder to build the local crate.';
-    desktopQueueStatus.textContent = desktopState?.queue?.length
-      ? `${desktopState.queue.length} background job${desktopState.queue.length === 1 ? '' : 's'} waiting`
+    const activeJobs = (desktopState?.queue || []).filter((job) => job.status === 'queued' || job.status === 'running');
+    desktopQueueStatus.textContent = activeJobs.length
+      ? `${activeJobs.length} background job${activeJobs.length === 1 ? '' : 's'} active`
       : 'No jobs queued.';
-    desktopCacheStatus.textContent = desktopState?.modelCache?.demucsAvailable
+    desktopCacheStatus.textContent = desktopState?.tools?.demucs?.available
       ? 'Demucs available, high quality cache ready.'
       : 'Preview cache ready, install Demucs for high quality local splitting.';
     desktopMode.textContent = window.stemacleNative ? 'desktop' : 'preview';
     list.innerHTML = '';
+    renderModels();
+    renderQueue();
+    renderExports();
+    renderSessions();
+    renderRoots();
+    renderTools();
+    renderCacheRoots();
+    renderRecentProjects();
+    renderPalette();
 
     if (!tracks.length) {
       const empty = document.createElement('div');
@@ -1070,6 +1153,7 @@ h1 {
       name.textContent = track.name || 'Untitled track';
       meta.textContent = [
         formatSize(track.size),
+        formatDuration(track.duration),
         track.analysisStatus || 'indexed',
         track.bpm ? `${Math.round(track.bpm)} bpm` : 'tempo pending',
       ].join(' · ');
@@ -1079,20 +1163,13 @@ h1 {
       open.type = 'button';
       open.textContent = 'split';
       open.addEventListener('click', () => {
-        sessionStorage.setItem('stemacle:lastLibraryTrack', JSON.stringify(track));
-        window.location.href = '/app/';
+        openTrackInSplitter(track);
       });
 
       row.append(details, open);
       row.addEventListener('click', () => setSelectedTrack(row.dataset.trackId));
       list.appendChild(row);
     });
-
-    renderModels();
-    renderQueue();
-    renderExports();
-    renderSessions();
-    renderPalette();
   }
 
   function addTracks(items) {
@@ -1165,6 +1242,32 @@ h1 {
       return;
     }
     input.click();
+  }
+
+  async function rescanLibrary() {
+    if (window.stemacleNative?.rescanLibrary) {
+      await window.stemacleNative.rescanLibrary();
+      await refreshDesktopState();
+      status.textContent = 'rescanned';
+      return;
+    }
+    status.textContent = 'desktop only';
+  }
+
+  async function enqueueDownload() {
+    const url = downloadUrlInput.value.trim();
+    if (!url) {
+      status.textContent = 'paste a url';
+      return;
+    }
+    if (window.stemacleNative?.enqueueDownload) {
+      await window.stemacleNative.enqueueDownload(url);
+      downloadUrlInput.value = '';
+      await refreshDesktopState();
+      status.textContent = 'download queued';
+      return;
+    }
+    status.textContent = 'desktop only';
   }
 
   function selectedTrack() {
@@ -1268,8 +1371,8 @@ h1 {
       row.className = 'queue-row';
       row.innerHTML = `
         <div>
-          <strong>${job.trackName || job.trackId}</strong>
-          <small>${job.quality} · ${job.message || 'queued'}</small>
+          <strong>${job.trackName || job.url || job.trackId}</strong>
+          <small>${job.kind}${job.quality ? ` · ${job.quality}` : ''}${job.format ? ` · ${job.format}` : ''} · ${job.message || 'queued'} · ${job.progress || 0}%</small>
         </div>
         <span class="quality-pill">${job.status}</span>
       `;
@@ -1290,7 +1393,7 @@ h1 {
       row.innerHTML = `
         <div>
           <strong>${exportItem.trackName || exportItem.trackId}</strong>
-          <small>${exportItem.kind} · ${exportItem.format}</small>
+          <small>${exportItem.kind} · ${exportItem.format}${exportItem.outputPath ? ` · ${exportItem.outputPath}` : ''}</small>
         </div>
         <span class="quality-pill">${exportItem.status}</span>
       `;
@@ -1319,9 +1422,97 @@ h1 {
     });
   }
 
+  function renderRoots() {
+    const roots = desktopState?.libraryRoots || [];
+    libraryRoots.innerHTML = '';
+    if (!roots.length) {
+      libraryRoots.innerHTML = '<div class="empty">No indexed roots yet</div>';
+      return;
+    }
+    roots.forEach((root) => {
+      const row = document.createElement('div');
+      row.className = 'system-row';
+      row.innerHTML = `
+        <div>
+          <strong>${root.path}</strong>
+          <small>${root.trackCount || 0} tracks · last indexed ${root.lastIndexedAt || root.addedAt || 'pending'}</small>
+        </div>
+        <span class="quality-pill">root</span>
+      `;
+      libraryRoots.appendChild(row);
+    });
+  }
+
+  function renderTools() {
+    const tools = desktopState?.tools || {};
+    toolStatusList.innerHTML = '';
+    const entries = Object.entries(tools);
+    if (!entries.length) {
+      toolStatusList.innerHTML = '<div class="empty">No native tool state</div>';
+      return;
+    }
+    entries.forEach(([key, tool]) => {
+      const row = document.createElement('div');
+      row.className = 'system-row';
+      row.innerHTML = `
+        <div>
+          <strong>${tool.label || key}</strong>
+          <small>${tool.command || 'not found'}</small>
+        </div>
+        <span class="quality-pill">${tool.available ? 'ready' : 'missing'}</span>
+      `;
+      toolStatusList.appendChild(row);
+    });
+  }
+
+  function renderCacheRoots() {
+    const paths = desktopState?.paths || {};
+    cacheRootList.innerHTML = '';
+    const entries = Object.entries(paths);
+    if (!entries.length) {
+      cacheRootList.innerHTML = '<div class="empty">No cache roots yet</div>';
+      return;
+    }
+    entries.forEach(([key, value]) => {
+      const row = document.createElement('div');
+      row.className = 'system-row';
+      row.innerHTML = `
+        <div>
+          <strong>${key}</strong>
+          <small>${value}</small>
+        </div>
+        <span class="quality-pill">path</span>
+      `;
+      cacheRootList.appendChild(row);
+    });
+  }
+
+  function renderRecentProjects() {
+    const projects = desktopState?.recentProjects || [];
+    recentProjectsList.innerHTML = '';
+    if (!projects.length) {
+      recentProjectsList.innerHTML = '<div class="empty">No recent tracks yet</div>';
+      return;
+    }
+    projects.slice(0, 6).forEach((project) => {
+      const row = document.createElement('div');
+      row.className = 'system-row';
+      row.innerHTML = `
+        <div>
+          <strong>${project.name}</strong>
+          <small>${project.path}</small>
+        </div>
+        <span class="quality-pill">recent</span>
+      `;
+      recentProjectsList.appendChild(row);
+    });
+  }
+
   const commands = [
     { label: 'Add audio files', hint: 'cmd/ctrl+o', action: pickLibrary },
     { label: 'Add folder', hint: 'cmd/ctrl+shift+o', action: pickFolder },
+    { label: 'Download from URL', hint: 'yt-dlp', action: enqueueDownload },
+    { label: 'Rescan library', hint: 'roots', action: rescanLibrary },
     { label: 'Analyze selected', hint: selectedQuality, action: analyzeSelected },
     { label: 'Export stem pack', hint: 'wav', action: exportSelected },
     { label: 'Save session', hint: 'cmd/ctrl+s', action: saveSession },
@@ -1363,6 +1554,8 @@ h1 {
   });
 
   document.querySelector('[data-native-action="pick-folder"]').addEventListener('click', pickFolder);
+  document.querySelector('[data-native-action="enqueue-download"]').addEventListener('click', enqueueDownload);
+  document.querySelector('[data-native-action="rescan-library"]').addEventListener('click', rescanLibrary);
   document.querySelector('[data-native-action="analyze-selected"]').addEventListener('click', analyzeSelected);
   document.querySelector('[data-native-action="export-selected"]').addEventListener('click', exportSelected);
   document.querySelector('[data-native-action="open-palette"]').addEventListener('click', openPalette);
@@ -1419,6 +1612,13 @@ h1 {
     }
     if (event.key === 'Escape') closePalette();
   });
+
+  if (window.stemacleNative && window.stemacleNative.onStateChanged) {
+    window.stemacleNative.onStateChanged((state) => {
+      desktopState = state;
+      render();
+    });
+  }
 
   window.stemacleNative?.onCommand?.((command) => {
     if (command === 'command-palette') openPalette();

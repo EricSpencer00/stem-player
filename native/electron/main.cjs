@@ -175,6 +175,13 @@ async function chooseAudioFiles(properties) {
 
 app.whenReady().then(() => {
   desktopStore = createDesktopStore(path.join(app.getPath('userData'), 'Stemacle Desktop'));
+  desktopStore.subscribe((state) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('stemacle:desktop-state', state);
+      }
+    }
+  });
 
   protocol.handle(scheme, (request) => {
     const filePath = fileForRequest(request.url);
@@ -189,6 +196,7 @@ app.whenReady().then(() => {
   ipcMain.handle('stemacle:pick-audio-files', () => chooseAudioFiles(['openFile', 'multiSelections']));
   ipcMain.handle('stemacle:pick-audio-folder', () => chooseAudioFiles(['openDirectory', 'multiSelections']));
   ipcMain.handle('stemacle:add-library-paths', (_event, paths) => desktopStore.addLibraryPaths(Array.isArray(paths) ? paths : []));
+  ipcMain.handle('stemacle:rescan-library', () => desktopStore.rescanLibrary());
   ipcMain.handle('stemacle:enqueue-analysis', (_event, trackId, options) => {
     const job = desktopStore.enqueueAnalysis(trackId, options || {});
     if (Notification.isSupported()) {
@@ -199,8 +207,19 @@ app.whenReady().then(() => {
     }
     return job;
   });
+  ipcMain.handle('stemacle:enqueue-download', (_event, url) => {
+    const job = desktopStore.enqueueDownload(url);
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Stemacle download queued',
+        body: url,
+      }).show();
+    }
+    return job;
+  });
   ipcMain.handle('stemacle:save-session', (_event, session) => desktopStore.saveSession(session || {}));
-  ipcMain.handle('stemacle:export-track', (_event, trackId, options) => desktopStore.planExport(trackId, options || {}));
+  ipcMain.handle('stemacle:export-track', (_event, trackId, options) => desktopStore.enqueueExport(trackId, options || {}));
+  ipcMain.handle('stemacle:read-track-file', (_event, trackId) => desktopStore.readTrackFile(trackId));
   ipcMain.handle('stemacle:reveal-path', (_event, filePath) => {
     if (filePath && fs.existsSync(filePath)) {
       shell.showItemInFolder(filePath);
@@ -215,6 +234,9 @@ app.whenReady().then(() => {
 
   installMenu();
   createWindow();
+  mainWindow?.webContents.on('did-finish-load', () => {
+    mainWindow?.webContents.send('stemacle:desktop-state', desktopStore.getState());
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
