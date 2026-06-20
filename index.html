@@ -13,7 +13,7 @@
 <script>
   (() => {
     if (window.location.pathname.startsWith('/stem-player')) {
-      const tail = window.location.pathname.replace(/^/stem-player/?/, '');
+      const tail = window.location.pathname.replace(/^\/stem-player\/?/, '');
       const suffix = tail ? '/' + tail : '';
       const destination = 'https://stemacle.com/app' + suffix + window.location.search + window.location.hash;
       window.location.replace(destination);
