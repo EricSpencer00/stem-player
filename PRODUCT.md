@@ -1,14 +1,14 @@
-# Stem Player — Product Context
+# Stemacle — Product Context
 
 ## Register
 product
 
 ## Users
 Music fans and producers who want to isolate and remix stems from any track.
-Primarily YEEZY / Kanye listeners familiar with the physical DONDA stem player device.
+People who want a tactile, local way to split, loop, and recombine music without uploading files.
 
 ## Product Purpose
-A browser-only audio stem separator. Drop any audio file; the app splits it into
+A browser-only audio stem separator. Drop any audio file; Stemacle splits it into
 drums, bass, vocals, and melody using a client-side ML model. Each stem is
 independently playable, mutable, and loopable. No accounts, no uploads, no server.
 
@@ -32,8 +32,8 @@ independently playable, mutable, and loopable. No accounts, no uploads, no serve
 
 ## Brand Tone
 Sparse. Functional. Physical. The device IS the interface — no chrome, no marketing.
-The aesthetic comes from Ye's product design sensibility: warm off-white, matte texture,
-utilitarian clarity. Not sterile white. Not hip-hop loud. The quiet confidence of
+The aesthetic is warm off-white, matte texture, purple thick-line tentacle artwork, and
+utilitarian clarity. Not sterile white. Not loud nightlife software. The quiet confidence of
 something that doesn't need to explain itself.
 
 ## Anti-References

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stem Player</title>
+<title>Stemacle</title>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
 <style>
 :root {
@@ -20,6 +20,8 @@
   --amber:      oklch(64% 0.13 64);
   --amber-glow: oklch(64% 0.13 64 / 0.4);
   --row-glow:   oklch(76% 0.014 76 / 0.34);
+  --plum:       oklch(28% 0.082 320);
+  --violet:     oklch(54% 0.112 315);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -37,6 +39,29 @@ body {
   padding: 32px 20px 40px;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.brand-tentacle {
+  position: fixed;
+  left: max(-210px, -18vw);
+  top: max(-80px, -8vw);
+  width: min(560px, 56vw);
+  opacity: 0.82;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+.wordmark,
+.device-wrap,
+.hint,
+.sample-rows,
+#playbar,
+#stems-panel,
+#overlay,
+footer {
+  position: relative;
+  z-index: 1;
 }
 
 .wordmark {
@@ -731,9 +756,10 @@ footer a:hover { border-color: var(--ink-faint); }
 </head>
 <body>
 
+<img class="brand-tentacle" src="assets/stemacle-tentacle-cutout.png" alt="" aria-hidden="true">
 <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac">
 
-<div class="wordmark"><div class="rule"></div><span>Stem Player</span><div class="rule"></div></div>
+<div class="wordmark"><div class="rule"></div><span>Stemacle</span><div class="rule"></div></div>
 
 <div class="device-wrap" id="deviceWrap">
   <div class="device" id="device"></div>
@@ -908,7 +934,7 @@ footer a:hover { border-color: var(--ink-faint); }
 
 <footer>
   made by <a href="https://ericspencer.us" target="_blank" rel="noopener">ericspencer.us</a>
-  &nbsp;·&nbsp; ML: Spleeter / Deezer &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
+  &nbsp;·&nbsp; local separation &nbsp;·&nbsp; HPSS &nbsp;·&nbsp; ONNX Runtime Web
 </footer>
 
 <script>
@@ -1195,7 +1221,7 @@ function estimateTempo(signal, sampleRate){
   const measureOffset = estimateMeasureOffset(onset, frames, selected.lag, bestOffset, hopSec);
 
   return {
-    bpm: Math.round(clamp(selected.bpm, BPM_MIN, BPM_MAX)),
+    bpm: clamp(selected.bpm, BPM_MIN, BPM_MAX),
     confidence: selected.score,
     beatOffset,
     measureOffset: measureOffset.offset,
