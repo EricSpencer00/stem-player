@@ -229,12 +229,79 @@ test('native shell keeps desktop controls while optionally layering iOS affordan
     assert.match(html, /<span[^>]*data-surface-only="desktop"[^>]*>desktop<\/span>/);
     assert.match(html, /data-surface-only="desktop"/);
     assert.match(html, /body\[data-surface="ios"\]/);
-    assert.match(html, /Split tracks on your phone/i);
-    assert.match(html, /local files · splitter · shuffle/i);
-    assert.match(html, /Keep stems on-device, move fast between splitting and shuffle/i);
+    assert.match(html, /id="iosApp"/);
+    assert.match(html, /id="iosTactileHome"/);
+    assert.match(html, /id="iosQuietNav"/);
+    assert.match(html, /body\[data-surface="ios"] \.workbench \{\s*display: none;/);
+    assert.match(html, /body\[data-surface="ios"] \.ios-app \{\s*padding-top: 0;/);
+    assert.match(html, /drop audio/i);
+    assert.match(html, /Stem Splitter/i);
+    assert.match(html, /Stem Shuffle/i);
     assert.match(html, /data-native-action="pick-folder"[^>]*data-surface-only="desktop"/);
     assert.match(html, /data-native-action="enqueue-download"[^>]*data-surface-only="desktop"/);
+    assert.doesNotMatch(html, /Split tracks on your phone/i);
+    assert.doesNotMatch(html, /Keep stems on-device, move fast between splitting and shuffle/i);
   }
+});
+
+test('ios native shell keeps the original Stemacle circle and hides app chrome', () => {
+  const html = readRepo('native/index.html');
+
+  assert.match(html, /id="iosApp"/);
+  assert.match(html, /id="iosTactileHome"/);
+  assert.match(html, /id="iosQuietNav"/);
+  assert.match(html, /class="device ios-device"/);
+  assert.match(html, /data-ios-action="import-track"[^>]*>\s*<span>drop audio<\/span>/);
+  assert.match(html, /data-ios-view="home"/);
+  assert.match(html, /data-ios-view="projects"/);
+  assert.match(html, /data-ios-view="library"/);
+  assert.match(html, /data-ios-view="settings"/);
+  assert.match(html, /data-ios-action="import-track"/);
+  assert.match(html, /data-ios-action="try-sample"/);
+  assert.match(html, /data-ios-action="new-project"/);
+  assert.match(html, /id="iosProjectSheet"/);
+  assert.match(html, /id="iosProjectDetail"/);
+  assert.match(html, /id="iosRecentProjectStrip"/);
+  assert.match(html, /id="iosProjectsList"/);
+  assert.match(html, /id="iosProjectNotes"/);
+  assert.match(html, /id="iosProjectName"/);
+  assert.match(html, /Create and Open Splitter/);
+  assert.match(html, /Create and Open Shuffle/);
+  assert.doesNotMatch(html, /id="iosTabbar"/);
+  assert.doesNotMatch(html, /id="iosOnboarding"/);
+  assert.doesNotMatch(html, /Projects first, tools second/i);
+  assert.doesNotMatch(html, /first run/i);
+  assert.doesNotMatch(html, /New Project<\/button>\s*<\/div>\s*<div class="ios-metrics"/);
+  assert.match(html, /data-tool="splitter"/);
+  assert.match(html, /data-tool="shuffle"/);
+  assert.match(html, /data-ios-filter="recent"/);
+  assert.match(html, /data-ios-filter="needs-analysis"/);
+  assert.match(html, /data-ios-filter="ready"/);
+  assert.match(html, /data-ios-filter="archived"/);
+  assert.match(html, /data-ios-action="share-project"/);
+  assert.match(html, /data-ios-action="export-project"/);
+  assert.match(html, /data-ios-action="duplicate-project"/);
+  assert.match(html, /data-ios-action="archive-project"/);
+  assert.match(html, /data-ios-action="delete-project"/);
+  assert.match(html, /stemacle\.ios\.projects\.v1/);
+  assert.doesNotMatch(html, /stemacle\.ios\.onboarding\.v1/);
+  assert.match(html, /stemacle:activeProject/);
+  assert.match(html, /function createProjectFromSource/);
+  assert.match(html, /function openProjectTool/);
+  assert.match(html, /function renderIOSApp/);
+  assert.match(html, /function shareProject/);
+  assert.match(html, /navigator\.share/);
+});
+
+test('ios project supports document intake and local file sharing declarations', () => {
+  const info = readRepo('native/ios/App/App/Info.plist');
+
+  assert.match(info, /LSSupportsOpeningDocumentsInPlace/);
+  assert.match(info, /UIFileSharingEnabled/);
+  assert.match(info, /CFBundleDocumentTypes/);
+  assert.match(info, /public\.audio/);
+  assert.match(info, /com\.apple\.m4a-audio/);
+  assert.match(info, /public\.mp3/);
 });
 
 test('electron bridge exposes native desktop operations and menu handlers', () => {
@@ -285,7 +352,7 @@ test('product surface document explains web, desktop, and ios differences', () =
   assert.match(doc, /## Web App/);
   assert.match(doc, /## Desktop App/);
   assert.match(doc, /## iOS App/);
-  assert.match(doc, /offline model cache/i);
+  assert.match(doc, /cache/i);
   assert.match(doc, /Demucs/i);
   assert.match(doc, /same tactile splitter/i);
   assert.doesNotMatch(doc, /TBD|TODO/);

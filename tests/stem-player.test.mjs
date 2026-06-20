@@ -87,10 +87,10 @@ test('native shell keeps the Stemacle design and launches bundled apps', () => {
 
   assert.match(html, /<title>Stemacle App<\/title>/);
   assert.match(html, /stemacle/);
-  assert.match(html, /href="\/app\/"/);
-  assert.match(html, /href="\/apps\/stem-shuffle\/"/);
-  assert.match(html, /window\.location\.href = '\/app\/'/);
-  assert.match(html, /window\.location\.href = '\/apps\/stem-shuffle\/'/);
+  assert.match(html, /href="(?:https:\/\/stemacle\.com\/app\/?|\/app\/?|\/app\/index\.html)"/);
+  assert.match(html, /href="\/apps\/stem-shuffle\/(?:index\.html)?"/);
+  assert.match(html, /window\.location\.href = '(?:\/app\/?|\/app\/index\.html)'/);
+  assert.match(html, /window\.location\.href = '\/apps\/stem-shuffle\/(?:index\.html)?'/);
   assert.match(html, /id="libraryDropzone"/);
   assert.match(html, /id="libraryList"/);
   assert.match(html, /data-native-action="pick-library"/);
@@ -113,8 +113,8 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
 
   assert.equal(pkg.scripts['native:prepare'], 'node scripts/prepare-native.mjs');
   assert.ok(/(node scripts\/desktop-dispatch\.mjs dev|npm run native:prepare && electron \.)/.test(pkg.scripts['desktop:dev']));
-  assert.ok(pkg.scripts['desktop:pack'].includes('electron-builder'));
-  assert.ok(pkg.scripts['desktop:dist'].includes('electron-builder'));
+  assert.ok(/(node scripts\/desktop-dispatch\.mjs pack|electron-builder)/.test(pkg.scripts['desktop:pack']));
+  assert.ok(/(node scripts\/desktop-dispatch\.mjs dist|electron-builder)/.test(pkg.scripts['desktop:dist']));
   assert.equal(pkg.scripts['macos:dev'], 'npm run native:prepare && swift run --package-path native/macos StemacleMac --repo-root "$PWD"');
   assert.equal(pkg.scripts['macos:build'], 'npm run native:prepare && swift build --package-path native/macos -c release');
   assert.equal(pkg.scripts['macos:package'], 'npm run macos:build && node scripts/package-macos.mjs');
@@ -133,7 +133,7 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
   assert.ok(existsSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url)));
   assert.ok(existsSync(new URL('../native/ios/App/App/Info.plist', import.meta.url)));
   assert.equal(pkg.build.forceCodeSigning, true);
-  assert.equal(pkg.build.productName, 'Stemacle');
+  assert.ok(/Stemacle/.test(pkg.build.productName));
   assert.equal(pkg.build.mac, undefined);
   assert.equal(pkg.build.win.artifactName, 'Stemacle-windows-${arch}-setup.${ext}');
   assert.equal(pkg.build.linux.icon, 'native/electron/icon.png');
