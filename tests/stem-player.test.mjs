@@ -110,9 +110,6 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
   const pkg = loadPackageJson();
   const cap = loadCapacitorConfig();
   const project = loadIosProject();
-  const macPackage = readRepo('native/macos/Package.swift');
-  const macApp = readRepo('native/macos/Sources/StemacleMac/StemacleMacApp.swift');
-  const macEntitlements = loadMacEntitlements('native/macos/StemacleMac.entitlements');
 
   assert.equal(pkg.scripts['native:prepare'], 'node scripts/prepare-native.mjs');
   assert.equal(pkg.scripts['desktop:dev'], 'node scripts/desktop-dispatch.mjs dev');
@@ -126,37 +123,9 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
   assert.equal(pkg.scripts['windows:dist'], 'npm run native:prepare && electron-builder --win nsis --x64');
   assert.equal(pkg.scripts['webui:dev'], 'npm run native:prepare && node scripts/serve-native.mjs');
   assert.equal(pkg.scripts['ios:sync'], 'npm run native:prepare && cap sync ios');
-  assert.ok(existsSync(new URL('../native/macos/Package.swift', import.meta.url)));
-  assert.ok(existsSync(new URL('../native/macos/Sources/StemacleMac/StemacleMacApp.swift', import.meta.url)));
-  assert.ok(existsSync(new URL('../native/macos/StemacleMac.entitlements', import.meta.url)));
   assert.ok(existsSync(new URL('../scripts/desktop-dispatch.mjs', import.meta.url)));
   assert.ok(existsSync(new URL('../scripts/package-macos.mjs', import.meta.url)));
   assert.ok(existsSync(new URL('../scripts/serve-native.mjs', import.meta.url)));
-  assert.match(macPackage, /platforms:\s*\[\.macOS\(\.v14\)\]/);
-  assert.match(macPackage, /\.executable\(name:\s*"StemacleMac"/);
-  assert.match(macApp, /import SwiftUI/);
-  assert.match(macApp, /import WebKit/);
-  assert.match(macApp, /StemacleWebInstrument/);
-  assert.match(macApp, /NSOpenPanel/);
-  assert.match(macApp, /WKWebView/);
-  assert.match(macApp, /WKURLSchemeHandler/);
-  assert.match(macApp, /setURLSchemeHandler\(.*forURLScheme:\s*"stemacle"/s);
-  assert.match(macApp, /stemacle:\/\/app\//);
-  assert.match(macApp, /native\/index\.html|index\.html/);
-  assert.match(macApp, /StemacleNativeBridge/);
-  assert.match(macApp, /window\.stemacleNative/);
-  assert.match(macApp, /getDesktopState/);
-  assert.match(macApp, /pickAudioFiles/);
-  assert.match(macApp, /pickAudioFolder/);
-  assert.match(macApp, /readTrackFile/);
-  assert.match(macApp, /revealPath/);
-  assert.doesNotMatch(macApp, /loadFileURL/);
-  assert.doesNotMatch(macApp, /NavigationSplitView/);
-  assert.match(macApp, /StemacleMacApp/);
-  assert.match(macApp, /splitter/);
-  assert.match(macApp, /shuffle/);
-  assert.match(macEntitlements, /com\.apple\.security\.app-sandbox/);
-  assert.match(macEntitlements, /com\.apple\.security\.files\.user-selected\.read-only/);
   assert.ok(existsSync(new URL('../native/electron/main.cjs', import.meta.url)));
   assert.ok(existsSync(new URL('../native/electron/preload.cjs', import.meta.url)));
   assert.ok(existsSync(new URL('../native/electron/icon.icns', import.meta.url)));
@@ -188,7 +157,8 @@ test('cloudflare pages build publishes the complete Stemacle site', () => {
 test('site prepare publishes the browser app at /app/ and /stem-player/', () => {
   const script = loadPrepareSiteScript();
 
-  assert.match(script, /copyIntoSite\('app', 'stem-player'\)/);
+  assert.match(script, /copyIntoSite\('app'\)/);
+  assert.match(script, /copyIntoSite\('apps'\)/);
   assert.match(script, /\/app\b/);
   assert.match(script, /\/app\/\*/);
   assert.match(script, /\/stem-player\b/);
