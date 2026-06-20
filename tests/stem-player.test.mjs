@@ -98,6 +98,7 @@ class FakeElement {
       moveTo() {},
       lineTo() {},
       arc() {},
+      closePath() {},
       stroke() {},
       fill() {},
       fillText() {},
@@ -113,6 +114,7 @@ class FakeElement {
       set textAlign(_) {},
       set textBaseline(_) {},
       set globalAlpha(_) {},
+      set globalCompositeOperation(_) {},
     };
   }
 }
@@ -371,6 +373,7 @@ globalThis.__app = {
   timeToSpectralPercent: typeof timeToSpectralPercent === 'function' ? timeToSpectralPercent : undefined,
   spectralTimeFromClientX: typeof spectralTimeFromClientX === 'function' ? spectralTimeFromClientX : undefined,
   levelMeterBandsAt: typeof levelMeterBandsAt === 'function' ? levelMeterBandsAt : undefined,
+  meterWavePoints: typeof meterWavePoints === 'function' ? meterWavePoints : undefined,
   setLoop,
   startPlayback,
   stopPlayback,
@@ -501,6 +504,25 @@ test('top circle is a passive level meter instead of quadrant controls', () => {
   assert.match(html, /<canvas class="level-meter" id="levelMeter" aria-hidden="true"><\/canvas>/);
   assert.match(html, /\.level-meter\s*\{(?=[^}]*border-radius:\s*50%;)(?=[^}]*pointer-events:\s*none;)/s);
   assert.match(html, /\.quadrant,\s*\.q-label,\s*\.q-mute-mark\s*\{(?=[^}]*display:\s*none;)/s);
+});
+
+test('level meter renders a filled waveform ring with a double border', () => {
+  const html = loadHtml();
+
+  assert.match(html, /function meterWavePoints\(/);
+  assert.match(html, /function drawMeterWaveBand\(/);
+  assert.match(html, /ctx\.fill\(\);/);
+  assert.match(html, /globalCompositeOperation\s*=\s*'destination-out'/);
+  assert.doesNotMatch(html, /traceMeterWaveBand\(ctx,\s*wave\);\s*ctx\.strokeStyle/s);
+  assert.doesNotMatch(html, /ctx\.moveTo\(0,\s*-inner\);\s*ctx\.lineTo\(0,\s*-outer\);/);
+});
+
+test('vocals headphones control gets a one-off pulse affordance', () => {
+  const html = loadHtml();
+
+  assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]\s*\{(?=[^}]*position:\s*relative;)(?=[^}]*overflow:\s*visible;)/s);
+  assert.match(html, /\.stem-headphones-btn\[data-stem="vocals"\]::after\s*\{(?=[^}]*animation:\s*vocalPhonesPulse\s+[^;]+;)(?=[^}]*border:\s*1px solid var\(--amber-glow\);)/s);
+  assert.match(html, /@keyframes vocalPhonesPulse\s*\{/);
 });
 
 test('sample track titles fit inside responsive multi-line buttons', () => {
@@ -951,6 +973,30 @@ test('level meter uses a live Web Audio analyser during playback', () => {
 
   assert.ok(bands.wave > 0.2, `expected waveform energy from analyser, got ${JSON.stringify(bands)}`);
   assert.ok(bands.bass > bands.treble, `expected analyser bass dominance, got ${JSON.stringify(bands)}`);
+});
+
+test('level meter waveform geometry stays compact and continuous', () => {
+  const { app } = loadApp();
+  const waveform = new Uint8Array(128);
+  for (let i = 0; i < waveform.length; i++) {
+    waveform[i] = Math.round(128 + Math.sin((i / waveform.length) * Math.PI * 4) * 96);
+  }
+
+  assert.equal(typeof app.meterWavePoints, 'function');
+  const wave = app.meterWavePoints({ bass: 1, treble: 1, wave: 1, waveform }, 480, 64);
+  const maxOuter = Math.max(...wave.outer.map((point) => point.r));
+  const minOuter = Math.min(...wave.outer.map((point) => point.r));
+  const maxInner = Math.max(...wave.inner.map((point) => point.r));
+
+  assert.equal(wave.outer.length, 65);
+  assert.equal(wave.inner.length, 65);
+  assert.equal(wave.mid.length, 65);
+  assert.deepEqual(wave.outer.at(-1), wave.outer[0]);
+  assert.deepEqual(wave.inner.at(-1), wave.inner[0]);
+  assert.deepEqual(wave.mid.at(-1), wave.mid[0]);
+  assert.ok(maxOuter - wave.base <= 62, `expected compact wave displacement, got ${maxOuter - wave.base}`);
+  assert.ok(maxOuter - minOuter > 8, 'expected visible waveform variation around the ring');
+  assert.ok(maxInner < minOuter, 'expected a filled ring band with inner and outer contours');
 });
 
 test('rejecting a loop that extends past the track clears stale loop state', () => {
