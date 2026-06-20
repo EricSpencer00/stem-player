@@ -571,23 +571,64 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
   position: relative;
   overflow: visible;
 }
+.stem-headphones-btn[data-stem="vocals"] svg {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: vocalPhonesIconPulse 2.8s cubic-bezier(0.22,1,0.36,1) 1;
+}
 .stem-headphones-btn[data-stem="vocals"]::after {
   content: "";
   position: absolute;
   inset: -5px;
-  border: 1px solid var(--amber-glow);
+  border: 2px solid var(--ink);
   border-radius: inherit;
-  opacity: 0.36;
+  box-shadow:
+    0 0 0 1px oklch(92% 0.012 84 / 0.92),
+    0 0 0 4px var(--amber-glow);
+  opacity: 0;
   pointer-events: none;
-  transform: scale(0.86);
-  animation: vocalPhonesPulse 2.15s cubic-bezier(0.22,1,0.36,1) infinite;
+  transform: scale(0.82);
+  animation: vocalPhonesPulse 2.8s cubic-bezier(0.22,1,0.36,1) 1;
 }
-.stem-headphones-btn[data-stem="vocals"][aria-pressed="true"]::after { opacity: 0; }
+.stem-headphones-btn[data-stem="vocals"][aria-pressed="true"] svg { animation: none; }
+.stem-headphones-btn[data-stem="vocals"][aria-pressed="true"]::after { animation: none; opacity: 0; }
+@keyframes vocalPhonesIconPulse {
+  0%, 100% {
+    color: var(--ink-soft);
+    filter: none;
+    opacity: 1;
+    stroke-width: 1.65;
+    transform: scale(1);
+  }
+  12% {
+    color: var(--ink);
+    filter:
+      drop-shadow(0 0 0 var(--page))
+      drop-shadow(0 0 4px var(--amber-glow));
+    stroke-width: 2.55;
+    transform: scale(1.22);
+  }
+  34% {
+    color: var(--ink);
+    filter:
+      drop-shadow(0 0 0 var(--page))
+      drop-shadow(0 0 5px var(--amber-glow));
+    stroke-width: 2.25;
+    transform: scale(1.12);
+  }
+  72% {
+    color: var(--ink-soft);
+    filter: none;
+    stroke-width: 1.65;
+    transform: scale(1);
+  }
+}
 @keyframes vocalPhonesPulse {
-  0%   { opacity: 0; transform: scale(0.86); }
-  18%  { opacity: 0.42; }
-  68%  { opacity: 0; transform: scale(1.18); }
-  100% { opacity: 0; transform: scale(1.18); }
+  0%   { opacity: 0; transform: scale(0.82); }
+  10%  { opacity: 0.95; transform: scale(0.98); }
+  34%  { opacity: 0.62; transform: scale(1.14); }
+  72%  { opacity: 0; transform: scale(1.28); }
+  100% { opacity: 0; transform: scale(1.28); }
 }
 
 /* loop buttons */
@@ -616,6 +657,7 @@ input.vol.muted::-moz-range-thumb { background: var(--ink-ghost); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
+  .stem-headphones-btn[data-stem="vocals"] svg { filter: none; }
   .stem-headphones-btn[data-stem="vocals"]::after { opacity: 0; }
 }
 
