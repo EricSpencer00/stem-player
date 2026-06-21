@@ -227,8 +227,10 @@ test('ios native polish uses the app icon as a real brand control', () => {
   assert.match(design, /StemacleAssetImage\(asset: \.appIcon\)/);
   assert.match(design, /stemacle-tentacle\.png/);
   assert.match(design, /accessibilityLabel\("Stemacle app icon"\)/);
-  assert.match(player, /StemacleAppIconMark\(size: 34\)/);
-  assert.match(player, /Local-first stem splitter/);
+  assert.match(player, /^\s*StemacleAppIconMark\(size: 34\)/m);
+  assert.match(player, /^\s*Text\("Local-first stem splitter"\)/m);
+  assert.doesNotMatch(player, /\/\/\s*StemacleAppIconMark\(size: 34\)/);
+  assert.doesNotMatch(player, /\/\/\s*Text\("Local-first stem splitter"\)/);
   assert.match(root, /toolbarBackground\(StemacleDesign\.paper/);
   assert.match(root, /toolbarColorScheme\(\.light/);
 });
@@ -249,10 +251,11 @@ test('ios native shell keeps system bars opaque so artwork cannot clash behind c
   assert.match(appDelegate, /selected\.iconColor\s*=\s*purple/);
   assert.match(design, /\.frame\(maxWidth:\s*\.infinity,\s*maxHeight:\s*\.infinity\)/);
   assert.match(root, /\.background\(StemacleDesign\.paper\.ignoresSafeArea\(\)\)/);
-  assert.match(root, /StemacleRootTabBar\(selection:\s*\$selectedTab\)/);
+  assert.match(root, /StemacleRootTabBar\(selection:\s*\$selectedTab,\s*showTopDivider:/);
   assert.match(root, /toolbar\(\.hidden,\s*for:\s*\.tabBar\)/);
   assert.match(root, /safeAreaInset\(edge:\s*\.bottom,\s*spacing:\s*0\)/);
   assert.match(root, /toolbarBackground\(\.visible,\s*for:\s*\.navigationBar,\s*\.tabBar\)/);
+  assert.doesNotMatch(root, /@ViewBuilder\s*\n\s*@ViewBuilder/);
 });
 
 test('ios stem player reserves bottom space so controls do not slide under the tab bar', () => {
@@ -314,7 +317,7 @@ test('ios utility tabs use compact native density instead of large zoomed panels
   const settings = swift('StemacleSettingsView.swift');
 
   assert.match(root, /navigationBarTitleDisplayMode\(\.inline\)/);
-  assert.match(shuffle, /private let utilityContentWidth: CGFloat = 560/);
+  assert.match(shuffle, /private let utilityContentWidth: CGFloat = 520/);
   assert.match(shuffle, /\.frame\(maxWidth:\s*utilityContentWidth\)/);
   assert.match(shuffle, /Text\(side\)\s*\.font\(\.headline\.weight\(\.black\)\)/);
   assert.doesNotMatch(shuffle, /\.largeTitle/);

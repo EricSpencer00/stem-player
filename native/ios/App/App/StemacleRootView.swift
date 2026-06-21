@@ -55,7 +55,6 @@ struct StemacleRootView: View {
     }
 
     @ViewBuilder
-    @ViewBuilder
     private func nativeNavigation<Content: View>(
         _ title: String,
         constrainedWidth: CGFloat? = nil,

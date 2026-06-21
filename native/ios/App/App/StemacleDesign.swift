@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private let backgroundArtworkLift: CGFloat = -60
+private let backgroundArtworkLift: CGFloat = -44
 
 enum StemacleDesign {
     static let paper = Color(red: 0.95, green: 0.91, blue: 0.82)
