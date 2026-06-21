@@ -305,11 +305,18 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
 test('cloudflare pages build publishes the complete Stemacle site', () => {
   const pkg = loadPackageJson();
   const wrangler = loadWranglerConfig();
+  const pagesWorkflow = loadPagesWorkflow();
 
   assert.equal(pkg.scripts['site:prepare'], 'node scripts/prepare-site.mjs');
   assert.match(wrangler, /^name = "stemacle"$/m);
   assert.match(wrangler, /^pages_build_output_dir = "dist\/site"$/m);
   assert.doesNotMatch(wrangler, /ericspencer\.us\/stem-player/);
+  assert.match(pagesWorkflow, /name:\s*Validate/);
+  assert.match(pagesWorkflow, /npm test/);
+  assert.match(pagesWorkflow, /npm run site:prepare/);
+  assert.match(pagesWorkflow, /npm run native:prepare/);
+  assert.doesNotMatch(pagesWorkflow, /configure-pages|upload-pages-artifact|deploy-pages/);
+  assert.doesNotMatch(pagesWorkflow, /pages:\s*write|id-token:\s*write|github-pages/);
 });
 
 test('site prepare preserves the perfect /app bundle and redirects only legacy stem-player paths', () => {
