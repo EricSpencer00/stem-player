@@ -84,9 +84,9 @@ jobs:
           name: stemacle-macos
           if-no-files-found: error
           path: |
-            release/Stemacle-*-arm64.dmg
-            release/Stemacle-*-arm64-mac.zip
-            release/Stemacle-*-SHA256SUMS.txt
+            release/Stemacle-[0-9]*-arm64.dmg
+            release/Stemacle-[0-9]*-arm64-mac.zip
+            release/Stemacle-[0-9]*-SHA256SUMS.txt
 
   publish:
     needs: build
@@ -110,7 +110,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: |
-            release-assets/Stemacle-*-arm64.dmg
-            release-assets/Stemacle-*-arm64-mac.zip
-            release-assets/Stemacle-*-SHA256SUMS.txt
+            release-assets/Stemacle-[0-9]*-arm64.dmg
+            release-assets/Stemacle-[0-9]*-arm64-mac.zip
+            release-assets/Stemacle-[0-9]*-SHA256SUMS.txt

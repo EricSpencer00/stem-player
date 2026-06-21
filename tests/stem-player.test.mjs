@@ -370,8 +370,9 @@ test('release workflow publishes comprehensive macOS desktop assets to GitHub Re
   assert.match(workflow, /Stemacle-\$\{version\}-arm64\.dmg/);
   assert.match(workflow, /Stemacle-\$\{version\}-arm64-mac\.zip/);
   assert.match(workflow, /Stemacle-\$\{version\}-SHA256SUMS\.txt/);
-  assert.match(workflow, /release-assets\/Stemacle-\*-arm64\.dmg/);
-  assert.match(workflow, /release-assets\/Stemacle-\*-arm64-mac\.zip/);
+  assert.match(workflow, /target_commitish:\s*\$\{\{\s*github\.sha\s*\}\}/);
+  assert.match(workflow, /release-assets\/Stemacle-\[0-9\]\*-arm64\.dmg/);
+  assert.match(workflow, /release-assets\/Stemacle-\[0-9\]\*-arm64-mac\.zip/);
   assert.doesNotMatch(workflow, /Stemacle-windows|Stemacle-linux|WIN_CSC_LINK/);
   assert.match(gitignore, /native\/macos\/\.build\//);
 });
