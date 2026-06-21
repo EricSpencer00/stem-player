@@ -62,10 +62,17 @@ function loadIosProject() {
   return readFileSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url), 'utf8');
 }
 
-test('landing page exposes current web, repo, and durable multi-platform release links without premature iOS claims', () => {
+test('landing page is a release-only shelf with durable public links', () => {
   const html = loadLandingHtml();
+  const main = html.match(/<main class="release-shelf"[\s\S]*?<\/main>/)?.[0] ?? '';
 
   assert.match(html, /<title>Stemacle<\/title>/);
+  assert.match(html, /<main class="release-shelf"/);
+  assert.match(html, /data-release="web"/);
+  assert.match(html, /data-release="mac-dmg"/);
+  assert.match(html, /data-release="mac-zip"/);
+  assert.match(html, /data-release="ios"/);
+  assert.match(html, /data-release="github"/);
   assert.match(html, /href="https:\/\/stemacle\.com\/app\/"/);
   assert.match(html, /EricSpencer00\/stem-player/);
   assert.match(html, /https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
@@ -73,10 +80,18 @@ test('landing page exposes current web, repo, and durable multi-platform release
   assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64\.dmg/);
   assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64-mac\.zip/);
   assert.match(html, /href="\/ios-coming-soon\/"/);
+  assert.match(main, /Stemacle/);
   assert.doesNotMatch(html, /stemacle-ios-project-0\.1\.0\.zip/);
   assert.doesNotMatch(html, /href=\"\/app\//);
   assert.doesNotMatch(html, /EricSpencer00\/stem-workstation/);
   assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
+  assert.doesNotMatch(html, /class="hero/);
+  assert.doesNotMatch(html, /class="dek"/);
+  assert.doesNotMatch(html, /class="body-copy"/);
+  assert.doesNotMatch(html, /class="route-strip"/);
+  assert.doesNotMatch(html, /class="desktop-grid"/);
+  assert.doesNotMatch(html, /class="terminal"/);
+  assert.doesNotMatch(html, /class="spec-list"/);
   assert.doesNotMatch(html, /desktop next/i);
   assert.doesNotMatch(html, /iOS tonight/i);
   assert.doesNotMatch(html, /soon on iOS/i);
@@ -98,23 +113,39 @@ test('web app keeps the Stemacle app icon visible in the product chrome', () => 
   assert.doesNotMatch(html, /class="brand-tentacle" src="assets\//);
 });
 
-test('landing page centers the Stemacle title and uses tentacle art with iOS coming soon routing', () => {
+test('landing page uses release artwork and responsive tile constraints without overlap-prone copy', () => {
   const html = loadLandingHtml();
   const mobileCss = html.slice(html.indexOf('@media (max-width: 560px)'));
+  const iconOnePosition = html.indexOf('release-icons/stemacle-release-icon-01.png');
+  const iconTwoPosition = html.indexOf('release-icons/stemacle-release-icon-02.png');
+  const iconThreePosition = html.indexOf('release-icons/stemacle-release-icon-03.png');
 
-  assert.match(html, /class="hero hero-centered"/);
-  assert.match(html, /class="hero-app-icon"/);
+  assert.match(html, /class="release-grid"/);
+  assert.match(html, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*220px\),\s*1fr\)\)/);
+  assert.match(html, /\.release-card \{[\s\S]*?min-width:\s*0;[\s\S]*?overflow:\s*hidden;[\s\S]*?\}/);
+  assert.match(html, /\.release-art \{[\s\S]*?aspect-ratio:\s*1;[\s\S]*?\}/);
+  assert.match(html, /\.release-card strong \{[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?\}/);
   assert.match(html, /src="\/assets\/stemacle-tentacle\.png"/);
-  assert.match(html, /tentacle-b-roll\/optimized\/tentacle-wide-sweep-web\.png/);
-  assert.match(html, /tentacle-b-roll\/optimized\/tentacle-bottom-border-web\.png/);
-  assert.match(html, /id="title">Stemacle<\/h1>/);
-  assert.match(html, /\.hero-centered \.object \{\s*order: 0;\s*\}/);
-  assert.match(mobileCss, /\.tentacle \{[\s\S]*?display: none;[\s\S]*?\}/);
-  assert.match(mobileCss, /\.tentacle-sweep \{[\s\S]*?top: 620px;[\s\S]*?opacity: 0\.24;[\s\S]*?\}/);
+  assert.match(html, /release-icons\/stemacle-release-icon-01\.png/);
+  assert.match(html, /release-icons\/stemacle-release-icon-02\.png/);
+  assert.match(html, /release-icons\/stemacle-release-icon-03\.png/);
+  assert.match(html, /release-icons\/stemacle-release-icon-05\.png/);
+  assert.match(html, /release-icons\/stemacle-release-icon-06\.png/);
+  assert.ok(iconOnePosition > -1 && iconThreePosition > iconOnePosition && iconTwoPosition > iconThreePosition);
+  assert.match(html, /data-release="ios"[\s\S]*?src="\/assets\/stemacle-tentacle\.png"/);
+  assert.doesNotMatch(html, /release-icons\/stemacle-release-icon-04\.png/);
+  assert.doesNotMatch(html, /release-icons\/stemacle-release-icons-contact-sheet\.png/);
+  assert.doesNotMatch(html, /release-strip\//);
+  assert.match(html, /id="title">STEMACLE<\/h1>/);
+  assert.match(mobileCss, /\.release-shell \{[\s\S]*?padding:\s*12px;[\s\S]*?\}/);
+  assert.match(mobileCss, /\.release-grid \{[\s\S]*?gap:\s*12px;[\s\S]*?\}/);
   assert.match(html, />get for ios<\/a>/i);
   assert.match(html, /href="\/ios-coming-soon\/"/);
   assert.doesNotMatch(html, /Current release signal/);
   assert.doesNotMatch(html, /actions validate it/i);
+  assert.doesNotMatch(html, /Split songs into stems/i);
+  assert.doesNotMatch(html, /Quiet power around/i);
+  assert.doesNotMatch(html, /Your music stays in the room/i);
 });
 
 test('ios coming soon page is a real branded destination, not a dead link', () => {
@@ -129,13 +160,17 @@ test('ios coming soon page is a real branded destination, not a dead link', () =
   assert.doesNotMatch(html, /TestFlight is the next surface/i);
 });
 
-test('landing page routes the primary download CTA by platform with a release-page fallback', () => {
+test('landing page keeps release labels terse and avoids platform-aware CTA scripting', () => {
   const html = loadLandingHtml();
 
-  assert.match(html, /class=\"cta primary\"/);
-  assert.match(html, /download mac app/);
+  assert.match(html, /<nav class="release-nav"/);
+  assert.match(html, />mac dmg<\/a>/);
+  assert.match(html, />mac zip<\/a>/);
   assert.match(html, /Latest GitHub release/);
   assert.match(html, /href=\"https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
+  assert.doesNotMatch(html, /class=\"cta primary\"/);
+  assert.doesNotMatch(html, /navigator\.platform|userAgent|matchMedia/);
+  assert.doesNotMatch(html, /download mac app/);
 });
 
 test('native shell keeps the Stemacle design and launches bundled apps', () => {
@@ -200,20 +235,42 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
   assert.match(project, /PRODUCT_BUNDLE_IDENTIFIER = com\.stemacle\.app;/);
 });
 
-test('macOS SwiftUI app wraps the canonical web instrument with native desktop polish', () => {
+test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper', () => {
   const swift = loadMacSwiftApp();
 
-  assert.match(swift, /StemacleDesktopWorkbench\(bridge: bridge\)/);
-  assert.match(swift, /struct StemacleDesktopWorkbench: View/);
-  assert.match(swift, /\.safeAreaInset\(edge: \.top, spacing: 0\)/);
-  assert.match(swift, /struct StemacleDesktopTitleBar: View/);
+  assert.match(swift, /StemacleMacShell\(bridge: bridge\)/);
+  assert.match(swift, /struct StemacleMacShell: View/);
+  assert.match(swift, /NavigationSplitView/);
+  assert.match(swift, /enum StemacleMacRoute: String, CaseIterable, Identifiable/);
+  assert.match(swift, /struct StemacleMacSidebar: View/);
+  assert.match(swift, /struct StemacleMacLibraryView: View/);
+  assert.match(swift, /struct StemacleMacQueueView: View/);
+  assert.match(swift, /struct StemacleMacReleaseView: View/);
+  assert.match(swift, /struct StemacleReleaseArtwork: View/);
+  assert.match(swift, /struct StemacleInstrumentPane: View/);
+  assert.match(swift, /ContentUnavailableView/);
+  assert.match(swift, /Table\(bridge\.tracks(?:,|\))/);
+  assert.match(swift, /ToolbarItemGroup/);
   assert.match(swift, /struct StemacleDesktopAppIcon: View/);
   assert.match(swift, /stemacle-tentacle\.png/);
-  assert.match(swift, /\.safeAreaInset\(edge: \.bottom\)/);
-  assert.match(swift, /struct StemacleDesktopStatusBar: View/);
   assert.match(swift, /@Published private\(set\) var desktopSummary = StemacleDesktopSummary/);
+  assert.match(swift, /@Published private\(set\) var tracks: \[StemacleTrack\]/);
+  assert.match(swift, /@Published private\(set\) var roots: \[StemacleRoot\]/);
+  assert.match(swift, /@Published private\(set\) var queue: \[StemacleJob\]/);
+  assert.match(swift, /@Published private\(set\) var releases: \[StemacleReleaseArtifact\]/);
+  assert.match(swift, /let artPath: String/);
+  assert.match(swift, /release\.artPath/);
+  assert.match(swift, /stemacle-release-icon-01\.png/);
+  assert.match(swift, /stemacle-release-icon-03\.png/);
+  assert.match(swift, /stemacle-release-icon-02\.png/);
+  assert.match(swift, /stemacle-release-icon-05\.png/);
+  assert.match(swift, /stemacle-release-icon-06\.png/);
+  assert.doesNotMatch(swift, /stemacle-release-icon-04\.png/);
+  assert.match(swift, /id: "repo"/);
   assert.match(swift, /struct StemacleDesktopSummary: Equatable/);
   assert.match(swift, /private func refreshDesktopSummary\(from state: \[String: Any\]\)/);
+  assert.match(swift, /func openSelectedTrackInInstrument\(/);
+  assert.match(swift, /func openRelease\(_ release: StemacleReleaseArtifact\)/);
   assert.match(swift, /Button\("Rescan Library"\)/);
   assert.match(swift, /Button\("Reveal Stemacle Data"\)/);
   assert.match(swift, /Button\("Reload Instrument"\)/);
@@ -226,6 +283,9 @@ test('macOS SwiftUI app wraps the canonical web instrument with native desktop p
   assert.match(swift, /createDirectory\(at: directory, withIntermediateDirectories: true\)/);
   assert.match(swift, /"storageReady": desktopSummary\.storageReady/);
   assert.match(swift, /"localFirst": true/);
+  assert.doesNotMatch(swift, /StemacleWebInstrument\(bridge: bridge\)\s*\n\s*\.ignoresSafeArea\(\)/);
+  assert.doesNotMatch(swift, /struct StemacleDesktopTitleBar: View/);
+  assert.doesNotMatch(swift, /struct StemacleDesktopStatusBar: View/);
 });
 
 test('cloudflare pages build publishes the complete Stemacle site', () => {

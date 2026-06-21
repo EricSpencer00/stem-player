@@ -4,16 +4,23 @@ import SwiftUI
 import UniformTypeIdentifiers
 import WebKit
 
+private let stemaclePaper = Color(red: 0.93, green: 0.89, blue: 0.80)
+private let stemacleRaised = Color(red: 0.97, green: 0.94, blue: 0.86)
+private let stemacleInk = Color(red: 0.15, green: 0.12, blue: 0.15)
+private let stemacleMuted = Color(red: 0.47, green: 0.41, blue: 0.38)
+private let stemaclePlum = Color(red: 0.34, green: 0.13, blue: 0.32)
+private let stemacleLine = Color(red: 0.72, green: 0.66, blue: 0.58).opacity(0.65)
+
 @main
 struct StemacleMacApp: App {
     @StateObject private var bridge = StemacleNativeBridge()
 
     var body: some Scene {
         WindowGroup("Stemacle") {
-            StemacleDesktopWorkbench(bridge: bridge)
-                .frame(minWidth: 1120, minHeight: 720)
+            StemacleMacShell(bridge: bridge)
+                .frame(minWidth: 1180, minHeight: 760)
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
         .commands {
             CommandMenu("Stemacle") {
                 Button("Command Palette") {
@@ -68,83 +75,381 @@ struct StemacleMacApp: App {
     }
 }
 
-struct StemacleDesktopWorkbench: View {
-    @ObservedObject var bridge: StemacleNativeBridge
+enum StemacleMacRoute: String, CaseIterable, Identifiable {
+    case library
+    case instrument
+    case queue
+    case releases
+    case settings
 
-    var body: some View {
-        StemacleWebInstrument(bridge: bridge)
-            .ignoresSafeArea()
-            .safeAreaInset(edge: .top, spacing: 0) {
-                StemacleDesktopTitleBar(
-                    summary: bridge.desktopSummary,
-                    openSplitter: {
-                        bridge.navigate(to: "stemacle://app/app/index.html")
-                    },
-                    openShuffle: {
-                        bridge.navigate(to: "stemacle://app/apps/stem-shuffle/index.html")
-                    },
-                    openPalette: {
-                        bridge.sendCommand("command-palette")
-                    }
-                )
-            }
-            .safeAreaInset(edge: .bottom) {
-                StemacleDesktopStatusBar(
-                    summary: bridge.desktopSummary,
-                    addFiles: bridge.chooseAudioFilesFromMenu,
-                    addFolder: bridge.chooseAudioFolderFromMenu,
-                    revealData: bridge.revealApplicationSupportFromMenu
-                )
-            }
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .library: return "Library"
+        case .instrument: return "Instrument"
+        case .queue: return "Queue"
+        case .releases: return "Releases"
+        case .settings: return "Settings"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .library: return "music.note.list"
+        case .instrument: return "waveform"
+        case .queue: return "list.bullet.rectangle"
+        case .releases: return "square.and.arrow.down"
+        case .settings: return "slider.horizontal.3"
+        }
     }
 }
 
-struct StemacleDesktopTitleBar: View {
-    let summary: StemacleDesktopSummary
-    let openSplitter: () -> Void
-    let openShuffle: () -> Void
-    let openPalette: () -> Void
+struct StemacleMacShell: View {
+    @ObservedObject var bridge: StemacleNativeBridge
+    @State private var selection: StemacleMacRoute? = .library
+    @State private var selectedTrackID: StemacleTrack.ID?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                StemacleDesktopAppIcon(size: 30)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Stemacle")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color(red: 0.15, green: 0.12, blue: 0.15))
-                    Text(summary.storageReady ? "Local-first desktop workbench" : "Preparing local storage")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Color(red: 0.46, green: 0.41, blue: 0.39))
-                }
-
-                Spacer(minLength: 16)
-
-                Button(action: openSplitter) {
-                    Label("Splitter", systemImage: "waveform")
-                }
-                .help("Open Stem Splitter")
-
-                Button(action: openShuffle) {
-                    Label("Shuffle", systemImage: "shuffle")
-                }
-                .help("Open Stem Shuffle")
-
-                Button(action: openPalette) {
-                    Label("Palette", systemImage: "command")
-                }
-                .help("Open command palette")
+        NavigationSplitView {
+            StemacleMacSidebar(selection: $selection, summary: bridge.desktopSummary)
+        } detail: {
+            switch selection ?? .library {
+            case .library:
+                StemacleMacLibraryView(
+                    bridge: bridge,
+                    selectedTrackID: $selectedTrackID,
+                    openSelectedTrack: {
+                        guard let selectedTrackID else { return }
+                        selection = .instrument
+                        bridge.openSelectedTrackInInstrument(selectedTrackID)
+                    }
+                )
+            case .instrument:
+                StemacleInstrumentPane(bridge: bridge)
+            case .queue:
+                StemacleMacQueueView(bridge: bridge)
+            case .releases:
+                StemacleMacReleaseView(bridge: bridge)
+            case .settings:
+                StemacleMacSettingsView(bridge: bridge)
             }
-            .buttonStyle(.plain)
-            .labelStyle(.titleAndIcon)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Color(red: 0.94, green: 0.90, blue: 0.80).opacity(0.96))
-
-            Divider()
-                .overlay(Color(red: 0.72, green: 0.66, blue: 0.56).opacity(0.62))
         }
+        .background(stemaclePaper)
+        .toolbar {
+            ToolbarItemGroup {
+                Button {
+                    bridge.chooseAudioFilesFromMenu()
+                    selection = .library
+                } label: {
+                    Label("Add Audio", systemImage: "waveform.badge.plus")
+                }
+
+                Button {
+                    bridge.chooseAudioFolderFromMenu()
+                    selection = .library
+                } label: {
+                    Label("Add Folder", systemImage: "folder.badge.plus")
+                }
+
+                Button {
+                    selection = .instrument
+                    bridge.navigate(to: "stemacle://app/app/index.html")
+                } label: {
+                    Label("Open Splitter", systemImage: "waveform")
+                }
+            }
+        }
+    }
+}
+
+struct StemacleMacSidebar: View {
+    @Binding var selection: StemacleMacRoute?
+    let summary: StemacleDesktopSummary
+
+    var body: some View {
+        List(StemacleMacRoute.allCases, selection: $selection) { route in
+            Label(route.title, systemImage: route.systemImage)
+                .tag(route as StemacleMacRoute?)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                StemacleDesktopAppIcon(size: 42)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Stemacle")
+                        .font(.system(size: 24, weight: .heavy))
+                        .foregroundStyle(stemaclePlum)
+                    Text(summary.storageReady ? "local library ready" : "preparing storage")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(stemacleMuted)
+                }
+                Text(summary.countText)
+                    .font(.caption2)
+                    .foregroundStyle(stemacleMuted)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+        }
+        .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
+        .scrollContentBackground(.hidden)
+        .background(stemaclePaper)
+    }
+}
+
+struct StemacleMacLibraryView: View {
+    @ObservedObject var bridge: StemacleNativeBridge
+    @Binding var selectedTrackID: StemacleTrack.ID?
+    let openSelectedTrack: () -> Void
+
+    var body: some View {
+        StemacleMacPage(title: "Library", eyebrow: bridge.desktopSummary.statusText) {
+            VStack(spacing: 16) {
+                HStack(spacing: 10) {
+                    Button {
+                        bridge.chooseAudioFilesFromMenu()
+                    } label: {
+                        Label("Audio", systemImage: "waveform.badge.plus")
+                    }
+
+                    Button {
+                        bridge.chooseAudioFolderFromMenu()
+                    } label: {
+                        Label("Folder", systemImage: "folder.badge.plus")
+                    }
+
+                    Button("Open") {
+                        openSelectedTrack()
+                    }
+                    .disabled(selectedTrackID == nil)
+
+                    Spacer()
+
+                    Button {
+                        bridge.rescanLibraryFromMenu()
+                    } label: {
+                        Label("Rescan", systemImage: "arrow.clockwise")
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                ZStack {
+                    Table(bridge.tracks, selection: $selectedTrackID) {
+                        TableColumn("Track") { track in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(track.name)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(stemacleInk)
+                                Text(track.url.deletingLastPathComponent().path)
+                                    .font(.caption)
+                                    .foregroundStyle(stemacleMuted)
+                                    .lineLimit(1)
+                            }
+                        }
+                        TableColumn("Kind") { track in
+                            Text(track.sourceKindLabel)
+                                .foregroundStyle(stemacleMuted)
+                        }
+                        .width(72)
+                        TableColumn("Added") { track in
+                            Text(track.addedAt, style: .relative)
+                                .foregroundStyle(stemacleMuted)
+                        }
+                        .width(90)
+                    }
+
+                    if bridge.tracks.isEmpty {
+                        ContentUnavailableView(
+                            "Drop audio into Stemacle",
+                            systemImage: "waveform.badge.plus",
+                            description: Text("Add files or folders to index a local library.")
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct StemacleInstrumentPane: View {
+    @ObservedObject var bridge: StemacleNativeBridge
+    @State private var mode = StemacleInstrumentMode.splitter
+
+    var body: some View {
+        StemacleMacPage(title: "Instrument", eyebrow: mode.label) {
+            VStack(spacing: 14) {
+                Picker("Instrument", selection: $mode) {
+                    ForEach(StemacleInstrumentMode.allCases) { mode in
+                        Label(mode.label, systemImage: mode.systemImage)
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: mode) { _, newMode in
+                    bridge.navigate(to: newMode.urlString)
+                }
+
+                StemacleWebInstrument(bridge: bridge, initialURLString: mode.urlString)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            }
+        }
+    }
+}
+
+enum StemacleInstrumentMode: String, CaseIterable, Identifiable {
+    case splitter
+    case shuffle
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .splitter: return "Stem Splitter"
+        case .shuffle: return "Stem Shuffle"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .splitter: return "waveform"
+        case .shuffle: return "shuffle"
+        }
+    }
+
+    var urlString: String {
+        switch self {
+        case .splitter: return "stemacle://app/app/index.html"
+        case .shuffle: return "stemacle://app/apps/stem-shuffle/index.html"
+        }
+    }
+}
+
+struct StemacleMacQueueView: View {
+    @ObservedObject var bridge: StemacleNativeBridge
+
+    var body: some View {
+        StemacleMacPage(title: "Queue", eyebrow: "\(bridge.queue.count) jobs") {
+            List(bridge.queue) { job in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(job.kind.capitalized)
+                            .font(.body.weight(.semibold))
+                        Spacer()
+                        Text(job.status)
+                            .foregroundStyle(job.status == "failed" ? Color.orange : stemacleMuted)
+                    }
+                    Text(job.message.isEmpty ? job.createdAt : job.message)
+                        .font(.caption)
+                        .foregroundStyle(stemacleMuted)
+                }
+                .padding(.vertical, 6)
+            }
+            .overlay {
+                if bridge.queue.isEmpty {
+                    ContentUnavailableView(
+                        "No jobs",
+                        systemImage: "list.bullet.rectangle",
+                        description: Text("Analysis, downloads, and exports appear here.")
+                    )
+                }
+            }
+            .scrollContentBackground(.hidden)
+        }
+    }
+}
+
+struct StemacleMacReleaseView: View {
+    @ObservedObject var bridge: StemacleNativeBridge
+
+    var body: some View {
+        StemacleMacPage(title: "Releases", eyebrow: "public artifacts") {
+            List(bridge.releases) { release in
+                HStack(spacing: 16) {
+                    StemacleReleaseArtwork(release: release)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(release.title)
+                            .font(.body.weight(.semibold))
+                        Text(release.detail)
+                            .font(.caption)
+                            .foregroundStyle(stemacleMuted)
+                    }
+                    Spacer()
+                    Button(release.actionTitle) {
+                        bridge.openRelease(release)
+                    }
+                }
+                .padding(.vertical, 7)
+            }
+            .scrollContentBackground(.hidden)
+        }
+    }
+}
+
+struct StemacleMacSettingsView: View {
+    @ObservedObject var bridge: StemacleNativeBridge
+
+    var body: some View {
+        StemacleMacPage(title: "Settings", eyebrow: "local storage") {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 18) {
+                GridRow {
+                    Text("Data")
+                        .foregroundStyle(stemacleMuted)
+                    Text(bridge.desktopSummary.dataRoot)
+                        .textSelection(.enabled)
+                }
+                GridRow {
+                    Text("Mode")
+                        .foregroundStyle(stemacleMuted)
+                    Text("Local-first")
+                }
+                GridRow {
+                    Text("Storage")
+                        .foregroundStyle(stemacleMuted)
+                    Text(bridge.desktopSummary.storageReady ? "Ready" : "Preparing")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack {
+                Button("Reveal Stemacle Data") {
+                    bridge.revealApplicationSupportFromMenu()
+                }
+                Button("Clear Desktop State", role: .destructive) {
+                    bridge.clearDesktopStateFromMenu()
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+}
+
+struct StemacleMacPage<Content: View>: View {
+    let title: String
+    let eyebrow: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(eyebrow.uppercased())
+                    .font(.caption.weight(.bold))
+                    .tracking(2.2)
+                    .foregroundStyle(stemacleMuted)
+                Text(title)
+                    .font(.system(size: 46, weight: .heavy))
+                    .foregroundStyle(stemacleInk)
+            }
+
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(stemacleRaised)
     }
 }
 
@@ -173,54 +478,37 @@ struct StemacleDesktopAppIcon: View {
     }
 }
 
-struct StemacleDesktopStatusBar: View {
-    let summary: StemacleDesktopSummary
-    let addFiles: () -> Void
-    let addFolder: () -> Void
-    let revealData: () -> Void
+struct StemacleReleaseArtwork: View {
+    let release: StemacleReleaseArtifact
+    var size: CGFloat = 54
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            HStack(spacing: 14) {
-                Label(summary.statusText, systemImage: summary.storageReady ? "internaldrive.fill" : "exclamationmark.triangle.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(summary.storageReady ? Color.primary : Color.orange)
-
-                Text(summary.countText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 16)
-
-                Button(action: addFiles) {
-                    Label("Audio", systemImage: "waveform.badge.plus")
-                }
-                .help("Add local audio files")
-
-                Button(action: addFolder) {
-                    Label("Folder", systemImage: "folder.badge.plus")
-                }
-                .help("Add a local music folder")
-
-                Button(action: revealData) {
-                    Label("Data", systemImage: "folder")
-                }
-                .help(summary.dataRoot)
+        ZStack {
+            if let image = NSImage(contentsOf: StemaclePaths.webRoot().appendingPathComponent(release.artPath)) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: release.systemImage)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(stemaclePlum)
             }
-            .buttonStyle(.borderless)
-            .labelStyle(.titleAndIcon)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(Color(red: 0.94, green: 0.90, blue: 0.80).opacity(0.96))
         }
+        .frame(width: size, height: size)
+        .background(stemaclePaper)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(stemacleLine, lineWidth: 1)
+        )
+        .shadow(color: Color(red: 0.22, green: 0.17, blue: 0.12).opacity(0.12), radius: 8, y: 3)
+        .accessibilityHidden(true)
     }
 }
 
 struct StemacleWebInstrument: NSViewRepresentable {
     @ObservedObject var bridge: StemacleNativeBridge
+    var initialURLString = "stemacle://app/app/index.html"
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -250,7 +538,7 @@ struct StemacleWebInstrument: NSViewRepresentable {
         webView.allowsBackForwardNavigationGestures = true
         webView.setValue(false, forKey: "drawsBackground")
         bridge.attach(webView)
-        webView.load(URLRequest(url: URL(string: "stemacle://app/")!))
+        webView.load(URLRequest(url: URL(string: initialURLString)!))
         return webView
     }
 
@@ -456,13 +744,14 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
     """
 
     @Published private(set) var desktopSummary = StemacleDesktopSummary()
+    @Published private(set) var tracks: [StemacleTrack] = []
+    @Published private(set) var roots: [StemacleRoot] = []
+    @Published private(set) var queue: [StemacleJob] = []
+    @Published private(set) var sessions: [[String: Any]] = []
+    @Published private(set) var exports: [[String: Any]] = []
+    @Published private(set) var releases: [StemacleReleaseArtifact] = StemacleReleaseArtifact.all
 
     private weak var webView: WKWebView?
-    private var tracks: [StemacleTrack] = []
-    private var roots: [StemacleRoot] = []
-    private var queue: [[String: Any]] = []
-    private var sessions: [[String: Any]] = []
-    private var exports: [[String: Any]] = []
     private let createdAt = ISO8601DateFormatter().string(from: Date())
     private let fileManager = FileManager.default
     private let appSupportRoot: URL
@@ -481,6 +770,15 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
     func navigate(to urlString: String) {
         guard let url = URL(string: urlString) else { return }
         webView?.load(URLRequest(url: url))
+    }
+
+    func openSelectedTrackInInstrument(_ trackId: String) {
+        evaluate("localStorage.setItem('stemacle:pendingTrackId', \(jsonString(trackId)))")
+        navigate(to: "stemacle://app/app/index.html")
+    }
+
+    func openRelease(_ release: StemacleReleaseArtifact) {
+        NSWorkspace.shared.open(release.url)
     }
 
     func sendCommand(_ command: String) {
@@ -632,27 +930,27 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
     private func enqueueAnalysis(trackId: String, options: [String: Any]) -> [String: Any] {
         let quality = options["quality"] as? String ?? "fast-preview"
         var job = jobRecord(kind: "analysis", trackId: trackId)
-        job["quality"] = quality
-        job["status"] = "completed"
-        job["progress"] = 1
-        job["message"] = quality == "fast-preview"
+        job.quality = quality
+        job.status = "completed"
+        job.progress = 1
+        job.message = quality == "fast-preview"
             ? "Preview analysis is ready in the bundled splitter."
             : "High quality native analysis is queued for the desktop worker path."
         queue.insert(job, at: 0)
         emitState()
-        return job
+        return job.dictionary()
     }
 
     private func enqueueDownload(url: String) -> [String: Any] {
         var job = jobRecord(kind: "download", trackId: nil)
-        job["url"] = url
-        job["status"] = "failed"
-        job["progress"] = 1
-        job["message"] = "URL downloads need yt-dlp outside the App Store sandbox."
-        job["error"] = "Install the Windows/Linux workbench or use a local audio file on macOS."
+        job.url = url
+        job.status = "failed"
+        job.progress = 1
+        job.message = "URL downloads need yt-dlp outside the App Store sandbox."
+        job.error = "Install the Windows/Linux workbench or use a local audio file on macOS."
         queue.insert(job, at: 0)
         emitState()
-        return job
+        return job.dictionary()
     }
 
     private func saveSession(_ session: [String: Any]) -> [String: Any] {
@@ -711,7 +1009,7 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
             "updatedAt": updatedAt,
             "library": tracks,
             "libraryRoots": roots,
-            "queue": queue,
+            "queue": queue.map { $0.dictionary() },
             "sessions": sessions,
             "exports": exports,
             "paths": ["dataRoot": appRoot.path],
@@ -727,7 +1025,7 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
             "storageReady": desktopSummary.storageReady,
             "library": tracks.map { $0.dictionary(paths: cachePaths(for: $0)) },
             "libraryRoots": roots.map { $0.dictionary(trackCount: tracks(in: $0).count) },
-            "queue": queue,
+            "queue": queue.map { $0.dictionary() },
             "sessions": sessions,
             "exports": exports,
             "recentProjects": sessions,
@@ -780,22 +1078,19 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
         webView?.evaluateJavaScript("window.\(source);", completionHandler: nil)
     }
 
-    private func jobRecord(kind: String, trackId: String?) -> [String: Any] {
-        var record: [String: Any] = [
-            "id": "\(kind)-\(Int(Date().timeIntervalSince1970 * 1000))",
-            "kind": kind,
-            "status": "queued",
-            "progress": 0,
-            "message": "",
-            "createdAt": timestamp(),
-            "startedAt": timestamp(),
-            "finishedAt": timestamp()
-        ]
-        if let trackId {
-            record["trackId"] = trackId
-            record["trackName"] = tracks.first(where: { $0.id == trackId })?.name ?? trackId
-        }
-        return record
+    private func jobRecord(kind: String, trackId: String?) -> StemacleJob {
+        StemacleJob(
+            id: "\(kind)-\(Int(Date().timeIntervalSince1970 * 1000))",
+            kind: kind,
+            status: "queued",
+            progress: 0,
+            message: "",
+            createdAt: timestamp(),
+            startedAt: timestamp(),
+            finishedAt: timestamp(),
+            trackId: trackId,
+            trackName: trackId.flatMap { id in tracks.first(where: { $0.id == id })?.name ?? id }
+        )
     }
 
     private func audioFiles(in folder: URL) -> [URL] {
@@ -949,12 +1244,125 @@ struct StemacleDesktopSummary: Equatable {
     }
 }
 
-struct StemacleTrack: Equatable {
+struct StemacleJob: Identifiable, Equatable {
+    let id: String
+    let kind: String
+    var status: String
+    var progress: Double
+    var message: String
+    let createdAt: String
+    let startedAt: String
+    let finishedAt: String
+    var trackId: String?
+    var trackName: String?
+    var quality: String?
+    var url: String?
+    var error: String?
+
+    func dictionary() -> [String: Any] {
+        var value: [String: Any] = [
+            "id": id,
+            "kind": kind,
+            "status": status,
+            "progress": progress,
+            "message": message,
+            "createdAt": createdAt,
+            "startedAt": startedAt,
+            "finishedAt": finishedAt
+        ]
+        if let trackId {
+            value["trackId"] = trackId
+        }
+        if let trackName {
+            value["trackName"] = trackName
+        }
+        if let quality {
+            value["quality"] = quality
+        }
+        if let url {
+            value["url"] = url
+        }
+        if let error {
+            value["error"] = error
+        }
+        return value
+    }
+}
+
+struct StemacleReleaseArtifact: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let detail: String
+    let actionTitle: String
+    let systemImage: String
+    let artPath: String
+    let url: URL
+
+    static let all: [StemacleReleaseArtifact] = [
+        StemacleReleaseArtifact(
+            id: "web",
+            title: "Open web app",
+            detail: "Browser instrument on stemacle.com/app.",
+            actionTitle: "Open",
+            systemImage: "safari",
+            artPath: "assets/release-icons/stemacle-release-icon-01.png",
+            url: URL(string: "https://stemacle.com/app/")!
+        ),
+        StemacleReleaseArtifact(
+            id: "mac-dmg",
+            title: "Stemacle DMG",
+            detail: "Apple Silicon installer image for v0.1.0.",
+            actionTitle: "Download",
+            systemImage: "opticaldiscdrive",
+            artPath: "assets/release-icons/stemacle-release-icon-03.png",
+            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg")!
+        ),
+        StemacleReleaseArtifact(
+            id: "mac-zip",
+            title: "App zip",
+            detail: "Portable Apple Silicon app bundle for v0.1.0.",
+            actionTitle: "Download",
+            systemImage: "archivebox",
+            artPath: "assets/release-icons/stemacle-release-icon-02.png",
+            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64-mac.zip")!
+        ),
+        StemacleReleaseArtifact(
+            id: "ios",
+            title: "Get for iOS",
+            detail: "Native iPhone release page.",
+            actionTitle: "Open",
+            systemImage: "iphone",
+            artPath: "assets/stemacle-tentacle.png",
+            url: URL(string: "https://stemacle.com/ios-coming-soon/")!
+        ),
+        StemacleReleaseArtifact(
+            id: "github",
+            title: "Latest GitHub release",
+            detail: "Release notes and current public assets.",
+            actionTitle: "Open",
+            systemImage: "shippingbox",
+            artPath: "assets/release-icons/stemacle-release-icon-05.png",
+            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/latest")!
+        ),
+        StemacleReleaseArtifact(
+            id: "repo",
+            title: "Source repo",
+            detail: "Public source and build files.",
+            actionTitle: "Open",
+            systemImage: "chevron.left.forwardslash.chevron.right",
+            artPath: "assets/release-icons/stemacle-release-icon-06.png",
+            url: URL(string: "https://github.com/EricSpencer00/stem-player")!
+        )
+    ]
+}
+
+struct StemacleTrack: Identifiable, Equatable {
     let url: URL
     let addedAt = Date()
 
     var id: String { url.standardizedFileURL.path }
     var name: String { url.lastPathComponent }
+    var sourceKindLabel: String { "local" }
 
     func dictionary(paths: [String: Any]) -> [String: Any] {
         let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
@@ -991,13 +1399,15 @@ struct StemacleTrack: Equatable {
     }
 }
 
-struct StemacleRoot {
+struct StemacleRoot: Identifiable, Equatable {
     let url: URL
     let addedAt = Date()
 
+    var id: String { url.standardizedFileURL.path }
+
     func dictionary(trackCount: Int) -> [String: Any] {
         [
-            "id": url.standardizedFileURL.path,
+            "id": id,
             "path": url.path,
             "addedAt": ISO8601DateFormatter().string(from: addedAt),
             "lastIndexedAt": ISO8601DateFormatter().string(from: Date()),
