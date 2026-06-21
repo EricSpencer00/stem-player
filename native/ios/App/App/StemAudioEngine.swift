@@ -21,6 +21,7 @@ final class StemAudioEngine {
         stop()
         buffers = result.buffers
         duration = result.duration
+        configurePlayerFormats()
         try startEngineIfNeeded()
     }
 
@@ -121,9 +122,24 @@ final class StemAudioEngine {
             mixers[stem] = mixer
             engine.attach(player)
             engine.attach(mixer)
-            engine.connect(player, to: mixer, format: nil)
             engine.connect(mixer, to: engine.mainMixerNode, format: nil)
             mixer.outputVolume = 0.8
+        }
+    }
+
+    private func configurePlayerFormats() {
+        if engine.isRunning {
+            engine.stop()
+        }
+
+        for stem in Stem.allCases {
+            guard let player = players[stem],
+                  let mixer = mixers[stem],
+                  let buffer = buffers[stem] else {
+                continue
+            }
+            engine.disconnectNodeOutput(player)
+            engine.connect(player, to: mixer, format: buffer.format)
         }
     }
 

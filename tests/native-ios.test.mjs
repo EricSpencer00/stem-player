@@ -82,6 +82,15 @@ test('native stem player exposes the original web player controls with iOS eleme
   assert.match(audioEngine, /updateMix/);
 });
 
+test('native audio engine binds each player output to the loaded stem buffer format before scheduling', () => {
+  const audioEngine = swift('StemAudioEngine.swift');
+
+  assert.doesNotMatch(audioEngine, /engine\.connect\(player,\s*to:\s*mixer,\s*format:\s*nil\)/);
+  assert.match(audioEngine, /configurePlayerFormats\(\)/);
+  assert.match(audioEngine, /engine\.disconnectNodeOutput\(player\)/);
+  assert.match(audioEngine, /engine\.connect\(player,\s*to:\s*mixer,\s*format:\s*buffer\.format\)/);
+});
+
 test('native stem player mirrors the web UI elements one to one', () => {
   const player = swift('StemPlayerView.swift');
   const viewModel = swift('StemPlayerViewModel.swift');
