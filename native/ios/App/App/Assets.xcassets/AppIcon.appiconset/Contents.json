@@ -1,9 +1,94 @@
 {
   "images" : [
     {
-      "filename" : "stemacle-tentacle-1024.png",
-      "idiom" : "universal",
+      "filename" : "stemacle-tentacle-20x20.png",
+      "idiom" : "iphone",
       "platform" : "ios",
+      "scale" : "1x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "stemacle-tentacle-40x40.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "stemacle-tentacle-60x60.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "3x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "stemacle-tentacle-40x40.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "stemacle-tentacle-60x60.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "3x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "stemacle-tentacle-80x80.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "stemacle-tentacle-120x120.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "3x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "stemacle-tentacle-120x120.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "stemacle-tentacle-180x180.png",
+      "idiom" : "iphone",
+      "platform" : "ios",
+      "scale" : "3x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "stemacle-tentacle-76x76.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "1x",
+      "size" : "76x76"
+    },
+    {
+      "filename" : "stemacle-tentacle-152x152.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "76x76"
+    },
+    {
+      "filename" : "stemacle-tentacle-167x167.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "83.5x83.5"
+    },
+    {
+      "filename" : "stemacle-tentacle-1024.png",
+      "idiom" : "ios-marketing",
+      "platform" : "ios",
+      "scale" : "1x",
       "size" : "1024x1024"
     }
   ],

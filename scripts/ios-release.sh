@@ -26,7 +26,7 @@ fi
 MODE="$1"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/native/ios/App/App.xcodeproj"
-SCHEME="App"
+SCHEME="Stemacle"
 ARCHIVE_PATH="${IOS_ARCHIVE_PATH:-$ROOT_DIR/release/ios/Stemacle.xcarchive}"
 EXPORT_PATH="${IOS_EXPORT_PATH:-$ROOT_DIR/release/ios/testflight-export}"
 EXPORT_OPTIONS_PLIST="${IOS_EXPORT_OPTIONS_PLIST:-$ROOT_DIR/native/ios/testflight-export-options.plist}"
