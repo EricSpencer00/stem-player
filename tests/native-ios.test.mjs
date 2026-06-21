@@ -330,6 +330,7 @@ test('ios native surfaces use Stemacle assets and document the new direction', (
   const design = swift('StemacleDesign.swift');
   const settings = swift('StemacleSettingsView.swift');
   const doc = readRepo('docs/STEMACLE_SURFACES.md');
+  const prepareNative = readRepo('scripts/prepare-native.mjs');
 
   assert.match(design, /enum StemacleAsset/);
   assert.match(design, /case bottomBorder/);
@@ -354,6 +355,7 @@ test('ios native surfaces use Stemacle assets and document the new direction', (
   assert.match(doc, /background texture/i);
   assert.match(doc, /Stem Shuffle remains separate/i);
   assert.doesNotMatch(doc, /iOS app uses the Capacitor bundle/i);
-  assert.ok(existsSync(new URL('native/ios/App/App/public/assets/tentacle-b-roll/graphics/tentacle-bottom-border.png', repoRoot)));
-  assert.ok(existsSync(new URL('native/ios/App/App/public/assets/tentacle-b-roll/graphics/suction-cup-pattern-bg.png', repoRoot)));
+  assert.match(prepareNative, /await copyIntoBundle\('assets'\)/);
+  assert.ok(existsSync(new URL('assets/tentacle-b-roll/graphics/tentacle-bottom-border.png', repoRoot)));
+  assert.ok(existsSync(new URL('assets/tentacle-b-roll/graphics/suction-cup-pattern-bg.png', repoRoot)));
 });

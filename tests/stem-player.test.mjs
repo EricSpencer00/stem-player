@@ -46,6 +46,10 @@ function loadReleaseWorkflow() {
   return readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 }
 
+function loadPagesWorkflow() {
+  return readFileSync(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8');
+}
+
 function loadGitignore() {
   return readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
 }
@@ -339,10 +343,15 @@ test('404 fallback redirects legacy paths without looping stemacle app routes', 
 test('release workflow publishes comprehensive macOS desktop assets to GitHub Releases', () => {
   const pkg = loadPackageJson();
   const workflow = loadReleaseWorkflow();
+  const pagesWorkflow = loadPagesWorkflow();
   const packageScript = loadPackageMacosScript();
   const gitignore = loadGitignore();
 
   assert.equal(pkg.version, '0.2.0');
+  assert.doesNotMatch(workflow, /node-version:\s*20/);
+  assert.match(workflow, /node-version:\s*24/);
+  assert.doesNotMatch(pagesWorkflow, /node-version:\s*20/);
+  assert.match(pagesWorkflow, /node-version:\s*24/);
   assert.equal(pkg.build.productName, 'Stemacle Web Workbench');
   assert.match(packageScript, /packageJson\.version/);
   assert.match(packageScript, /CFBundleShortVersionString[\s\S]*\$\{version\}/);
