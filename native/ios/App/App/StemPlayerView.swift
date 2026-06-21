@@ -887,3 +887,22 @@ struct DocumentPicker: UIViewControllerRepresentable {
         }
     }
 }
+
+#Preview("Splitter screen QA") {
+    Group {
+        if #available(iOS 16.0, *) {
+            NavigationStack {
+                StemPlayerView(viewModel: StemPlayerViewModel())
+                    .navigationTitle("Stem Splitter")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        } else {
+            NavigationView {
+                StemPlayerView(viewModel: StemPlayerViewModel())
+                    .navigationTitle("Stem Splitter")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .navigationViewStyle(.stack)
+        }
+    }
+}

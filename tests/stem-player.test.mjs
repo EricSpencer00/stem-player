@@ -1628,3 +1628,57 @@ test('reset all tracks clears mutes, headphones, and restores default volume', (
   }
   assert.equal(app.state.headphonesStem, null);
 });
+
+test('hasMutedTracks detects individual stem muting independently of headphones and global mute', () => {
+  const { app } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.startPlayback(0);
+
+  assert.equal(typeof app.hasMutedTracks, 'function');
+  assert.equal(app.hasMutedTracks(), false);
+
+  app.setMute('drums', true);
+  assert.equal(app.hasMutedTracks(), true);
+
+  // Unmuting should return to a clean state
+  app.setMute('drums', false);
+  assert.equal(app.hasMutedTracks(), false);
+
+  // Headphones mode routes audio but should not register as a muted track
+  app.setHeadphones('vocals', true);
+  assert.equal(app.hasMutedTracks(), false);
+});
+
+test('clearAllLoops after a linked all-stem loop resets the all pseudo-state and every stem', () => {
+  const { app, document } = loadApp();
+  const audioCtx = new FakeAudioContext();
+  preparePlayback(app, audioCtx);
+  app.state.bpm = 120;
+  app.startPlayback(0);
+  audioCtx.currentTime = 3.1;
+
+  app.setLoop('all', 1);
+  assert.equal(app.state.loopDot.all, 1);
+  for (const stem of STEMS) assert.equal(app.state.loopDot[stem], 1);
+
+  app.clearAllLoops();
+
+  // The 'all' pseudo-state and every individual stem must be cleared
+  assert.equal(app.state.loopDot.all, -1);
+  for (const stem of STEMS) {
+    assert.equal(app.state.loopDot[stem], -1);
+    assert.equal(app.sources[stem].loop, false);
+  }
+  assert.deepEqual(document.loopButtons.all.map((btn) => btn.classList.contains('on')), [false, false, false, false]);
+});
+
+test('web app keeps default stem volume at 0.8 so tracks are audible on first load', () => {
+  const { app } = loadApp();
+
+  for (const stem of STEMS) {
+    assert.equal(app.state.volume[stem], 0.8, `expected default volume 0.8 for ${stem}`);
+  }
+  // The global-mute default must be off so first play is audible
+  assert.equal(app.state.globalMuted ?? false, false);
+});

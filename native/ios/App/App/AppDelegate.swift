@@ -10,6 +10,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         configureSystemBarAppearance()
+        // Keep in sync with StemacleDesign.paper
         let paper = UIColor(red: 0.95, green: 0.91, blue: 0.82, alpha: 1)
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.backgroundColor = paper
@@ -34,6 +35,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         navigation.backgroundColor = paper
         navigation.shadowColor = track
         navigation.titleTextAttributes = [.foregroundColor: ink]
+        navigation.largeTitleTextAttributes = [.foregroundColor: ink]
+        UINavigationBar.appearance().tintColor = purple
         UINavigationBar.appearance().standardAppearance = navigation
         UINavigationBar.appearance().compactAppearance = navigation
         UINavigationBar.appearance().scrollEdgeAppearance = navigation
@@ -58,5 +61,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         UITabBar.appearance().backgroundColor = paper
         UITabBar.appearance().standardAppearance = tabs
         UITabBar.appearance().scrollEdgeAppearance = tabs
+        UITabBar.appearance().tintColor = purple
+        UITabBar.appearance().unselectedItemTintColor = muted
     }
 }
+

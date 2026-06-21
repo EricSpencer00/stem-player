@@ -152,7 +152,8 @@ struct StemacleScreen<Content: View>: View {
 
 struct StemacleBackground: View {
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
+            // Base paper gradient
             LinearGradient(
                 colors: [StemacleDesign.paper, StemacleDesign.pageTwo],
                 startPoint: .top,
@@ -160,12 +161,24 @@ struct StemacleBackground: View {
             )
             .ignoresSafeArea()
 
+            // Subtle suction-cup texture
             StemacleAssetImage(asset: .background)
                 .scaledToFill()
                 .opacity(0.105)
                 .blendMode(.multiply)
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
+
+            // Top fade to keep it above the navigator and unify the beige at the status/navigation bar seam
+            LinearGradient(
+                colors: [StemacleDesign.paper, StemacleDesign.paper.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 96)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+            .zIndex(1)
         }
     }
 }
@@ -297,5 +310,22 @@ struct WaveformBars: View {
                     .offset(x: min(width - 2, max(0, width * cursor)))
             }
         }
+    }
+}
+
+#Preview("Background with top fade under navigation") {
+    NavigationView {
+        VStack(spacing: 12) {
+            Text("Background QA")
+                .font(.headline)
+            Text("Verify beige gradient, texture, and top fade.")
+                .font(.caption)
+                .foregroundStyle(StemacleDesign.mutedInk)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background { StemacleBackground() }
+        .navigationTitle("Visual QA")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

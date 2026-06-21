@@ -397,3 +397,42 @@ test('product surface document explains web, desktop, and ios differences', () =
   assert.match(doc, /same tactile splitter/i);
   assert.doesNotMatch(doc, /TBD|TODO/);
 });
+
+test('desktop model quality catalog declares all four tiers with correct stem counts', async () => {
+  const desktop = await importDesktopModule();
+
+  const catalog = desktop.MODEL_QUALITY_CATALOG;
+  assert.ok(Array.isArray(catalog), 'expected MODEL_QUALITY_CATALOG to be an array');
+
+  const byId = Object.fromEntries(catalog.map((m) => [m.id, m]));
+  // fast-preview: on-device ONNX, 4 stems
+  assert.ok(byId['fast-preview'], 'expected fast-preview tier in catalog');
+  assert.equal(byId['fast-preview'].stems, 4);
+  // demucs-4stem: baseline HQ offline split
+  assert.ok(byId['demucs-4stem'], 'expected demucs-4stem tier in catalog');
+  assert.equal(byId['demucs-4stem'].stems, 4);
+  // demucs-6stem: extended split adding piano and guitar
+  assert.ok(byId['demucs-6stem'], 'expected demucs-6stem tier in catalog');
+  assert.ok(byId['demucs-6stem'].stems >= 6, `expected ≥6 stems for demucs-6stem, got ${byId['demucs-6stem'].stems}`);
+  // mdx-extra-q: high-fidelity single-model alternative
+  assert.ok(byId['mdx-extra-q'], 'expected mdx-extra-q tier in catalog');
+});
+
+test('desktop store initialises with an empty library when no persisted data exists', async () => {
+  const desktop = await importDesktopModule();
+  const tempRoot = mkdtempSync(join(tmpdir(), 'stemacle-empty-'));
+
+  try {
+    const store = desktop.createDesktopStore(tempRoot);
+    const state = store.getState();
+
+    assert.deepEqual(state.library, []);
+    assert.deepEqual(state.queue, []);
+    assert.ok(Array.isArray(state.libraryRoots));
+    assert.equal(state.libraryRoots.length, 0);
+    assert.ok(state.modelCache, 'expected modelCache in initial state');
+    assert.ok(state.paths, 'expected paths in initial state');
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

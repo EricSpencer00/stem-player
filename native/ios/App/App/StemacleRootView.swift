@@ -400,3 +400,7 @@ private struct StemLibraryStatusPill: View {
         }
     }
 }
+
+#Preview("Root tabs QA") {
+    StemacleRootView()
+}

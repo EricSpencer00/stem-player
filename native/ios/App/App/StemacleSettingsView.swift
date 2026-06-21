@@ -55,6 +55,7 @@ struct StemacleSettingsView: View {
             }
             .stemacleCompactList()
             .background(StemacleDesign.paper)
+            .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 8) }
         }
     }
 
@@ -116,5 +117,13 @@ private struct SettingsLinkRow: View {
                 .multilineTextAlignment(.trailing)
         }
         .font(.subheadline)
+    }
+}
+
+#Preview("Settings QA - Safe Areas") {
+    NavigationView {
+        StemacleSettingsView()
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
     }
 }

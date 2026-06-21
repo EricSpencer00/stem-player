@@ -2643,22 +2643,68 @@ function buildSampleButtons(){
 }
 
 async function openPendingNativeTrack(){
-  if(!window.stemacleNative?.readTrackFile) return;
-  const pendingTrackId = sessionStorage.getItem(PENDING_NATIVE_TRACK_KEY);
-  if(!pendingTrackId) return;
-  sessionStorage.removeItem(PENDING_NATIVE_TRACK_KEY);
+  // Browser-only globals guard. The web app may be loaded in non-browser
+  // hosts (test VM, prerender, sandboxed iframe) that don't expose
+  // sessionStorage or indexedDB. When those are missing, this function is a
+  // no-op so the rest of the app can still come up.
+  const hasSession = typeof sessionStorage !== 'undefined';
+  const hasIndexedDb = typeof indexedDB !== 'undefined';
+
+  // Desktop native bridge: read file by ID from Electron/macOS layer
+  if(window.stemacleNative?.readTrackFile && hasSession){
+    const pendingTrackId = sessionStorage.getItem(PENDING_NATIVE_TRACK_KEY);
+    if(pendingTrackId){
+      sessionStorage.removeItem(PENDING_NATIVE_TRACK_KEY);
+      try{
+        showOverlay('Opening Library Track','Reading audio from the desktop library…',4);
+        const payload = await window.stemacleNative.readTrackFile(pendingTrackId);
+        if(!payload?.bytes) throw new Error('Desktop track payload was empty.');
+        const bytes = payload.bytes instanceof Uint8Array ? payload.bytes : new Uint8Array(payload.bytes);
+        const file = new File([bytes], payload.name || 'Desktop Track', {type: payload.mimeType || 'application/octet-stream'});
+        await handleFile(file);
+        return;
+      }catch(e){
+        hideOverlay();
+        state.processing = false;
+        updateSampleRowsVisibility();
+        alert('Unable to open desktop library track: ' + e.message);
+        return;
+      }
+    }
+  }
+  // iOS / fallback: read file bytes from IndexedDB written by the native shell
+  if(!hasSession) return;
+  const localTrackRaw = sessionStorage.getItem('stemacle:lastLibraryTrack');
+  if(!localTrackRaw) return;
+  sessionStorage.removeItem('stemacle:lastLibraryTrack');
+  if(!hasIndexedDb){
+    alert('Cannot open the requested library track on this browser.');
+    return;
+  }
   try{
-    showOverlay('Opening Library Track','Reading audio from the desktop library…',4);
-    const payload = await window.stemacleNative.readTrackFile(pendingTrackId);
-    if(!payload?.bytes) throw new Error('Desktop track payload was empty.');
-    const bytes = payload.bytes instanceof Uint8Array ? payload.bytes : new Uint8Array(payload.bytes);
-    const file = new File([bytes], payload.name || 'Desktop Track', {type: payload.mimeType || 'application/octet-stream'});
+    const meta = JSON.parse(localTrackRaw);
+    if(!meta?.id) return;
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('stemacle-local-audio', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('Cannot open local audio store.'));
+    });
+    const record = await new Promise((resolve, reject) => {
+      const tx = db.transaction('tracks', 'readonly');
+      const req = tx.objectStore('tracks').get(meta.id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('Track lookup failed.'));
+    });
+    db.close();
+    if(!record?.bytes) throw new Error('Track not found in local storage.');
+    const file = new File([record.bytes], record.name || meta.name || 'Track', {type: record.type || 'audio/mpeg'});
+    showOverlay('Opening Track','Loading from device library…',4);
     await handleFile(file);
   }catch(e){
     hideOverlay();
     state.processing = false;
     updateSampleRowsVisibility();
-    alert('Unable to open desktop library track: ' + e.message);
+    alert('Unable to open library track: ' + e.message);
   }
 }
 

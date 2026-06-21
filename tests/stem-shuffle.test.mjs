@@ -77,3 +77,46 @@ test('crossfade math leans left at 0, center at 0.5, and right at 1', async () =
   assert.deepEqual(mod.computeDeckMixGains(0.5), { left: 0.5, right: 0.5 });
   assert.deepEqual(mod.computeDeckMixGains(1), { left: 0, right: 1 });
 });
+
+test('crossfade gain is monotonic and symmetric around center', async () => {
+  const mod = await importModule('./audio-core.js');
+
+  const positions = [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1];
+  const gains = positions.map((p) => mod.computeDeckMixGains(p));
+
+  // As the fader moves right, right gain must increase and left gain must decrease
+  for (let i = 1; i < gains.length; i++) {
+    assert.ok(
+      gains[i].right >= gains[i - 1].right,
+      `right gain must be non-decreasing at position ${positions[i]}`,
+    );
+    assert.ok(
+      gains[i].left <= gains[i - 1].left,
+      `left gain must be non-increasing at position ${positions[i]}`,
+    );
+  }
+
+  // Symmetric: gain at 0.25 mirrors gain at 0.75
+  const quarter = mod.computeDeckMixGains(0.25);
+  const threeQ = mod.computeDeckMixGains(0.75);
+  assert.ok(
+    Math.abs(quarter.left - threeQ.right) < 0.01,
+    `expected symmetric gains: left@0.25=${quarter.left} should equal right@0.75=${threeQ.right}`,
+  );
+});
+
+test('compatibility scoring gives identical tracks the maximum possible score', async () => {
+  const mod = await importModule('./library.js');
+
+  const near = mod.scoreCompatibility(
+    { tempo: 120, keyClass: 0, duration: 180, analysisStatus: 'ready' },
+    { tempo: 122, keyClass: 1, duration: 176, analysisStatus: 'ready' },
+  );
+  const identical = mod.scoreCompatibility(
+    { tempo: 120, keyClass: 0, duration: 180, analysisStatus: 'ready' },
+    { tempo: 120, keyClass: 0, duration: 180, analysisStatus: 'ready' },
+  );
+
+  assert.ok(identical >= near, `identical tracks (${identical}) should score at least as well as near-identical (${near})`);
+  assert.ok(identical > 0, 'expected a positive score for identical tracks');
+});

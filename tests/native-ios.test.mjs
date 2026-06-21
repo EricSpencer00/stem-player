@@ -483,3 +483,190 @@ test('ios native surfaces use Stemacle assets and document the new direction', (
   assert.ok(existsSync(new URL('assets/tentacle-b-roll/graphics/tentacle-bottom-border.png', repoRoot)));
   assert.ok(existsSync(new URL('assets/tentacle-b-roll/graphics/suction-cup-pattern-bg.png', repoRoot)));
 });
+
+test('ios design system defines the full Stemacle color palette including loop amber', () => {
+  const design = swift('StemacleDesign.swift');
+
+  assert.match(design, /static let paper = Color\(red: 0\.95/);
+  assert.match(design, /static let ink = Color\(red: 0\.15/);
+  assert.match(design, /static let purple = Color\(red: 0\.63/);
+  // amber is the loop-active accent — must stay visually distinct from the purple brand color
+  assert.match(design, /static let amber = Color\(red: 0\.86/);
+  assert.match(design, /static let amberGlow/);
+  assert.match(design, /static let rowGlow/);
+  assert.match(design, /static let shadow/);
+  assert.match(design, /static let mutedInk/);
+  assert.match(design, /static let deviceInner/);
+  assert.match(design, /static let deviceOuter/);
+  assert.match(design, /func stemColor\(_ stem: Stem\) -> Color/);
+  assert.match(design, /case \.vocals:\s*return purple/);
+  assert.match(design, /case \.melody:\s*return amber/);
+});
+
+test('ios design system provides the full set of structural SwiftUI components', () => {
+  const design = swift('StemacleDesign.swift');
+
+  assert.match(design, /struct StemacleScreen<Content: View>: View/);
+  assert.match(design, /struct StemacleBackground: View/);
+  assert.match(design, /struct TentacleFooter: View/);
+  assert.match(design, /struct StemacleHairline: View/);
+  assert.match(design, /struct StemaclePanel<Content: View>: View/);
+  assert.match(design, /struct StemacleAppIconMark: View/);
+  assert.match(design, /func stemacleCompactList\(\) -> some View/);
+});
+
+test('ios asset catalog registers all nine decorative art layers', () => {
+  const design = swift('StemacleDesign.swift');
+
+  assert.match(design, /case appIcon/);
+  assert.match(design, /case cutout/);
+  assert.match(design, /case bottomBorder/);
+  assert.match(design, /case background/);
+  assert.match(design, /case cornerFlourish/);
+  assert.match(design, /case emptyDots/);
+  assert.match(design, /case waveformIcon/);
+  assert.match(design, /case loopBadge/);
+  assert.match(design, /case loadingSwirl/);
+  assert.match(design, /var bundleSubdirectory: String/);
+});
+
+test('ios library status sort rank floats active work above failed and completed tracks', () => {
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  // processing→0 queued→1 failed→2 ready→3 keeps in-flight work at the top
+  assert.match(viewModel, /var sortRank: Int/);
+  assert.match(viewModel, /case \.processing:\s*return 0/);
+  assert.match(viewModel, /case \.queued:\s*return 1/);
+  assert.match(viewModel, /case \.failed:\s*return 2/);
+  assert.match(viewModel, /case \.ready:\s*return 3/);
+});
+
+test('ios library visible items apply both filter and sort before rendering', () => {
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  assert.match(viewModel, /var visibleLibraryItems: \[StemLibraryItem\]/);
+  assert.match(viewModel, /libraryFilter/);
+  assert.match(viewModel, /librarySort/);
+  assert.match(viewModel, /case \.recent:\s*return left\.lastUpdatedAt > right\.lastUpdatedAt/);
+  assert.match(viewModel, /case \.name:\s*return left\.title\.localizedCaseInsensitiveCompare/);
+  assert.match(viewModel, /case \.status:\s*if left\.status != right\.status/);
+  // Queue list strips ready tracks so only work items appear there
+  assert.match(viewModel, /var queueLibraryItems: \[StemLibraryItem\]/);
+  assert.match(viewModel, /filter \{ \$0\.status != \.ready \}/);
+});
+
+test('ios library index is written with an atomic option so partial saves never corrupt it', () => {
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  assert.match(viewModel, /\.atomic/);
+  assert.match(viewModel, /JSONEncoder\(\)\.encode/);
+  assert.match(viewModel, /JSONDecoder\(\)\.decode\(\[StemLibraryItem\]\.self/);
+});
+
+test('ios library filename sanitizer produces collision-safe slugs from arbitrary source names', () => {
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  // Non-alphanumeric runs become dashes so filenames stay safe for the file system
+  assert.match(viewModel, /\[\^A-Za-z0-9\]\+/);
+  // Eight-character UUID suffix ensures two identically-named imports never collide
+  assert.match(viewModel, /UUID\(\)\.uuidString\.prefix\(8\)/);
+  // Fallback when the source name has no alphanumeric content at all
+  assert.match(viewModel, /stemacle-track/);
+});
+
+test('ios device center button carries distinct accessibility labels for import vs playback states', () => {
+  const player = swift('StemPlayerView.swift');
+
+  assert.match(player, /"Play or pause"/);
+  assert.match(player, /"Choose an audio file to separate"/);
+  // Both strings come from the same accessibilityLabel call driven by isReady
+  assert.match(player, /accessibilityLabel\(viewModel\.isReady \? "Play or pause" : "Choose an audio file to separate"\)/);
+});
+
+test('ios processing overlay binds to determinate progress so the user sees real advancement', () => {
+  const player = swift('StemPlayerView.swift');
+
+  // Determinate: value bound to viewModel.progress (0–1)
+  // The zero-argument form ProgressView() would spin forever with no feedback
+  assert.match(player, /ProgressView\(value:\s*viewModel\.progress\)/);
+  assert.match(player, /struct ProcessingOverlay: View/);
+});
+
+test('ios transport buttons maintain a 46pt minimum touch target across restart pause and stop', () => {
+  const player = swift('StemPlayerView.swift');
+
+  assert.match(player, /struct TransportButton: View/);
+  assert.match(player, /minHeight:\s*46/);
+  assert.match(player, /\.labelStyle\(\.titleAndIcon\)/);
+});
+
+test('ios stem action buttons maintain fixed 48×42 hit areas for reliable one-handed control', () => {
+  const player = swift('StemPlayerView.swift');
+
+  assert.match(player, /struct StemIconButton: View/);
+  assert.match(player, /\.frame\(width:\s*48,\s*height:\s*42\)/);
+});
+
+test('ios stem panel hides completely until a track is ready so there are no ghost controls', () => {
+  const player = swift('StemPlayerView.swift');
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  // StemPlaybar is also visible during processing so the title and seek bar appear during the split
+  assert.match(player, /if viewModel\.isReady \|\| viewModel\.isProcessing/);
+  // Stem rows only render after a fully successful load
+  assert.match(player, /struct StemPanelView: View/);
+  assert.match(player, /if viewModel\.isReady\b/);
+  assert.match(viewModel, /@Published var isReady = false/);
+  assert.match(viewModel, /@Published var isProcessing = false/);
+});
+
+test('ios audio engine starts all four stems with a shared 18ms start delay to prevent inter-stem glitches', () => {
+  const audioEngine = swift('StemAudioEngine.swift');
+
+  assert.match(audioEngine, /synchronizedStartDelay: TimeInterval = 0\.018/);
+  // All stems share one startTime — not staggered — so the tracks open in phase
+  assert.match(audioEngine, /for stem in Stem\.allCases/);
+  assert.match(audioEngine, /players\[stem\]\?\.play\(at:\s*startTime\)/);
+});
+
+test('ios audio engine interruption handler only stops on type.began so resume events are ignored', () => {
+  const audioEngine = swift('StemAudioEngine.swift');
+
+  assert.match(audioEngine, /AVAudioSessionInterruptionTypeKey/);
+  assert.match(audioEngine, /AVAudioSession\.InterruptionType\(rawValue:/);
+  // Only .began triggers a stop — .ended is left to the user to manually resume
+  assert.match(audioEngine, /if type == \.began/);
+  assert.doesNotMatch(audioEngine, /if type == \.ended/);
+});
+
+test('ios document picker copies the file, restricts to audio, and disallows multiple selection', () => {
+  const player = swift('StemPlayerView.swift');
+
+  // asCopy keeps the original untouched and gives the app a local copy it can read freely
+  assert.match(player, /asCopy:\s*true/);
+  assert.match(player, /forOpeningContentTypes:\s*\[\.audio\]/);
+  assert.match(player, /allowsMultipleSelection\s*=\s*false/);
+});
+
+test('ios loop buttons highlight in amber not purple so active loops read as a distinct accent', () => {
+  const player = swift('StemPlayerView.swift');
+
+  assert.match(player, /selectedIndex == index \? StemacleDesign\.amber : StemacleDesign\.inkSoft/);
+  assert.match(player, /selectedIndex == index \? StemacleDesign\.amber : StemacleDesign\.track/);
+});
+
+test('ios all-stem loop row uses allSatisfy for atomic linked-loop detection and clearing', () => {
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  assert.match(viewModel, /allSatisfy\(\{ loops\[\$0\]\?\.selectedIndex == index \}\)/);
+  assert.match(viewModel, /Linked loop would run past the end/);
+});
+
+test('ios info.plist does not request microphone or photo library permissions', () => {
+  const info = swift('Info.plist');
+
+  // Stemacle never records audio or reads photos — these keys would confuse users
+  // and fail App Store review if present without justification
+  assert.doesNotMatch(info, /NSMicrophoneUsageDescription/);
+  assert.doesNotMatch(info, /NSPhotoLibraryUsageDescription/);
+});

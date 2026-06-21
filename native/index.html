@@ -194,6 +194,51 @@ body[data-surface="ios"] .tentacle {
   padding: clamp(52px, 8vw, 96px) 0 clamp(32px, 5vw, 58px);
 }
 
+.app-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: auto;
+  gap: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  align-items: stretch;
+}
+
+.app-pair-item {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: clamp(22px, 4vw, 48px);
+}
+
+.app-pair-item + .app-pair-item {
+  border-left: 1px solid var(--line);
+}
+
+.app-pair-item .object {
+  min-height: min(220px, 28vw);
+}
+
+.app-pair-item .device {
+  width: min(220px, 28vw);
+}
+
+.app-pair-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-pair-name {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.8vw, 38px);
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1;
+  margin: 0;
+}
+
 .copy {
   min-width: 0;
   width: 100%;
@@ -1278,6 +1323,24 @@ body[data-surface="ios"] .track button {
     min-height: auto;
   }
 
+  .app-pair {
+    grid-template-columns: 1fr;
+    border-bottom: 0;
+  }
+
+  .app-pair-item + .app-pair-item {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .app-pair-item .object {
+    min-height: min(200px, 50vw);
+  }
+
+  .app-pair-item .device {
+    width: min(200px, 50vw);
+  }
+
   .object {
     min-height: auto;
     padding: 12px 0 8px;
@@ -1420,24 +1483,41 @@ body[data-surface="ios"] .track button {
   </header>
 
   <main>
-    <section class="workbench" aria-labelledby="appTitle">
-      <div class="copy">
-        <span class="eyebrow" data-surface-only="desktop">local library · splitter · shuffle · meta+k</span>
-        <h1 id="appTitle">Stemacle</h1>
-        <p class="dek" data-surface-only="desktop">A quiet desktop control room for local stems: cache models, analyze folders in the background, export packs, and move into Stem Shuffle without changing skins.</p>
-        <div class="command-row" aria-label="App actions" data-surface-only="desktop">
-          <a class="command primary" href="/app/index.html">stem splitter</a>
-          <a class="command" href="/apps/stem-shuffle/index.html">stem shuffle</a>
-          <button class="command" type="button" data-native-action="pick-library">add music</button>
-          <button class="command" type="button" data-native-action="open-palette">commands</button>
+    <section class="workbench app-pair" aria-label="Stemacle desktop apps" data-surface-only="desktop">
+      <div class="app-pair-item">
+        <div class="object" aria-hidden="true">
+          <div class="device">
+            <button class="center" type="button" data-open="/app/index.html" tabindex="-1">
+              <span>split</span>
+            </button>
+          </div>
+        </div>
+        <div class="app-pair-copy">
+          <span class="eyebrow">splitter</span>
+          <h1 id="appTitle" class="app-pair-name">Stem Splitter</h1>
+          <p class="dek" style="font-size: clamp(14px, 1.6vw, 18px); margin-top: 0;">Drop audio, separate stems, lock loops, and export. Works with local files or anything added to the library.</p>
+          <div class="command-row">
+            <a class="command primary" href="/app/index.html">open</a>
+            <button class="command" type="button" data-native-action="pick-library">add music</button>
+          </div>
         </div>
       </div>
-
-      <div class="object" aria-hidden="true" data-surface-only="desktop">
-        <div class="device">
-        <button class="center" type="button" data-open="/app/index.html" tabindex="-1">
-            <span>split</span>
-          </button>
+      <div class="app-pair-item">
+        <div class="object" aria-hidden="true">
+          <div class="device">
+            <button class="center" type="button" data-open="/apps/stem-shuffle/index.html" tabindex="-1">
+              <span>shuffle</span>
+            </button>
+          </div>
+        </div>
+        <div class="app-pair-copy">
+          <span class="eyebrow">shuffle</span>
+          <h2 class="app-pair-name">Stem Shuffle</h2>
+          <p class="dek" style="font-size: clamp(14px, 1.6vw, 18px); margin-top: 0;">Build transition pairs from local stems with tempo and key scoring. Uses tracks already in the library.</p>
+          <div class="command-row">
+            <a class="command" href="/apps/stem-shuffle/index.html">open</a>
+            <button class="command" type="button" data-native-action="open-palette">commands</button>
+          </div>
         </div>
       </div>
     </section>
@@ -1555,23 +1635,22 @@ body[data-surface="ios"] .track button {
             <div class="ios-panel" data-card>
               <div class="ios-panel-header">
                 <div>
-                  <span class="small-label">previous tracks</span>
-                  <h3>Made on this device</h3>
+                  <span class="small-label">library</span>
+                  <h3>On this device</h3>
                 </div>
                 <span class="small-label" id="iosLibraryCount">0 tracks</span>
               </div>
               <div class="ios-track-list" id="iosLibraryTrackList"></div>
             </div>
-
             <div class="ios-panel" data-card>
               <div class="ios-panel-header">
                 <div>
                   <span class="small-label">queue</span>
-                  <h3>Status queue</h3>
+                  <h3>Queued for analysis</h3>
                 </div>
-                <span class="small-label">local only</span>
+                <span class="small-label" id="iosLibraryQueueCount">0 tracks</span>
               </div>
-              <div class="ios-queue-list" id="iosLibraryQueueList"></div>
+              <div class="ios-track-list" id="iosLibraryQueueList"></div>
             </div>
           </div>
         </div>
@@ -1584,13 +1663,17 @@ body[data-surface="ios"] .track button {
             <h2 id="iosSettingsTitle">Settings</h2>
             <p>Release metadata, support links, and local device controls for the App Store build.</p>
             <div class="ios-link-panel">
+              <a class="ios-link-card" href="https://github.com/EricSpencer00/stem-player/releases" data-ios-link="releases">
+                <strong>Releases</strong>
+                <span>Version history, download links, and release notes for Stemacle desktop and iOS.</span>
+              </a>
               <a class="ios-link-card" href="/privacy/" data-ios-link="privacy">
                 <strong>Privacy Policy</strong>
                 <span>stemacle.com/privacy explains what stays on-device and what the app does not collect.</span>
               </a>
               <a class="ios-link-card" href="/support/" data-ios-link="support">
                 <strong>Support</strong>
-                <span>Get help, report a problem, or read the App Store release notes and contact options.</span>
+                <span>Get help, report a problem, or contact us with questions about the app.</span>
               </a>
               <button class="ios-link-card" type="button" data-ios-action="leave-review">
                 <strong>Leave a Review</strong>
@@ -1779,10 +1862,10 @@ body[data-surface="ios"] .track button {
       </div>
     </section>
 
-    <section class="desktop-grid" aria-labelledby="queueTitle" data-surface-only="desktop">
+    <section class="desktop-grid" aria-labelledby="libraryStatusTitle" data-surface-only="desktop">
       <div class="surface-panel">
-        <span class="eyebrow">background work</span>
-        <h2 id="queueTitle">Queue, export, then come back later.</h2>
+        <span class="eyebrow">library</span>
+        <h2 id="libraryStatusTitle">Analyze, export, then come back later.</h2>
         <p>Desktop tracks keep analysis status, cache paths, export plans, and saved sessions. The app can notify when batches finish without turning into an audio dashboard.</p>
       </div>
       <div class="surface-panel">
@@ -1850,8 +1933,9 @@ body[data-surface="ios"] .track button {
   const iosDetailExportCount = document.getElementById('iosDetailExportCount');
   const iosProjectNotes = document.getElementById('iosProjectNotes');
   const iosLibraryTrackList = document.getElementById('iosLibraryTrackList');
-  const iosLibraryQueueList = document.getElementById('iosLibraryQueueList');
   const iosLibraryCount = document.getElementById('iosLibraryCount');
+  const iosLibraryQueueList = document.getElementById('iosLibraryQueueList');
+  const iosLibraryQueueCount = document.getElementById('iosLibraryQueueCount');
   const iosProjectSheet = document.getElementById('iosProjectSheet');
   const iosProjectName = document.getElementById('iosProjectName');
   const iosProjectSources = document.getElementById('iosProjectSources');
@@ -2409,33 +2493,27 @@ body[data-surface="ios"] .track button {
     });
   }
 
-  function renderIOSQueueList() {
+  function renderIOSLibraryQueue() {
     if (!iosLibraryQueueList) return;
-    const tracks = sortLibraryTracks(currentTracks()).slice(0, 5);
+    const queued = currentTracks().filter((track) => track.analysisStatus === 'queued');
     iosLibraryQueueList.innerHTML = '';
-    if (!tracks.length) {
+    if (iosLibraryQueueCount) {
+      iosLibraryQueueCount.textContent = `${queued.length} ${queued.length === 1 ? 'track' : 'tracks'}`;
+    }
+    if (!queued.length) {
       const empty = document.createElement('div');
       empty.className = 'ios-empty';
-      empty.textContent = 'Track status will show up here after you import music.';
+      empty.textContent = 'Nothing waiting in the analysis queue.';
       iosLibraryQueueList.appendChild(empty);
       return;
     }
-    tracks.forEach((track) => {
+    queued.forEach((track) => {
       const row = document.createElement('div');
-      row.className = 'ios-project-row';
-      row.innerHTML = `
-        <div>
-          <span class="ios-project-title">${track.name}</span>
-          <small>${trackStatusLabel(track)} · ${formatDuration(track.duration)} · ${new Date(track.lastModified || Date.now()).toLocaleDateString()}</small>
-        </div>
-        <button class="ios-link-button" type="button">open</button>
-      `;
-      row.querySelector('button').addEventListener('click', () => {
-        const project = ensureProjectForTrack(track);
-        selectedProjectId = project.id;
-        setIOSView('projects');
-        renderIOSApp();
-      });
+      row.className = 'ios-track-row';
+      row.dataset.status = 'queued';
+      const detail = document.createElement('div');
+      detail.innerHTML = `<span class="ios-project-title">${track.name}</span><small>${formatSize(track.size)} · ${formatDuration(track.duration)} · queued</small>`;
+      row.appendChild(detail);
       iosLibraryQueueList.appendChild(row);
     });
   }
@@ -2481,7 +2559,7 @@ body[data-surface="ios"] .track button {
     renderProjectList(iosProjectsList, projects);
     renderIOSProjectDetail(projects);
     renderIOSLibraryTracks();
-    renderIOSQueueList();
+    renderIOSLibraryQueue();
     renderProjectSources();
     syncIOSLibraryControls();
     setIOSView(activeIOSView);

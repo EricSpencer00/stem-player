@@ -4,6 +4,7 @@ dist/
 release/
 build/
 .wrangler/
+.hermes/
 .DS_Store
 *.log
 
