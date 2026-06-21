@@ -1,6 +1,8 @@
 import SwiftUI
 import UIKit
 
+private let backgroundArtworkLift: CGFloat = -60
+
 enum StemacleDesign {
     static let paper = Color(red: 0.95, green: 0.91, blue: 0.82)
     static let pageTwo = Color(red: 0.89, green: 0.85, blue: 0.74)
@@ -138,6 +140,7 @@ struct StemacleScreen<Content: View>: View {
                 .allowsHitTesting(false)
             content
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(StemacleDesign.ink)
     }
 }
@@ -174,6 +177,7 @@ struct TentacleFooter: View {
                     .frame(width: proxy.size.width, height: min(260, proxy.size.height * 0.34), alignment: .bottom)
                     .clipped()
                     .opacity(opacity)
+                    .offset(y: backgroundArtworkLift)
                     .accessibilityLabel(StemacleAsset.bottomBorder.label)
             }
             .ignoresSafeArea(edges: .bottom)

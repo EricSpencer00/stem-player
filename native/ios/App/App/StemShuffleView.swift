@@ -1,5 +1,7 @@
 import SwiftUI
 
+private let utilityContentWidth: CGFloat = 520
+
 private struct ShuffleTrack: Identifiable, Equatable {
     let id: String
     let title: String
@@ -23,15 +25,16 @@ struct StemShuffleView: View {
     var body: some View {
         StemacleScreen {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     DeckCard(side: "A", track: left, level: 1 - crossfade, lead: lead == "A")
                     DeckCard(side: "B", track: right, level: crossfade, lead: lead == "B")
 
                     StemaclePanel {
-                        VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Text("Blend")
-                                    .font(.headline)
+                                    .font(.caption.weight(.bold))
+                                    .textCase(.uppercase)
                                 Spacer()
                                 Button {
                                     shufflePair()
@@ -59,7 +62,7 @@ struct StemShuffleView: View {
                             .tint(StemacleDesign.amber)
 
                             Text("Shuffle keeps pair picking, rate feel, crossfade, and lead A/B separate from the main splitter so each surface stays focused.")
-                                .font(.footnote)
+                                .font(.caption2)
                                 .foregroundStyle(StemacleDesign.mutedInk)
                         }
                     }
@@ -78,7 +81,10 @@ struct StemShuffleView: View {
                     }
                     .padding(.bottom, 110)
                 }
-                .padding(18)
+                .frame(maxWidth: utilityContentWidth)
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .frame(maxWidth: .infinity)
             }
         }
         .navigationTitle("Shuffle")
@@ -103,10 +109,10 @@ private struct DeckCard: View {
 
     var body: some View {
         StemaclePanel {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(side)
-                        .font(.largeTitle.weight(.black))
+                        .font(.headline.weight(.black))
                     Spacer()
                     if lead {
                         Label("Lead", systemImage: "arrowtriangle.right.fill")
@@ -115,7 +121,7 @@ private struct DeckCard: View {
                     }
                 }
                 Text(track.title)
-                    .font(.title3.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                 HStack {
                     Label("\(track.bpm) bpm", systemImage: "metronome")
                     Label(track.key, systemImage: "key")

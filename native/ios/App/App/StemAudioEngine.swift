@@ -1,7 +1,9 @@
 import AVFoundation
+import Darwin
 import Foundation
 
 final class StemAudioEngine {
+    private let synchronizedStartDelay: TimeInterval = 0.018
     private let engine = AVAudioEngine()
     private var players: [Stem: AVAudioPlayerNode] = [:]
     private var mixers: [Stem: AVAudioMixerNode] = [:]
@@ -43,12 +45,13 @@ final class StemAudioEngine {
             schedule(buffer: buffer, on: player, from: offset, loop: loops[stem] ?? .inactive)
         }
 
+        let startTime = synchronizedStartTime(after: synchronizedStartDelay)
         for stem in Stem.allCases {
-            players[stem]?.play()
+            players[stem]?.play(at: startTime)
         }
 
         startOffset = min(max(0, offset), duration)
-        startDate = Date()
+        startDate = Date().addingTimeInterval(synchronizedStartDelay)
         isPlaying = true
     }
 
@@ -91,9 +94,50 @@ final class StemAudioEngine {
         }
     }
 
+    func reschedule(
+        stems: Set<Stem>,
+        controls: [Stem: StemPlaybackControl],
+        loops: [Stem: StemLoop],
+        globalMute: Bool,
+        headphonesStem: Stem?,
+        loopMonitorMode: LoopMonitorMode
+    ) throws {
+        guard !buffers.isEmpty else { return }
+        let activeStems = Set(stems.filter { players[$0] != nil && buffers[$0] != nil })
+        guard !activeStems.isEmpty else { return }
+
+        let offset = currentOffset()
+        updateMix(controls: controls, globalMute: globalMute, headphonesStem: headphonesStem)
+        startOffset = min(max(0, offset), duration)
+
+        guard isPlaying else {
+            return
+        }
+
+        try startEngineIfNeeded()
+        let reschedulingEveryStem = Stem.allCases.allSatisfy { activeStems.contains($0) }
+        let startDelay = synchronizedStartDelay
+        let startTime = synchronizedStartTime(after: startDelay)
+        let scheduleOffset = reschedulingEveryStem ? offset : min(duration, offset + startDelay)
+
+        for stem in Stem.allCases where activeStems.contains(stem) {
+            guard let player = players[stem], let buffer = buffers[stem] else { continue }
+            player.stop()
+            player.reset()
+            schedule(buffer: buffer, on: player, from: scheduleOffset, loop: loops[stem] ?? .inactive)
+        }
+
+        for stem in Stem.allCases where stems.contains(stem) {
+            players[stem]?.play(at: startTime)
+        }
+
+        startDate = reschedulingEveryStem ? Date().addingTimeInterval(startDelay) : Date()
+        isPlaying = true
+    }
+
     func currentOffset() -> TimeInterval {
         guard isPlaying, let startDate else { return startOffset }
-        return min(duration, startOffset + Date().timeIntervalSince(startDate))
+        return min(duration, max(0, startOffset + Date().timeIntervalSince(startDate)))
     }
 
     func updateMix(
@@ -167,7 +211,7 @@ final class StemAudioEngine {
         if loop.isActive {
             let loopStart = min(max(0, AVAudioFramePosition(loop.start * sampleRate)), frameLength - 1)
             let loopEnd = min(max(loopStart + 1, AVAudioFramePosition(loop.end * sampleRate)), frameLength)
-            let firstStart = min(max(loopStart, startFrame), loopEnd - 1)
+            let firstStart = wrappedLoopStartFrame(startFrame: startFrame, loopStart: loopStart, loopEnd: loopEnd)
             let firstCount = AVAudioFrameCount(max(1, loopEnd - firstStart))
             let loopCount = AVAudioFrameCount(max(1, loopEnd - loopStart))
             let looping = AVAudioPlayerNodeBufferOptions.loops
@@ -184,6 +228,21 @@ final class StemAudioEngine {
         if let tailBuffer = segmentBuffer(from: buffer, startFrame: startFrame, frameCount: remaining) {
             queue(tailBuffer, on: player)
         }
+    }
+
+    private func wrappedLoopStartFrame(
+        startFrame: AVAudioFramePosition,
+        loopStart: AVAudioFramePosition,
+        loopEnd: AVAudioFramePosition
+    ) -> AVAudioFramePosition {
+        let loopLength = max(1, loopEnd - loopStart)
+        guard startFrame >= loopStart else {
+            return loopStart
+        }
+        if startFrame >= loopEnd {
+            return loopStart + ((startFrame - loopStart) % loopLength)
+        }
+        return startFrame
     }
 
     private func queue(
@@ -212,10 +271,12 @@ final class StemAudioEngine {
         segment.frameLength = AVAudioFrameCount(safeCount)
         let channels = Int(buffer.format.channelCount)
         for channel in 0..<channels {
-            for frame in 0..<safeCount {
-                destination[channel][frame] = source[channel][safeStart + frame]
-            }
+            destination[channel].update(from: source[channel].advanced(by: safeStart), count: safeCount)
         }
         return segment
+    }
+
+    private func synchronizedStartTime(after delay: TimeInterval) -> AVAudioTime {
+        AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: delay))
     }
 }

@@ -38,8 +38,8 @@ struct StemacleSettingsView: View {
 
 private struct StemacleIdentityPanel: View {
     var body: some View {
-        HStack(spacing: 16) {
-            StemacleAppIconMark(size: 64)
+        HStack(spacing: 12) {
+            StemacleAppIconMark(size: 44)
             VStack(alignment: .leading, spacing: 5) {
                 Text("Stemacle")
                     .font(.headline)

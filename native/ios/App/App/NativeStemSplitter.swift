@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 
-enum Stem: String, CaseIterable, Identifiable {
+enum Stem: String, CaseIterable, Identifiable, Hashable {
     case drums
     case vocals
     case bass
@@ -144,28 +144,39 @@ final class NativeStemSplitter: @unchecked Sendable {
     private let tempoMinConfidence = 0.04
 
     func split(audioAt url: URL, progress: @escaping @Sendable (Double, String) -> Void = { _, _ in }) async throws -> StemSplitResult {
-        try await Task.detached(priority: .userInitiated) { [self] in
+        let task = Task.detached(priority: .userInitiated) { [self] in
             try performSplit(audioAt: url, progress: progress)
-        }.value
+        }
+
+        return try await withTaskCancellationHandler(operation: {
+            try await task.value
+        }, onCancel: {
+            task.cancel()
+        })
     }
 
     private func performSplit(
         audioAt url: URL,
         progress: @escaping @Sendable (Double, String) -> Void
     ) throws -> StemSplitResult {
+        try Task.checkCancellation()
         progress(0.03, "Reading audio with AVFoundation")
         let source = try readAudio(url)
         let duration = Double(source.mono.count) / source.sampleRate
 
+        try Task.checkCancellation()
         progress(0.08, "Audio decoded. Tempo mapped.")
         let tempo = estimateTempo(source.mono, sampleRate: source.sampleRate)
 
+        try Task.checkCancellation()
         let stemSamples = try webDSPFallback(source: source, duration: duration, progress: progress)
 
+        try Task.checkCancellation()
         progress(0.9, "Preparing native buffers")
         var buffers: [Stem: AVAudioPCMBuffer] = [:]
         var overview: [Stem: [Float]] = [:]
         for stem in Stem.allCases {
+            try Task.checkCancellation()
             guard let samples = stemSamples[stem] else { continue }
             let prepared = trimOrPad(samples, count: source.mono.count)
             buffers[stem] = try makeBuffer(samples: prepared, sampleRate: source.sampleRate)
@@ -190,9 +201,10 @@ final class NativeStemSplitter: @unchecked Sendable {
         progress: @escaping @Sendable (Double, String) -> Void
     ) throws -> [Stem: [Float]] {
         if duration > nativeSpectralDurationLimit {
-            return fastFullTrackFallback(source: source, progress: progress)
+            return try fastFullTrackFallback(source: source, progress: progress)
         }
 
+        try Task.checkCancellation()
         let window = hann(fftSize)
 
         progress(0.10, "Computing left spectrogram")
@@ -200,6 +212,7 @@ final class NativeStemSplitter: @unchecked Sendable {
             progress(0.10 + (0.12 * fraction), "Computing left spectrogram")
         }
 
+        try Task.checkCancellation()
         progress(0.22, "Computing right spectrogram")
         let rightSpectrogram = stft(source.right, window: window) { fraction in
             progress(0.22 + (0.12 * fraction), "Computing right spectrogram")
@@ -208,16 +221,19 @@ final class NativeStemSplitter: @unchecked Sendable {
         let frameCount = leftSpectrogram.frameCount
         let binCount = totalBins
 
+        try Task.checkCancellation()
         progress(0.34, "Measuring left channel")
         let leftMagnitude = buildMagnitude(leftSpectrogram) { fraction in
             progress(0.34 + (0.04 * fraction), "Measuring left channel")
         }
 
+        try Task.checkCancellation()
         progress(0.38, "Measuring right channel")
         let rightMagnitude = buildMagnitude(rightSpectrogram) { fraction in
             progress(0.38 + (0.04 * fraction), "Measuring right channel")
         }
 
+        try Task.checkCancellation()
         progress(0.44, "Separating vocals with native DSP")
         let vocalMask = buildVocalMask(leftMagnitude: leftMagnitude, rightMagnitude: rightMagnitude, frameCount: frameCount) { fraction in
             progress(0.44 + (0.24 * fraction), "Separating vocals with native DSP")
@@ -240,10 +256,12 @@ final class NativeStemSplitter: @unchecked Sendable {
                 accompanimentImaginary[frame][bin] = monoImaginary * (1 - mask)
             }
             if frame % maskStride == 0 || frame == frameCount - 1 {
+                try Task.checkCancellation()
                 progress(0.70 + (0.04 * Double(frame + 1) / Double(frameCount)), "Applying masks")
             }
         }
 
+        try Task.checkCancellation()
         let separated = hpss(
             realRows: accompanimentReal,
             imaginaryRows: accompanimentImaginary,
@@ -253,6 +271,7 @@ final class NativeStemSplitter: @unchecked Sendable {
             progress(0.74 + (0.08 * fraction), message)
         }
 
+        try Task.checkCancellation()
         progress(0.83, "Extracting bass")
         let bassAndMelody = lowPassSpectrogram(
             realRows: separated.harmonicReal,
@@ -265,6 +284,7 @@ final class NativeStemSplitter: @unchecked Sendable {
 
         let targetCount = max(1, Int(ceil(duration * source.sampleRate)))
 
+        try Task.checkCancellation()
         progress(0.86, "Synthesizing drums")
         let drums = trimOrPad(istft(
             realRows: separated.percussiveReal,
@@ -275,6 +295,7 @@ final class NativeStemSplitter: @unchecked Sendable {
             progress(0.86 + (0.03 * fraction), "Synthesizing drums")
         }, count: targetCount)
 
+        try Task.checkCancellation()
         progress(0.89, "Synthesizing vocals")
         let vocals = trimOrPad(istft(
             realRows: vocalReal,
@@ -285,6 +306,7 @@ final class NativeStemSplitter: @unchecked Sendable {
             progress(0.89 + (0.03 * fraction), "Synthesizing vocals")
         }, count: targetCount)
 
+        try Task.checkCancellation()
         progress(0.92, "Synthesizing bass")
         let bass = trimOrPad(istft(
             realRows: bassAndMelody.lowReal,
@@ -295,6 +317,7 @@ final class NativeStemSplitter: @unchecked Sendable {
             progress(0.92 + (0.03 * fraction), "Synthesizing bass")
         }, count: targetCount)
 
+        try Task.checkCancellation()
         progress(0.95, "Synthesizing melody")
         let melody = trimOrPad(istft(
             realRows: bassAndMelody.highReal,
@@ -316,7 +339,7 @@ final class NativeStemSplitter: @unchecked Sendable {
     private func fastFullTrackFallback(
         source: AudioFrameData,
         progress: @escaping @Sendable (Double, String) -> Void
-    ) -> [Stem: [Float]] {
+    ) throws -> [Stem: [Float]] {
         progress(0.12, "Preparing full-track native preview")
         let count = source.mono.count
         let bassAlpha = lowPassAlpha(cutoff: 260, sampleRate: source.sampleRate)
@@ -370,10 +393,12 @@ final class NativeStemSplitter: @unchecked Sendable {
             melodyPeak = max(melodyPeak, abs(melodySample))
 
             if index % stride == 0 {
+                try Task.checkCancellation()
                 progress(0.12 + 0.66 * Double(index) / Double(count), "Separating full track")
             }
         }
 
+        try Task.checkCancellation()
         progress(0.80, "Balancing stems")
         normalizeSamplesInPlace(&drums, peak: drumPeak, ceiling: 0.95)
         normalizeSamplesInPlace(&vocals, peak: vocalPeak, ceiling: 0.92)
@@ -810,19 +835,18 @@ final class NativeStemSplitter: @unchecked Sendable {
     ) -> [Float] {
         var output = [Float](repeating: 0, count: frameCount * binCount)
         let half = length / 2
+        var windowSamples = [Float](repeating: 0, count: length)
 
         if axis == "h" {
             let stride = max(1, binCount / 18)
-            var prefix = [Float](repeating: 0, count: frameCount + 1)
             for bin in 0..<binCount {
-                prefix[0] = 0
                 for frame in 0..<frameCount {
-                    prefix[frame + 1] = prefix[frame] + spectrogram[(frame * binCount) + bin]
-                }
-                for frame in 0..<frameCount {
-                    let start = max(0, frame - half)
-                    let end = min(frameCount, frame + half + 1)
-                    output[(frame * binCount) + bin] = (prefix[end] - prefix[start]) / Float(length)
+                    for index in 0..<length {
+                        let sampleFrame = frame - half + index
+                        windowSamples[index] = sampleFrame >= 0 && sampleFrame < frameCount ? spectrogram[(sampleFrame * binCount) + bin] : 0
+                    }
+                    windowSamples.sort()
+                    output[(frame * binCount) + bin] = windowSamples[half]
                 }
                 if bin % stride == 0 || bin == binCount - 1 {
                     onProgress?(Double(bin + 1) / Double(binCount))
@@ -830,16 +854,14 @@ final class NativeStemSplitter: @unchecked Sendable {
             }
         } else {
             let stride = max(1, frameCount / 18)
-            var prefix = [Float](repeating: 0, count: binCount + 1)
             for frame in 0..<frameCount {
-                prefix[0] = 0
                 for bin in 0..<binCount {
-                    prefix[bin + 1] = prefix[bin] + spectrogram[(frame * binCount) + bin]
-                }
-                for bin in 0..<binCount {
-                    let start = max(0, bin - half)
-                    let end = min(binCount, bin + half + 1)
-                    output[(frame * binCount) + bin] = (prefix[end] - prefix[start]) / Float(length)
+                    for index in 0..<length {
+                        let sampleBin = bin - half + index
+                        windowSamples[index] = sampleBin >= 0 && sampleBin < binCount ? spectrogram[(frame * binCount) + sampleBin] : 0
+                    }
+                    windowSamples.sort()
+                    output[(frame * binCount) + bin] = windowSamples[half]
                 }
                 if frame % stride == 0 || frame == frameCount - 1 {
                     onProgress?(Double(frame + 1) / Double(frameCount))

@@ -35,9 +35,6 @@ struct StemPlayerView: View {
                     }
                     .padding(.bottom, 12)
 
-                    StemSampleRows(viewModel: viewModel)
-                        .padding(.bottom, viewModel.isReady ? 0 : 10)
-
                     StemPlaybar(viewModel: viewModel)
                         .padding(.bottom, 18)
 
@@ -52,6 +49,9 @@ struct StemPlayerView: View {
                 .frame(width: max(280, min(UIScreen.main.bounds.width - 28, 760)))
                 .padding(.horizontal, 14)
                 .frame(maxWidth: .infinity)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                StemacleTabBarClearance()
             }
         }
         .navigationTitle("Stem Splitter")
@@ -102,22 +102,29 @@ struct StemPlayerView: View {
     }
 }
 
+private struct StemacleTabBarClearance: View {
+    var body: some View {
+        StemacleDesign.paper
+            .frame(height: 96)
+    }
+}
+
 struct StemacleWordmark: View {
     var body: some View {
         HStack(spacing: 12) {
             Rectangle()
                 .fill(StemacleDesign.inkGhost)
                 .frame(width: 20, height: 1)
-            StemacleAppIconMark(size: 34)
+//            StemacleAppIconMark(size: 34)
             VStack(spacing: 2) {
                 Text("Stemacle")
                     .font(.caption.weight(.bold))
                     .textCase(.uppercase)
                     .foregroundStyle(StemacleDesign.inkSoft)
-                Text("Local-first stem splitter")
-                    .font(.caption2.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(StemacleDesign.inkGhost)
+//                Text("Local-first stem splitter")
+//                    .font(.caption2.weight(.semibold))
+//                    .textCase(.uppercase)
+//                    .foregroundStyle(StemacleDesign.inkGhost)
             }
             Rectangle()
                 .fill(StemacleDesign.inkGhost)
@@ -129,6 +136,7 @@ struct StemacleWordmark: View {
 
 struct StemLocalProjectHint: View {
     @ObservedObject var viewModel: StemPlayerViewModel
+    @State private var samplesExpanded = false
     var openImporter: () -> Void
 
     var body: some View {
@@ -161,18 +169,28 @@ struct StemLocalProjectHint: View {
                         .background(Capsule().fill(StemacleDesign.ink))
 
                         Button {
-                            if let sample = viewModel.samples.first {
-                                viewModel.loadSample(sample)
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                samplesExpanded.toggle()
                             }
                         } label: {
-                            Label("Try a sample", systemImage: "waveform")
-                                .font(.caption2.weight(.bold))
-                                .textCase(.uppercase)
-                                .frame(maxWidth: .infinity, minHeight: 42)
+                            HStack(spacing: 8) {
+                                Label("Try a sample", systemImage: "waveform")
+                                Image(systemName: "chevron.down")
+                                    .font(.caption2.weight(.bold))
+                                    .rotationEffect(.degrees(samplesExpanded ? 180 : 0))
+                            }
+                            .font(.caption2.weight(.bold))
+                            .textCase(.uppercase)
+                            .frame(maxWidth: .infinity, minHeight: 42)
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(StemacleDesign.inkSoft)
                         .overlay(Capsule().stroke(StemacleDesign.track, lineWidth: 1))
+                    }
+
+                    if samplesExpanded {
+                        StemSampleRows(viewModel: viewModel)
+                            .padding(.top, 2)
                     }
                 }
             }
@@ -186,6 +204,8 @@ struct StemacleDeviceView: View {
     var openImporter: () -> Void
 
     var body: some View {
+        let bands = viewModel.levelMeterBands()
+
         ZStack {
             Circle()
                 .fill(
@@ -210,9 +230,9 @@ struct StemacleDeviceView: View {
                 .padding(10)
 
             LevelMeterRing(
-                bass: meterBass,
-                treble: meterTreble,
-                wave: viewModel.isPlaying ? 0.74 : 0.16
+                bass: bands.bass,
+                treble: bands.treble,
+                wave: bands.wave
             )
             .padding(54)
 
@@ -266,16 +286,6 @@ struct StemacleDeviceView: View {
     private var centerHint: String {
         if !viewModel.isReady { return "drop audio" }
         return viewModel.isPlaying ? "playing" : "play"
-    }
-
-    private var meterBass: Double {
-        guard viewModel.isPlaying else { return 0.08 }
-        return 0.36 + (sin(viewModel.currentTime * 3.2) + 1) * 0.18
-    }
-
-    private var meterTreble: Double {
-        guard viewModel.isPlaying else { return 0.10 }
-        return 0.34 + (sin(viewModel.currentTime * 5.1 + 1.3) + 1) * 0.2
     }
 }
 
@@ -343,7 +353,7 @@ struct StemSampleRows: View {
 
     var body: some View {
         if !viewModel.isReady && !viewModel.isProcessing {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 8)], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 8)], spacing: 8) {
                 ForEach(viewModel.samples) { sample in
                     Button {
                         viewModel.loadSample(sample)
@@ -353,6 +363,7 @@ struct StemSampleRows: View {
                             .foregroundStyle(StemacleDesign.inkSoft)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
+                            .minimumScaleFactor(0.86)
                             .frame(maxWidth: .infinity, minHeight: 52)
                             .padding(.horizontal, 12)
                     }
@@ -512,7 +523,7 @@ struct StemControlRow: View {
             StemControlStrip(viewModel: viewModel, stem: stem)
                 .padding(.vertical, 8)
             StemSpectrogramLane(
-                values: viewModel.overview[stem] ?? [],
+                values: viewModel.spectralValues(for: stem, bucketCount: 96),
                 cursor: viewModel.cursorRatio(for: stem),
                 window: viewModel.spectralWindow,
                 markers: viewModel.spectralGridMarkers()
@@ -714,6 +725,7 @@ struct StemSpectrogramLane: View {
                     context.fill(Path(hardRect), with: .color(StemacleDesign.ink.opacity(0.42)))
                 }
 
+                var lastMarkerLabelX = -CGFloat.infinity
                 for marker in markers {
                     let span = max(0.001, window.end - window.start)
                     let x = size.width * CGFloat((marker.time - window.start) / span)
@@ -722,12 +734,13 @@ struct StemSpectrogramLane: View {
                     line.move(to: CGPoint(x: x, y: 0))
                     line.addLine(to: CGPoint(x: x, y: size.height))
                     context.stroke(line, with: .color(StemacleDesign.ink.opacity(marker.weight)), lineWidth: marker.label == "1" ? 1.5 : 1)
-                    context.draw(
-                        Text(marker.label)
-                            .font(.caption2)
-                            .foregroundColor(StemacleDesign.ink.opacity(min(0.68, marker.weight + 0.16))),
-                        at: CGPoint(x: x, y: 10)
-                    )
+                    if shouldDrawMarkerLabel(marker, x: x, lastLabelX: lastMarkerLabelX) {
+                        context.draw(
+                            markerLabel(marker),
+                            at: CGPoint(x: x, y: 10)
+                        )
+                        lastMarkerLabelX = x
+                    }
                 }
 
                 let cursorX = min(size.width, max(0, size.width * CGFloat(cursor)))
@@ -752,6 +765,16 @@ struct StemSpectrogramLane: View {
         (0..<96).map { index in
             Float(0.12 + (sin(Double(index) * 0.44) + 1) * 0.16)
         }
+    }
+
+    private func shouldDrawMarkerLabel(_ marker: SpectralGridMarker, x: CGFloat, lastLabelX: CGFloat) -> Bool {
+        marker.label == "1" && x - lastLabelX >= 72
+    }
+
+    private func markerLabel(_ marker: SpectralGridMarker) -> Text {
+        Text(marker.label)
+            .font(.caption2)
+            .foregroundColor(StemacleDesign.ink.opacity(min(0.68, marker.weight + 0.16)))
     }
 
 }
