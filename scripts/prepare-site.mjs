@@ -20,6 +20,8 @@ await cp(join(root, 'index.html'), join(outDir, 'index.html'));
 await copyIntoSite('app');
 await copyIntoSite('apps');
 await copyIntoSite('ios-coming-soon');
+await copyIntoSite('privacy');
+await copyIntoSite('support');
 await copyIntoSite('assets');
 await copyIntoSite('samples');
 await writeFile(join(outDir, '_headers'), [

@@ -48,8 +48,20 @@ body {
 
 body[data-surface="ios"] {
   background:
-    radial-gradient(96% 72% at 102% -4%, oklch(80% 0.03 320 / 0.18) 0%, oklch(80% 0.03 320 / 0) 42%),
-    linear-gradient(180deg, oklch(95% 0.01 82) 0%, oklch(91% 0.012 82) 100%);
+    radial-gradient(96% 72% at 102% -4%, oklch(76% 0.042 316 / 0.16) 0%, oklch(76% 0.042 316 / 0) 42%),
+    linear-gradient(180deg, oklch(96% 0.016 84) 0%, oklch(92% 0.020 83) 100%);
+  --page: oklch(96% 0.016 84);
+  --page-2: oklch(92% 0.020 83);
+  --device-out: oklch(87% 0.022 80);
+  --device-in: oklch(91% 0.016 82);
+  --center: oklch(84% 0.030 76);
+  --ink: oklch(22% 0.030 314);
+  --ink-soft: oklch(38% 0.028 314);
+  --ink-faint: oklch(54% 0.018 312);
+  --track: oklch(80% 0.014 79);
+  --line: oklch(74% 0.014 74 / 0.46);
+  --plum: oklch(32% 0.110 315);
+  --amber: oklch(65% 0.108 68);
 }
 
 a,
@@ -298,8 +310,8 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
   min-height: 100svh;
   display: grid;
   align-content: center;
-  gap: 22px;
-  padding: calc(28px + env(safe-area-inset-top)) 0 calc(34px + env(safe-area-inset-bottom));
+  gap: 18px;
+  padding: calc(24px + env(safe-area-inset-top)) 0 calc(26px + env(safe-area-inset-bottom));
   text-align: center;
 }
 
@@ -336,7 +348,7 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
 
 .ios-quiet-nav {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -389,12 +401,25 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
   gap: 22px;
 }
 
+.ios-library-layout,
+.ios-settings-layout {
+  gap: 18px;
+}
+
 .ios-panel {
   display: grid;
   gap: 16px;
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.ios-panel[data-card] {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: oklch(96% 0.012 84 / 0.8);
+  box-shadow: 0 12px 30px oklch(24% 0.012 70 / 0.08);
 }
 
 .ios-project-row,
@@ -467,12 +492,37 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
   gap: 8px;
 }
 
+.ios-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .ios-action,
 .ios-link-button {
   min-height: 42px;
   border-color: var(--line);
   border-radius: 999px;
   padding: 0 14px;
+}
+
+.ios-chip {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ios-chip[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .ios-action.primary {
@@ -507,6 +557,12 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
   gap: 10px;
 }
 
+.ios-track-list,
+.ios-queue-list {
+  display: grid;
+  gap: 10px;
+}
+
 .ios-project-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -514,6 +570,30 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
   gap: 12px;
   padding: 14px;
   text-align: left;
+}
+
+.ios-track-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: oklch(96% 0.012 84 / 0.74);
+}
+
+.ios-track-row[data-status="ready"] {
+  border-color: oklch(63% 0.08 315 / 0.24);
+}
+
+.ios-track-row[data-status="queued"],
+.ios-track-row[data-status="indexed"] {
+  border-color: oklch(68% 0.06 78 / 0.28);
+}
+
+.ios-track-row[data-status="error"] {
+  border-color: oklch(58% 0.09 28 / 0.34);
 }
 
 .ios-project-row[aria-current="true"] {
@@ -554,6 +634,31 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
 .ios-field textarea {
   min-height: 92px;
   resize: vertical;
+}
+
+.ios-link-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.ios-link-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: oklch(96% 0.012 84 / 0.72);
+}
+
+.ios-link-card strong {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ios-link-card span {
+  color: var(--ink-soft);
+  line-height: 1.45;
 }
 
 .ios-source-option {
@@ -960,6 +1065,55 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
   line-height: 1.3;
 }
 
+.hq-setup {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: oklch(96% 0.008 84 / 0.4);
+}
+
+.hq-setup[hidden] {
+  display: none;
+}
+
+.hq-setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hq-setup-head strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.hq-setup p {
+  margin: 8px 0 12px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.hq-setup-command {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.hq-setup-command code {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: oklch(28% 0.02 80 / 0.9);
+  color: oklch(94% 0.01 90);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
 .command-palette {
   position: fixed;
   z-index: 20;
@@ -1068,11 +1222,12 @@ body[data-surface="ios"] .ios-app {
 
 body[data-surface="ios"] .library {
   padding-top: 38px;
-  padding-bottom: 40px;
+  padding-bottom: 28px;
 }
 
 body[data-surface="ios"] .status-footer {
-  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  padding-top: 18px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
 }
 
 body[data-surface="ios"] .library-controls {
@@ -1271,7 +1426,7 @@ body[data-surface="ios"] .track button {
         <h1 id="appTitle">Stemacle</h1>
         <p class="dek" data-surface-only="desktop">A quiet desktop control room for local stems: cache models, analyze folders in the background, export packs, and move into Stem Shuffle without changing skins.</p>
         <div class="command-row" aria-label="App actions" data-surface-only="desktop">
-          <a class="command primary" href="https://stemacle.com/app">stem splitter</a>
+          <a class="command primary" href="/app/index.html">stem splitter</a>
           <a class="command" href="/apps/stem-shuffle/index.html">stem shuffle</a>
           <button class="command" type="button" data-native-action="pick-library">add music</button>
           <button class="command" type="button" data-native-action="open-palette">commands</button>
@@ -1280,7 +1435,7 @@ body[data-surface="ios"] .track button {
 
       <div class="object" aria-hidden="true" data-surface-only="desktop">
         <div class="device">
-          <button class="center" type="button" data-open="https://stemacle.com/app" tabindex="-1">
+        <button class="center" type="button" data-open="/app/index.html" tabindex="-1">
             <span>split</span>
           </button>
         </div>
@@ -1308,8 +1463,8 @@ body[data-surface="ios"] .track button {
           <button type="button" data-ios-action="open-shuffle" data-ios-view="shuffle" aria-selected="false">shuffle</button>
           <button type="button" data-ios-action="open-projects" data-ios-tab="projects" data-ios-view="projects" aria-selected="false">projects</button>
           <button type="button" data-ios-action="open-library" data-ios-tab="library" data-ios-view="library" aria-selected="false">library</button>
+          <button type="button" data-ios-action="open-settings" data-ios-tab="settings" data-ios-view="settings" aria-selected="false">settings</button>
         </nav>
-        <button class="ios-link-button" type="button" data-ios-action="try-sample">try a sample</button>
       </section>
 
       <section class="ios-view is-active" id="iosHomeView" data-ios-view="home" aria-label="Recent Stemacle projects">
@@ -1374,28 +1529,77 @@ body[data-surface="ios"] .track button {
 
       <section class="ios-view" id="iosLibraryView" data-ios-view="library" aria-labelledby="iosLibraryTitle">
         <div class="ios-library-layout">
-          <div class="ios-panel">
+          <div class="ios-panel" data-card>
             <div class="ios-panel-header">
               <div>
                 <span class="small-label">library</span>
-                <h2 id="iosLibraryTitle">Library</h2>
+                <h2 id="iosLibraryTitle">Your tracks</h2>
               </div>
               <button class="ios-link-button" type="button" data-ios-action="import-track">import</button>
             </div>
-            <div class="ios-project-list" id="iosLibraryTrackList"></div>
+            <p>Everything here stays on the device. Sort by recency, name, or status, then jump back into a track or promote it into a project.</p>
+            <div class="ios-chip-row" id="iosLibrarySortRow" aria-label="Library sort">
+              <button class="ios-chip" type="button" data-ios-library-sort="recent" aria-pressed="true">Recent</button>
+              <button class="ios-chip" type="button" data-ios-library-sort="status" aria-pressed="false">Status</button>
+              <button class="ios-chip" type="button" data-ios-library-sort="name" aria-pressed="false">Name</button>
+            </div>
+            <div class="ios-chip-row" aria-label="Library filter">
+              <button class="ios-chip" type="button" data-ios-library-filter="all" aria-pressed="true">All</button>
+              <button class="ios-chip" type="button" data-ios-library-filter="ready" aria-pressed="false">Ready</button>
+              <button class="ios-chip" type="button" data-ios-library-filter="queued" aria-pressed="false">Queued</button>
+              <button class="ios-chip" type="button" data-ios-library-filter="error" aria-pressed="false">Failed</button>
+            </div>
+          </div>
+
+          <div class="ios-project-layout">
+            <div class="ios-panel" data-card>
+              <div class="ios-panel-header">
+                <div>
+                  <span class="small-label">previous tracks</span>
+                  <h3>Made on this device</h3>
+                </div>
+                <span class="small-label" id="iosLibraryCount">0 tracks</span>
+              </div>
+              <div class="ios-track-list" id="iosLibraryTrackList"></div>
+            </div>
+
+            <div class="ios-panel" data-card>
+              <div class="ios-panel-header">
+                <div>
+                  <span class="small-label">queue</span>
+                  <h3>Status queue</h3>
+                </div>
+                <span class="small-label">local only</span>
+              </div>
+              <div class="ios-queue-list" id="iosLibraryQueueList"></div>
+            </div>
           </div>
         </div>
       </section>
 
       <section class="ios-view" id="iosSettingsView" data-ios-view="settings" aria-labelledby="iosSettingsTitle">
         <div class="ios-settings-layout">
-          <div class="ios-panel">
+          <div class="ios-panel" data-card>
             <span class="small-label">settings</span>
             <h2 id="iosSettingsTitle">Settings</h2>
-            <p>Audio stays on this device unless you share it.</p>
+            <p>Release metadata, support links, and local device controls for the App Store build.</p>
+            <div class="ios-link-panel">
+              <a class="ios-link-card" href="/privacy/" data-ios-link="privacy">
+                <strong>Privacy Policy</strong>
+                <span>stemacle.com/privacy explains what stays on-device and what the app does not collect.</span>
+              </a>
+              <a class="ios-link-card" href="/support/" data-ios-link="support">
+                <strong>Support</strong>
+                <span>Get help, report a problem, or read the App Store release notes and contact options.</span>
+              </a>
+              <button class="ios-link-card" type="button" data-ios-action="leave-review">
+                <strong>Leave a Review</strong>
+                <span>Open the review flow after you’ve used the app long enough to have an opinion.</span>
+              </button>
+            </div>
             <div class="ios-action-row">
               <button class="ios-link-button" type="button" data-ios-action="clear-projects">clear projects</button>
-              <button class="ios-action warn" type="button" data-native-action="clear-library">Clear Library</button>
+              <button class="ios-action warn" type="button" data-native-action="clear-library">clear library</button>
             </div>
           </div>
         </div>
@@ -1416,7 +1620,7 @@ body[data-surface="ios"] .track button {
           <input id="iosProjectName" type="text" autocomplete="off" placeholder="Project name">
         </div>
         <div>
-          <span class="small-label">source</span>
+          <span class="small-label">local source</span>
           <div class="ios-source-list" id="iosProjectSources"></div>
         </div>
         <div class="ios-action-row">
@@ -1429,7 +1633,7 @@ body[data-surface="ios"] .track button {
 
     <section class="route-strip" aria-label="Stemacle native apps" data-surface-only="desktop">
       <div class="route-grid">
-        <a class="route" href="https://stemacle.com/app">
+        <a class="route" href="/app/index.html">
           <span class="route-label">splitter</span>
           <strong>Stem Splitter</strong>
           <p>Drop audio, separate stems, lock loops, and export from the original Stemacle surface.</p>
@@ -1444,7 +1648,7 @@ body[data-surface="ios"] .track button {
           <strong>Local crate</strong>
           <p>Keep a device-local list of tracks for desktop and iOS sessions.</p>
         </a>
-        <a class="route" href="https://stemacle.com/app">
+        <a class="route" href="/app/index.html">
           <span class="route-label">models</span>
           <strong>Preview plus HQ</strong>
           <p>Use fast preview, local Demucs four-stem, or the optional six-stem model when installed.</p>
@@ -1549,6 +1753,21 @@ body[data-surface="ios"] .track button {
             <span>Alternative Demucs model for sharper 4-stem detail when installed.</span>
           </button>
         </div>
+        <div class="hq-setup" id="hqSetupCard" data-surface-only="desktop" hidden>
+          <div class="hq-setup-head">
+            <strong id="hqSetupTitle">High-quality engine needs Demucs</strong>
+            <span class="status-pill" id="hqSetupStatus">not installed</span>
+          </div>
+          <p id="hqSetupBody">The HQ 4/6-stem models run a local copy of Demucs (plus ffmpeg). Install once, then re-check to unlock them — fast preview keeps working in the meantime.</p>
+          <div class="hq-setup-command">
+            <code id="hqInstallCommand">pipx install demucs &amp;&amp; brew install ffmpeg</code>
+            <button class="library-btn secondary" type="button" data-hq-action="copy-install">copy</button>
+          </div>
+          <div class="command-row">
+            <button class="library-btn secondary" type="button" data-hq-action="recheck">re-check tools</button>
+            <a class="library-btn secondary" href="https://stemacle.com/support/#high-quality" target="_blank" rel="noopener">setup guide</a>
+          </div>
+        </div>
       </div>
       <div class="surface-panel">
         <h3>Model cache</h3>
@@ -1587,7 +1806,6 @@ body[data-surface="ios"] .track button {
 (() => {
   const pendingTrackKey = 'stemacle:pendingTrackId';
   const localLibraryTrackKey = 'stemacle:lastLibraryTrack';
-  const pendingSampleTrackKey = 'stemacle:pendingSampleTrack';
   const activeProjectKey = 'stemacle:activeProject';
   const storeKey = 'stemacle.library.v1';
   const iosProjectsKey = 'stemacle.ios.projects.v1';
@@ -1632,6 +1850,8 @@ body[data-surface="ios"] .track button {
   const iosDetailExportCount = document.getElementById('iosDetailExportCount');
   const iosProjectNotes = document.getElementById('iosProjectNotes');
   const iosLibraryTrackList = document.getElementById('iosLibraryTrackList');
+  const iosLibraryQueueList = document.getElementById('iosLibraryQueueList');
+  const iosLibraryCount = document.getElementById('iosLibraryCount');
   const iosProjectSheet = document.getElementById('iosProjectSheet');
   const iosProjectName = document.getElementById('iosProjectName');
   const iosProjectSources = document.getElementById('iosProjectSources');
@@ -1641,30 +1861,8 @@ body[data-surface="ios"] .track button {
   let selectedProjectId = null;
   let selectedProjectSourceId = null;
   let activeIOSView = 'home';
-
-  const iosSampleSources = [
-    {
-      id: 'sample-stem-sample-1',
-      kind: 'sample',
-      name: 'Gentleman — cdk feat. QuianaNadine',
-      url: '/samples/stem-sample-1.mp3',
-      analysisStatus: 'sample',
-    },
-    {
-      id: 'sample-stem-sample-2',
-      kind: 'sample',
-      name: 'Red Light Blues — Alex & UnrealDM',
-      url: '/samples/stem-sample-2.mp3',
-      analysisStatus: 'sample',
-    },
-    {
-      id: 'sample-stem-sample-3',
-      kind: 'sample',
-      name: 'Pyramid — 7OOP3D feat. Mr Yesterday',
-      url: '/samples/stem-sample-3.mp3',
-      analysisStatus: 'sample',
-    },
-  ];
+  let iosLibrarySort = 'recent';
+  let iosLibraryFilter = 'all';
 
   function detectSurface() {
     const capacitorPlatform = window.Capacitor?.getPlatform?.();
@@ -1857,18 +2055,90 @@ body[data-surface="ios"] .track button {
   }
 
   function sourceCandidates() {
-    const tracks = currentTracks().map(projectSourceFromTrack);
-    const seen = new Set(tracks.map((track) => track.id));
-    return [
-      ...tracks,
-      ...iosSampleSources.filter((sample) => !seen.has(sample.id)),
-    ];
+    return currentTracks().map(projectSourceFromTrack);
   }
 
   function sourceLabel(source) {
     if (!source) return 'No source selected';
-    if (source.kind === 'sample') return `${source.name} · bundled sample`;
     return `${source.name} · ${formatSize(source.size)} · ${formatDuration(source.duration)}`;
+  }
+
+  function trackStatusLabel(track) {
+    switch (track?.analysisStatus) {
+      case 'ready':
+      case 'preview-ready':
+        return 'Ready';
+      case 'analyzing':
+      case 'queued':
+        return 'Queued';
+      case 'error':
+        return 'Failed';
+      case 'indexed':
+        return 'Indexed';
+      default:
+        return track?.analysisStatus || 'Queued';
+    }
+  }
+
+  function trackStatusRank(track) {
+    switch (track?.analysisStatus) {
+      case 'ready':
+      case 'preview-ready':
+        return 0;
+      case 'queued':
+      case 'analyzing':
+        return 1;
+      case 'indexed':
+        return 2;
+      case 'error':
+        return 3;
+      default:
+        return 2;
+    }
+  }
+
+  function sortLibraryTracks(tracks) {
+    const list = iosLibraryFilter === 'all'
+      ? [...tracks]
+      : tracks.filter((track) => {
+          const status = track?.analysisStatus || 'indexed';
+          if (iosLibraryFilter === 'ready') return status === 'ready' || status === 'preview-ready';
+          if (iosLibraryFilter === 'queued') return status === 'queued' || status === 'analyzing' || status === 'indexed';
+          if (iosLibraryFilter === 'error') return status === 'error';
+          return true;
+        });
+
+    const compareByStatus = (left, right) => {
+      const delta = trackStatusRank(left) - trackStatusRank(right);
+      if (delta !== 0) return delta;
+      const leftTime = Number(left?.lastModified || left?.createdAt || 0);
+      const rightTime = Number(right?.lastModified || right?.createdAt || 0);
+      return rightTime - leftTime;
+    };
+
+    switch (iosLibrarySort) {
+      case 'name':
+        list.sort((left, right) => String(left.name || '').localeCompare(String(right.name || '')));
+        break;
+      case 'status':
+        list.sort((left, right) => {
+          const delta = compareByStatus(left, right);
+          if (delta !== 0) return delta;
+          return String(right.name || '').localeCompare(String(left.name || ''));
+        });
+        break;
+      case 'recent':
+      default:
+        list.sort((left, right) => {
+          const leftTime = Number(left?.lastModified || left?.createdAt || 0);
+          const rightTime = Number(right?.lastModified || right?.createdAt || 0);
+          if (rightTime !== leftTime) return rightTime - leftTime;
+          return String(left.name || '').localeCompare(String(right.name || ''));
+        });
+        break;
+    }
+
+    return list;
   }
 
   function defaultProjectName(source) {
@@ -1897,15 +2167,15 @@ body[data-surface="ios"] .track button {
   }
 
   function createProjectFromSource(source, options = {}) {
-    const candidate = source || sourceCandidates()[0] || iosSampleSources[0];
+    const candidate = source || sourceCandidates()[0] || null;
     const now = new Date().toISOString();
     const project = {
       id: `project-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       name: (options.name || defaultProjectName(candidate)).trim() || 'Untitled Project',
-      source: { ...candidate },
+      source: candidate ? { ...candidate } : null,
       createdAt: now,
       lastOpenedAt: now,
-      analysisStatus: candidate.analysisStatus || 'not analyzed',
+      analysisStatus: candidate?.analysisStatus || 'not analyzed',
       loopIdeas: [],
       shuffleIdeas: [],
       exports: [],
@@ -1955,8 +2225,8 @@ body[data-surface="ios"] .track button {
   }
 
   function showProjectSheet(source = null) {
-    const candidate = source || sourceCandidates()[0] || iosSampleSources[0];
-    selectedProjectSourceId = candidate.id;
+    const candidate = source || sourceCandidates()[0] || null;
+    selectedProjectSourceId = candidate?.id || null;
     iosProjectName.value = defaultProjectName(candidate);
     renderProjectSources();
     iosProjectSheet.classList.add('open');
@@ -1970,7 +2240,7 @@ body[data-surface="ios"] .track button {
   }
 
   function selectedSheetSource() {
-    return sourceCandidates().find((source) => source.id === selectedProjectSourceId) || iosSampleSources[0];
+    return sourceCandidates().find((source) => source.id === selectedProjectSourceId) || null;
   }
 
   function createProjectFromSheet(tool = null) {
@@ -2001,20 +2271,14 @@ body[data-surface="ios"] .track button {
     if (tool === 'splitter') {
       transientStore.removeItem(pendingTrackKey);
       transientStore.removeItem(localLibraryTrackKey);
-      transientStore.removeItem(pendingSampleTrackKey);
-      if (source.kind === 'sample' && source.url) {
-        transientStore.setItem(pendingSampleTrackKey, JSON.stringify({
-          name: source.name,
-          url: source.url,
-        }));
-      } else if (source.id) {
+      if (source.id) {
         transientStore.setItem(localLibraryTrackKey, JSON.stringify({
           id: source.id,
           name: source.name,
         }));
       }
     }
-    window.location.href = tool === 'shuffle' ? '/apps/stem-shuffle/index.html' : 'https://stemacle.com/app';
+    window.location.href = tool === 'shuffle' ? '/apps/stem-shuffle/index.html' : '/app/index.html';
   }
 
   function exportProject() {
@@ -2060,6 +2324,13 @@ body[data-surface="ios"] .track button {
     if (!iosProjectSources) return;
     const sources = sourceCandidates();
     iosProjectSources.innerHTML = '';
+    if (!sources.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ios-empty';
+      empty.textContent = 'Import a track from Files first, then return here to make a project.';
+      iosProjectSources.appendChild(empty);
+      return;
+    }
     sources.forEach((source) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -2106,24 +2377,27 @@ body[data-surface="ios"] .track button {
 
   function renderIOSLibraryTracks() {
     if (!iosLibraryTrackList) return;
-    const tracks = currentTracks();
+    const tracks = sortLibraryTracks(currentTracks());
     iosLibraryTrackList.innerHTML = '';
     if (!tracks.length) {
       const empty = document.createElement('div');
       empty.className = 'ios-empty';
-      empty.textContent = 'Import audio from Files to build the local crate';
+      empty.textContent = iosLibraryFilter === 'all'
+        ? 'Import audio from Files to build the local crate'
+        : 'No tracks match this filter yet';
       iosLibraryTrackList.appendChild(empty);
       return;
     }
     tracks.forEach((track) => {
       const row = document.createElement('div');
-      row.className = 'ios-project-row';
+      row.className = 'ios-track-row';
+      row.dataset.status = track.analysisStatus || 'indexed';
       const detail = document.createElement('div');
-      detail.innerHTML = `<span class="ios-project-title">${track.name}</span><small>${formatSize(track.size)} · ${formatDuration(track.duration)} · ${track.analysisStatus || 'indexed'}</small>`;
+      detail.innerHTML = `<span class="ios-project-title">${track.name}</span><small>${formatSize(track.size)} · ${formatDuration(track.duration)} · ${trackStatusLabel(track)}</small>`;
       const create = document.createElement('button');
       create.type = 'button';
       create.className = 'ios-action';
-      create.textContent = 'project';
+      create.textContent = 'open';
       create.addEventListener('click', () => {
         const project = ensureProjectForTrack(track);
         selectedProjectId = project.id;
@@ -2132,6 +2406,46 @@ body[data-surface="ios"] .track button {
       });
       row.append(detail, create);
       iosLibraryTrackList.appendChild(row);
+    });
+  }
+
+  function renderIOSQueueList() {
+    if (!iosLibraryQueueList) return;
+    const tracks = sortLibraryTracks(currentTracks()).slice(0, 5);
+    iosLibraryQueueList.innerHTML = '';
+    if (!tracks.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ios-empty';
+      empty.textContent = 'Track status will show up here after you import music.';
+      iosLibraryQueueList.appendChild(empty);
+      return;
+    }
+    tracks.forEach((track) => {
+      const row = document.createElement('div');
+      row.className = 'ios-project-row';
+      row.innerHTML = `
+        <div>
+          <span class="ios-project-title">${track.name}</span>
+          <small>${trackStatusLabel(track)} · ${formatDuration(track.duration)} · ${new Date(track.lastModified || Date.now()).toLocaleDateString()}</small>
+        </div>
+        <button class="ios-link-button" type="button">open</button>
+      `;
+      row.querySelector('button').addEventListener('click', () => {
+        const project = ensureProjectForTrack(track);
+        selectedProjectId = project.id;
+        setIOSView('projects');
+        renderIOSApp();
+      });
+      iosLibraryQueueList.appendChild(row);
+    });
+  }
+
+  function syncIOSLibraryControls() {
+    document.querySelectorAll('[data-ios-library-sort]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.iosLibrarySort === iosLibrarySort));
+    });
+    document.querySelectorAll('[data-ios-library-filter]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.iosLibraryFilter === iosLibraryFilter));
     });
   }
 
@@ -2160,11 +2474,16 @@ body[data-surface="ios"] .track button {
     iosProjectCount.textContent = String(projects.length);
     iosTrackCount.textContent = String(tracks.length);
     iosExportCount.textContent = String(exportCount);
+    if (iosLibraryCount) {
+      iosLibraryCount.textContent = `${tracks.length} ${tracks.length === 1 ? 'track' : 'tracks'}`;
+    }
     renderProjectList(iosRecentProjectStrip, projects.slice(0, 3), true);
     renderProjectList(iosProjectsList, projects);
     renderIOSProjectDetail(projects);
     renderIOSLibraryTracks();
+    renderIOSQueueList();
     renderProjectSources();
+    syncIOSLibraryControls();
     setIOSView(activeIOSView);
   }
 
@@ -2178,7 +2497,7 @@ body[data-surface="ios"] .track button {
         name: track.name,
       }));
     }
-    window.location.href = 'https://stemacle.com/app';
+    window.location.href = '/app/index.html';
   }
 
   function render() {
@@ -2202,6 +2521,7 @@ body[data-surface="ios"] .track button {
     renderSessions();
     renderRoots();
     renderTools();
+    renderHQSetup();
     renderCacheRoots();
     renderRecentProjects();
     renderPalette();
@@ -2520,6 +2840,31 @@ body[data-surface="ios"] .track button {
     });
   }
 
+  function renderHQSetup() {
+    const card = document.getElementById('hqSetupCard');
+    if (!card) return;
+    const isDesktop = Boolean(window.stemacleNative) && !isIOSSurface;
+    const demucsReady = Boolean(desktopState?.tools?.demucs?.available);
+    const ffmpegReady = Boolean(desktopState?.tools?.ffmpeg?.available);
+    if (!isDesktop || demucsReady) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+    const command = document.getElementById('hqInstallCommand');
+    const body = document.getElementById('hqSetupBody');
+    if (command) {
+      command.textContent = ffmpegReady
+        ? 'pipx install demucs'
+        : 'pipx install demucs && brew install ffmpeg';
+    }
+    if (body) {
+      body.textContent = ffmpegReady
+        ? 'The HQ 4/6-stem models run a local copy of Demucs. Install it once, then re-check to unlock them — fast preview keeps working in the meantime.'
+        : 'The HQ 4/6-stem models run a local copy of Demucs (plus ffmpeg). Install them once, then re-check to unlock the HQ models — fast preview keeps working in the meantime.';
+    }
+  }
+
   function renderTools() {
     const tools = desktopState?.tools || {};
     toolStatusList.innerHTML = '';
@@ -2596,8 +2941,9 @@ body[data-surface="ios"] .track button {
   const commands = isIOSSurface
     ? [
         { label: 'Add audio files', hint: 'files', action: pickLibrary },
-        { label: 'Open Stem Splitter', hint: 'app', action: () => { window.location.href = 'https://stemacle.com/app'; } },
+        { label: 'Open Stem Splitter', hint: 'app', action: () => { window.location.href = '/app/index.html'; } },
         { label: 'Open Stem Shuffle', hint: 'decks', action: () => { window.location.href = '/apps/stem-shuffle/index.html'; } },
+        { label: 'Open Settings', hint: 'app store', action: () => setIOSView('settings') },
         { label: 'Clear library', hint: 'local', action: () => document.querySelector('[data-native-action="clear-library"]').click() },
       ]
     : [
@@ -2608,7 +2954,7 @@ body[data-surface="ios"] .track button {
         { label: 'Analyze selected', hint: selectedQuality, action: analyzeSelected },
         { label: 'Export stem pack', hint: 'wav', action: exportSelected },
         { label: 'Save session', hint: 'cmd/ctrl+s', action: saveSession },
-        { label: 'Open Stem Splitter', hint: 'app', action: () => { window.location.href = 'https://stemacle.com/app'; } },
+        { label: 'Open Stem Splitter', hint: 'app', action: () => { window.location.href = '/app/index.html'; } },
         { label: 'Open Stem Shuffle', hint: 'decks', action: () => { window.location.href = '/apps/stem-shuffle/index.html'; } },
       ];
 
@@ -2663,6 +3009,41 @@ body[data-surface="ios"] .track button {
     });
   });
 
+  document.querySelectorAll('[data-hq-action="copy-install"]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const text = document.getElementById('hqInstallCommand')?.textContent || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        const original = button.textContent;
+        button.textContent = 'copied';
+        setTimeout(() => { button.textContent = original; }, 1400);
+      } catch (error) {
+        // Clipboard may be unavailable; leave the command visible to copy by hand.
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-hq-action="recheck"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      // getState() re-runs native tool detection, so this genuinely re-checks.
+      refreshDesktopState();
+    });
+  });
+
+  document.querySelectorAll('[data-ios-library-sort]').forEach((button) => {
+    button.addEventListener('click', () => {
+      iosLibrarySort = button.dataset.iosLibrarySort;
+      renderIOSApp();
+    });
+  });
+
+  document.querySelectorAll('[data-ios-library-filter]').forEach((button) => {
+    button.addEventListener('click', () => {
+      iosLibraryFilter = button.dataset.iosLibraryFilter;
+      renderIOSApp();
+    });
+  });
+
   document.querySelectorAll('[data-ios-filter]').forEach((button) => {
     button.addEventListener('click', () => {
       const filter = button.dataset.iosFilter;
@@ -2679,9 +3060,9 @@ body[data-surface="ios"] .track button {
       const action = button.dataset.iosAction;
       const project = findProject() || latestProject();
       if (action === 'import-track') pickLibrary();
-      if (action === 'try-sample') showProjectSheet(iosSampleSources[0]);
       if (action === 'open-library') setIOSView('library');
       if (action === 'open-projects') setIOSView('projects');
+      if (action === 'open-settings') setIOSView('settings');
       if (action === 'new-project') showProjectSheet();
       if (action === 'close-project-sheet') closeProjectSheet();
       if (action === 'create-project') createProjectFromSheet();
@@ -2692,6 +3073,7 @@ body[data-surface="ios"] .track button {
       if (action === 'open-shuffle') openProjectTool(project, 'shuffle');
       if (action === 'export-project') exportProject();
       if (action === 'share-project') shareProject();
+      if (action === 'leave-review') window.location.href = '/support/#review';
       if (action === 'rename-project' && project) {
         const name = prompt('Project name', project.name);
         if (name && name.trim()) updateProject(project.id, (current) => ({ ...current, name: name.trim() }));

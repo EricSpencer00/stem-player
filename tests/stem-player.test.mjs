@@ -42,6 +42,14 @@ function loadNotFoundHtml() {
   return readFileSync(new URL('../404.html', import.meta.url), 'utf8');
 }
 
+function loadPrivacyHtml() {
+  return readFileSync(new URL('../privacy/index.html', import.meta.url), 'utf8');
+}
+
+function loadSupportHtml() {
+  return readFileSync(new URL('../support/index.html', import.meta.url), 'utf8');
+}
+
 function loadReleaseWorkflow() {
   return readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 }
@@ -173,6 +181,20 @@ test('ios coming soon page is a real branded destination, not a dead link', () =
   assert.doesNotMatch(html, /TestFlight is the next surface/i);
 });
 
+test('privacy and support pages are real public destinations', () => {
+  const privacy = loadPrivacyHtml();
+  const support = loadSupportHtml();
+
+  assert.match(privacy, /<title>Stemacle Privacy Policy<\/title>/);
+  assert.match(privacy, /What stays local/);
+  assert.match(privacy, /What we do not collect/);
+  assert.match(privacy, /Back to Stemacle/);
+  assert.match(support, /<title>Stemacle Support<\/title>/);
+  assert.match(support, /Open GitHub issue/);
+  assert.match(support, /Leave a Review/);
+  assert.match(support, /id="review"/);
+});
+
 test('landing page keeps release labels terse and avoids platform-aware CTA scripting', () => {
   const html = loadLandingHtml();
 
@@ -192,9 +214,9 @@ test('native shell keeps the Stemacle design and launches bundled apps', () => {
 
   assert.match(html, /<title>Stemacle App<\/title>/);
   assert.match(html, /stemacle/);
-  assert.match(html, /href="https:\/\/stemacle\.com\/app\/?/);
+  assert.match(html, /href="\/app\/index\.html"/);
   assert.match(html, /href="\/apps\/stem-shuffle\/(?:index\.html)?"/);
-  assert.match(html, /window\.location\.href = 'https:\/\/stemacle\.com\/app'/);
+  assert.match(html, /window\.location\.href = '\/app\/index\.html'/);
   assert.match(html, /window\.location\.href = '\/apps\/stem-shuffle\/(?:index\.html)?'/);
   assert.match(html, /id="libraryDropzone"/);
   assert.match(html, /id="libraryList"/);
@@ -331,6 +353,8 @@ test('site prepare preserves the perfect /app bundle and redirects only legacy s
   assert.match(script, /copyIntoSite\('app'\)/);
   assert.match(script, /copyIntoSite\('apps'\)/);
   assert.match(script, /copyIntoSite\('ios-coming-soon'\)/);
+  assert.match(script, /copyIntoSite\('privacy'\)/);
+  assert.match(script, /copyIntoSite\('support'\)/);
   assert.match(script, /\/app\b/);
   assert.match(script, /\/app\/\*/);
   assert.doesNotMatch(script, /'\/app\s+https:\/\/stemacle\.com\/app\s+301'/);

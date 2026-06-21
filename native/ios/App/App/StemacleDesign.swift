@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private let backgroundArtworkLift: CGFloat = -44
+private let backgroundArtworkLift: CGFloat = -62
 
 enum StemacleDesign {
     static let paper = Color(red: 0.95, green: 0.91, blue: 0.82)
@@ -14,9 +14,9 @@ enum StemacleDesign {
     static let inkSoft = Color(red: 0.28, green: 0.24, blue: 0.27)
     static let mutedInk = Color(red: 0.46, green: 0.41, blue: 0.39)
     static let inkGhost = Color(red: 0.62, green: 0.57, blue: 0.51)
-    static let purple = Color(red: 0.29, green: 0.15, blue: 0.35)
-    static let amber = Color(red: 0.82, green: 0.51, blue: 0.2)
-    static let amberGlow = Color(red: 0.82, green: 0.51, blue: 0.2).opacity(0.38)
+    static let purple = Color(red: 0.63, green: 0.40, blue: 0.66)
+    static let amber = Color(red: 0.86, green: 0.74, blue: 0.53)
+    static let amberGlow = Color(red: 0.86, green: 0.74, blue: 0.53).opacity(0.34)
     static let rowGlow = Color(red: 0.79, green: 0.74, blue: 0.66).opacity(0.36)
     static let shadow = Color(red: 0.22, green: 0.17, blue: 0.12).opacity(0.18)
 
@@ -127,21 +127,26 @@ struct StemacleAppIconMark: View {
 }
 
 struct StemacleScreen<Content: View>: View {
+    var showsTentacleFooter = true
     let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(showsTentacleFooter: Bool = true, @ViewBuilder content: () -> Content) {
+        self.showsTentacleFooter = showsTentacleFooter
         self.content = content()
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            StemacleBackground()
-            TentacleFooter(opacity: 0.52)
-                .allowsHitTesting(false)
-            content
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(StemacleDesign.ink)
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background {
+                StemacleBackground()
+            }
+            .overlay(alignment: .bottom) {
+                if showsTentacleFooter {
+                    TentacleFooter(opacity: 0.42)
+                        .allowsHitTesting(false)
+                }
+            }
     }
 }
 
@@ -169,19 +174,14 @@ struct TentacleFooter: View {
     var opacity: Double = 0.48
 
     var body: some View {
-        GeometryReader { proxy in
-            VStack {
-                Spacer()
-                StemacleAssetImage(asset: .bottomBorder)
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: proxy.size.width, height: min(260, proxy.size.height * 0.34), alignment: .bottom)
-                    .clipped()
-                    .opacity(opacity)
-                    .offset(y: backgroundArtworkLift)
-                    .accessibilityLabel(StemacleAsset.bottomBorder.label)
-            }
-            .ignoresSafeArea(edges: .bottom)
-        }
+        StemacleAssetImage(asset: .bottomBorder)
+            .aspectRatio(contentMode: .fill)
+            .frame(height: 120)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .opacity(opacity)
+            .offset(y: backgroundArtworkLift)
+            .accessibilityLabel(StemacleAsset.bottomBorder.label)
     }
 }
 
@@ -218,6 +218,35 @@ struct StemacleHairline: View {
         Rectangle()
             .fill(StemacleDesign.track.opacity(0.75))
             .frame(height: 1)
+    }
+}
+
+struct HideScrollContentBackgroundIfAvailable: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.scrollContentBackground(.hidden)
+        } else {
+            content
+        }
+    }
+}
+
+struct StemacleCompactListStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .listStyle(.insetGrouped)
+            .modifier(HideScrollContentBackgroundIfAvailable())
+            .foregroundStyle(StemacleDesign.ink)
+            .tint(StemacleDesign.purple)
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+            .listRowBackground(StemacleDesign.paper.opacity(0.92))
+            .listRowSeparatorTint(StemacleDesign.track.opacity(0.45))
+    }
+}
+
+extension View {
+    func stemacleCompactList() -> some View {
+        modifier(StemacleCompactListStyle())
     }
 }
 

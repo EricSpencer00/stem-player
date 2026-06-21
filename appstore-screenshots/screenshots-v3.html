@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=428">
+<title>Stemacle — App Store Screenshots v3</title>
+<style>
+
+:root {
+  --dark:    #1C1018;
+  --paper:   #F2E8D1;
+  --ink:     #261E26;
+  --drums:   #8A3D57;
+  --bass:    #2E565C;
+  --vocals:  #4A2659;
+  --melody:  #D18233;
+  --pad:     32px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0D0A0C;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 0 80px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.label {
+  color: rgba(255,255,255,0.28);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  align-self: flex-start;
+  margin-left: calc(50% - 214px);
+}
+
+.shot {
+  width: 428px;
+  height: 926px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-bottom: 52px;
+}
+
+.bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 1.5px 1.5px 0 0;
+}
+
+.spec-row {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  gap: 1.5px;
+  padding: 0 2px;
+}
+
+
+/* ══════════════════════════════════════════
+   S1 — IDENTITY
+   Headline top, circle bleeds from bottom
+   ══════════════════════════════════════════ */
+
+#s1 { background: var(--dark); }
+
+.s1-eyebrow {
+  position: absolute;
+  top: 72px;
+  left: var(--pad);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242,232,209,0.3);
+}
+
+.s1-headline {
+  position: absolute;
+  top: 106px;
+  left: var(--pad);
+  right: var(--pad);
+  font-size: 76px;
+  font-weight: 900;
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  color: var(--paper);
+}
+
+.s1-headline em {
+  font-style: normal;
+  color: rgba(242,232,209,0.38);
+}
+
+.s1-dots {
+  position: absolute;
+  top: 416px;
+  left: var(--pad);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.s1-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.s1-platform {
+  position: absolute;
+  top: 419px;
+  right: var(--pad);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(242,232,209,0.22);
+}
+
+/* Circle bleeds from bottom edge */
+.s1-circle-wrap {
+  position: absolute;
+  bottom: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 390px;
+  height: 390px;
+  pointer-events: none;
+}
+
+
+/* ══════════════════════════════════════════
+   S2 — FOUR STEMS
+   Stem names top, massive spectrogram fills rest
+   ══════════════════════════════════════════ */
+
+#s2 { background: var(--paper); }
+
+.s2-stems {
+  position: absolute;
+  top: 60px;
+  left: var(--pad);
+}
+
+.s2-stem-name {
+  font-size: 66px;
+  font-weight: 900;
+  line-height: 1.0;
+  letter-spacing: -0.03em;
+  display: block;
+}
+
+.s2-sub {
+  position: absolute;
+  top: 340px;
+  left: var(--pad);
+  right: var(--pad);
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(38,30,38,0.46);
+  line-height: 1.5;
+  letter-spacing: 0.005em;
+}
+
+.s2-spec {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* ══════════════════════════════════════════
+   S3 — CONTROL
+   Compact headline, mixer close underneath, tall spec
+   ══════════════════════════════════════════ */
+
+#s3 { background: var(--dark); }
+
+.s3-eyebrow {
+  position: absolute;
+  top: 68px;
+  left: var(--pad);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(242,232,209,0.32);
+}
+
+.s3-headline {
+  position: absolute;
+  top: 96px;
+  left: var(--pad);
+  right: var(--pad);
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+}
+
+.s3-headline em { font-style: normal; color: var(--melody); }
+
+.mixer {
+  position: absolute;
+  top: 262px;
+  left: var(--pad);
+  right: var(--pad);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 20px 18px 18px;
+}
+
+.mixer-title {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242,232,209,0.22);
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.mix-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+
+.mix-row:last-of-type { margin-bottom: 0; }
+
+.mix-label {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.mix-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mix-fill { height: 100%; border-radius: 3px; }
+
+.mix-badge {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: center;
+}
+
+.badge-mute   { background: rgba(255,255,255,0.07); color: rgba(242,232,209,0.32); }
+.badge-solo   { background: var(--vocals); color: white; }
+.badge-muted  { border: 1px solid rgba(255,255,255,0.08); color: rgba(242,232,209,0.2); }
+
+.mix-row.is-solo {
+  background: rgba(74,38,89,0.2);
+  border-radius: 9px;
+  padding: 5px 8px;
+  margin: 0 -8px 13px;
+}
+
+.loop-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.loop-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.loop-lbl {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(242,232,209,0.26);
+}
+
+.loop-btns { display: flex; gap: 4px; }
+
+.lbtn {
+  font-size: 7.5px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(242,232,209,0.32);
+}
+
+.lbtn.on { background: var(--melody); color: white; }
+
+.loop-vis {
+  height: 5px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.loop-fill-vis {
+  position: absolute; top: 0; bottom: 0;
+  left: 22%; width: 34%;
+  background: var(--melody);
+  opacity: 0.55;
+  border-radius: 3px;
+}
+
+/* Tall spectrogram at bottom of S3 */
+.s3-spec {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* ══════════════════════════════════════════
+   S4 — DROP FLOW
+   Massive headline top, SVG circle, clean flow
+   ══════════════════════════════════════════ */
+
+#s4 { background: var(--paper); }
+
+.s4-hl {
+  position: absolute;
+  top: 62px;
+  left: var(--pad);
+  font-size: 100px;
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+}
+
+.s4-sub {
+  position: absolute;
+  top: 362px;
+  left: var(--pad);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(38,30,38,0.3);
+}
+
+.s4-flow {
+  position: absolute;
+  top: 400px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 330px;
+}
+
+.file-chip {
+  background: white;
+  border-radius: 15px;
+  padding: 13px 17px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-shadow: 0 5px 24px rgba(38,30,38,0.11), 0 1px 3px rgba(38,30,38,0.06);
+}
+
+.chip-icon {
+  width: 38px; height: 46px;
+  background: var(--vocals);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.chip-name { font-size: 13px; font-weight: 700; color: var(--ink); }
+.chip-meta { font-size: 9.5px; color: rgba(38,30,38,0.42); margin-top: 2px; }
+
+.flow-arr {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(38,30,38,0.2);
+  font-size: 16px;
+}
+
+.stem-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.stem-pill {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 7px 13px;
+  border-radius: 20px;
+  color: white;
+}
+
+
+/* ══════════════════════════════════════════
+   S5 — PRICE
+   Cream background so tentacle PNG blends
+   ══════════════════════════════════════════ */
+
+#s5 { background: var(--paper); }
+
+.s5-tentacle {
+  position: absolute;
+  top: -20px;
+  right: -30px;
+  width: 400px;
+  height: 400px;
+  object-fit: contain;
+  opacity: 0.62;
+}
+
+.s5-block {
+  position: absolute;
+  top: 390px;
+  left: var(--pad);
+  right: var(--pad);
+}
+
+.s5-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(38,30,38,0.35);
+  margin-bottom: 14px;
+}
+
+.s5-price {
+  font-size: 112px;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  color: var(--ink);
+  line-height: 0.9;
+  margin-bottom: 12px;
+}
+
+.s5-once {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(38,30,38,0.42);
+}
+
+.s5-chips {
+  position: absolute;
+  bottom: 160px;
+  left: var(--pad);
+  right: var(--pad);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.s5-chip {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 11px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(38,30,38,0.14);
+  color: rgba(38,30,38,0.42);
+}
+
+</style>
+</head>
+<body>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- S1: IDENTITY                               -->
+<!-- Headline top · circle bleeds from bottom   -->
+<!-- ══════════════════════════════════════════ -->
+<div class="label">1 of 5 — Identity</div>
+<div class="shot" id="s1">
+
+  <div class="s1-eyebrow">Stemacle · Stem Splitter</div>
+
+  <div class="s1-headline">
+    Finally<br>hear<br>what's<br><em>under.</em>
+  </div>
+
+  <!-- stem names as a tight horizontal list — carries color without redundant dots -->
+  <div style="position:absolute;top:414px;left:var(--pad);right:var(--pad);display:flex;gap:0;align-items:center;">
+    <span style="font-size:8.5px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:var(--drums)">Drums</span>
+    <span style="font-size:8.5px;font-weight:700;letter-spacing:0.1em;color:rgba(242,232,209,0.2);margin:0 6px">·</span>
+    <span style="font-size:8.5px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:var(--bass)">Bass</span>
+    <span style="font-size:8.5px;font-weight:700;letter-spacing:0.1em;color:rgba(242,232,209,0.2);margin:0 6px">·</span>
+    <span style="font-size:8.5px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:var(--vocals)">Vocals</span>
+    <span style="font-size:8.5px;font-weight:700;letter-spacing:0.1em;color:rgba(242,232,209,0.2);margin:0 6px">·</span>
+    <span style="font-size:8.5px;font-weight:800;letter-spacing:0.16em;text-transform:uppercase;color:var(--melody)">Melody</span>
+    <span style="margin-left:auto;font-size:8.5px;font-weight:600;letter-spacing:0.13em;text-transform:uppercase;color:rgba(242,232,209,0.2)">iOS · macOS · Web</span>
+  </div>
+
+  <!-- Circle bleeds from bottom, 390px diameter, bottom:-100px = showing top 290px of it -->
+  <div class="s1-circle-wrap">
+    <svg viewBox="0 0 390 390" fill="none" xmlns="http://www.w3.org/2000/svg" width="390" height="390">
+      <!-- depth layers -->
+      <circle cx="195" cy="195" r="188" fill="#2A1A25"/>
+      <circle cx="195" cy="195" r="188" stroke="rgba(255,255,255,0.045)" stroke-width="1.5" fill="none"/>
+      <circle cx="195" cy="195" r="138" fill="#221520"/>
+      <circle cx="195" cy="195" r="138" stroke="rgba(255,255,255,0.035)" stroke-width="1" fill="none"/>
+      <circle cx="195" cy="195" r="90" fill="#1C1018"/>
+      <circle cx="195" cy="195" r="90" stroke="rgba(255,255,255,0.03)" stroke-width="1" fill="none"/>
+      <!-- glint -->
+      <ellipse cx="164" cy="128" rx="36" ry="16" fill="rgba(255,255,255,0.03)" transform="rotate(-28 164 128)"/>
+      <!-- 4 stem arcs on outer ring (r=188) — each quadrant -->
+      <path d="M195 7 A188 188 0 0 1 375 187" stroke="#8A3D57" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M375 187 A188 188 0 0 1 207 383" stroke="#2E565C" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M207 383 A188 188 0 0 1 15 203" stroke="#4A2659" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M15 203 A188 188 0 0 1 195 7"   stroke="#D18233" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <!-- down arrow in core -->
+      <path d="M195 175 L195 215 M179 204 L195 220 L211 204" stroke="rgba(242,232,209,0.45)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- S2: FOUR STEMS                             -->
+<!-- Names top in stem colors · massive spec    -->
+<!-- ══════════════════════════════════════════ -->
+<div class="label">2 of 5 — Four Stems</div>
+<div class="shot" id="s2">
+
+  <div class="s2-stems">
+    <span class="s2-stem-name" style="color:var(--drums)">Drums.</span>
+    <span class="s2-stem-name" style="color:var(--bass)">Bass.</span>
+    <span class="s2-stem-name" style="color:var(--vocals)">Vocals.</span>
+    <span class="s2-stem-name" style="color:var(--melody)">Melody.</span>
+  </div>
+
+  <div class="s2-sub">Four stems from any track, on your device, in seconds.</div>
+
+  <!-- spectrogram fills bottom ~480px (4 × 120px) -->
+  <div class="s2-spec">
+    <div class="spec-row" id="s2-drums" style="height:120px;background:rgba(138,61,87,0.09);"></div>
+    <div class="spec-row" id="s2-bass"  style="height:120px;background:rgba(46,86,92,0.09);"></div>
+    <div class="spec-row" id="s2-vocals" style="height:120px;background:rgba(74,38,89,0.09);"></div>
+    <div class="spec-row" id="s2-melody" style="height:120px;background:rgba(209,130,51,0.09);"></div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- S3: CONTROL                                -->
+<!-- Compact, mixer close under headline, tall  -->
+<!-- ══════════════════════════════════════════ -->
+<div class="label">3 of 5 — Control</div>
+<div class="shot" id="s3">
+
+  <div class="s3-eyebrow">Loop · Solo · Mute</div>
+
+  <div class="s3-headline">Make it<br><em>yours.</em></div>
+
+  <div class="mixer">
+    <div class="mixer-title">Stemacle · Stem Mixer</div>
+
+    <div class="mix-row">
+      <span class="mix-label" style="color:var(--drums)">Drums</span>
+      <div class="mix-track"><div class="mix-fill" style="width:92%;background:var(--drums)"></div></div>
+      <span class="mix-badge badge-mute">Mute</span>
+    </div>
+
+    <div class="mix-row">
+      <span class="mix-label" style="color:var(--bass)">Bass</span>
+      <div class="mix-track"><div class="mix-fill" style="width:100%;background:var(--bass)"></div></div>
+      <span class="mix-badge badge-mute">Mute</span>
+    </div>
+
+    <div class="mix-row is-solo">
+      <span class="mix-label" style="color:var(--vocals);font-size:8px">Vocals</span>
+      <div class="mix-track" style="height:6px"><div class="mix-fill" style="width:78%;background:var(--vocals)"></div></div>
+      <span class="mix-badge badge-solo">Solo</span>
+    </div>
+
+    <div class="mix-row" style="opacity:0.26">
+      <span class="mix-label" style="color:var(--melody)">Melody</span>
+      <div class="mix-track"><div class="mix-fill" style="width:42%;background:var(--melody)"></div></div>
+      <span class="mix-badge badge-muted">Muted</span>
+    </div>
+
+    <div class="loop-section">
+      <div class="loop-hdr">
+        <span class="loop-lbl">Loop · Vocals</span>
+        <div class="loop-btns">
+          <span class="lbtn">¼</span>
+          <span class="lbtn on">½</span>
+          <span class="lbtn">1</span>
+          <span class="lbtn">2</span>
+        </div>
+      </div>
+      <div class="loop-vis"><div class="loop-fill-vis"></div></div>
+    </div>
+  </div>
+
+  <!-- Tall spectrogram: fills from mixer bottom (~570) to screen bottom (926) = 356px / 4 rows = 89px each -->
+  <div class="s3-spec">
+    <div class="spec-row" id="s3-drums"  style="height:89px;background:rgba(138,61,87,0.12);"></div>
+    <div class="spec-row" id="s3-bass"   style="height:89px;background:rgba(46,86,92,0.12);"></div>
+    <div class="spec-row" id="s3-vocals" style="height:89px;background:rgba(74,38,89,0.18);"></div>
+    <div class="spec-row" id="s3-melody" style="height:89px;background:rgba(209,130,51,0.12);"></div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- S4: DROP FLOW                              -->
+<!-- 100px headline · SVG circle · clean        -->
+<!-- ══════════════════════════════════════════ -->
+<div class="label">4 of 5 — Drop Flow</div>
+<div class="shot" id="s4">
+
+  <div class="s4-hl">Just<br>drop<br>it.</div>
+  <div class="s4-sub">Any file · Any format</div>
+
+  <div class="s4-flow">
+
+    <div class="file-chip">
+      <div class="chip-icon">♪</div>
+      <div>
+        <div class="chip-name">red_light_blues.mp3</div>
+        <div class="chip-meta">Alex & UnrealDM · 5.2 MB</div>
+      </div>
+    </div>
+
+    <div class="flow-arr">↓</div>
+
+    <!-- SVG: the iconic Stemacle 3-ring circle -->
+    <svg viewBox="0 0 160 160" width="160" height="160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- outer ring (concentric, physical) -->
+      <circle cx="80" cy="80" r="76" fill="#DDD3B8"/>
+      <circle cx="80" cy="80" r="76" stroke="rgba(255,255,255,0.25)" stroke-width="1" fill="none"/>
+      <!-- specular glint top-left -->
+      <ellipse cx="58" cy="42" rx="16" ry="8" fill="rgba(255,255,255,0.22)" transform="rotate(-30 58 42)"/>
+      <!-- mid ring -->
+      <circle cx="80" cy="80" r="54" fill="#CCBE9E"/>
+      <circle cx="80" cy="80" r="54" stroke="rgba(255,255,255,0.18)" stroke-width="0.75" fill="none"/>
+      <!-- core -->
+      <circle cx="80" cy="80" r="35" fill="#BFB08C"/>
+      <circle cx="80" cy="80" r="35" stroke="rgba(255,255,255,0.15)" stroke-width="0.75" fill="none"/>
+      <!-- drop shadow suggestion -->
+      <circle cx="80" cy="80" r="76" fill="none" stroke="rgba(38,30,38,0.12)" stroke-width="2"/>
+      <!-- down arrow -->
+      <path d="M80 68 L80 93 M70 84 L80 94 L90 84" stroke="rgba(38,30,38,0.48)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- SPLIT label -->
+      <text x="80" y="110" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="6.5" font-weight="800" letter-spacing="2" fill="rgba(38,30,38,0.35)">DROP AUDIO</text>
+    </svg>
+
+    <div class="flow-arr">↓</div>
+
+    <div class="stem-pills">
+      <span class="stem-pill" style="background:var(--drums)">Drums</span>
+      <span class="stem-pill" style="background:var(--bass)">Bass</span>
+      <span class="stem-pill" style="background:var(--vocals)">Vocals</span>
+      <span class="stem-pill" style="background:var(--melody)">Melody</span>
+    </div>
+
+  </div>
+
+  <!-- tentacle border at bottom -->
+  <img src="../assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png"
+       style="position:absolute;bottom:0;left:0;width:100%;height:80px;object-fit:cover;object-position:top center;"
+       alt="">
+
+</div>
+
+
+<!-- ══════════════════════════════════════════ -->
+<!-- S5: PRICE                                  -->
+<!-- Cream so tentacle PNG blends naturally     -->
+<!-- ══════════════════════════════════════════ -->
+<div class="label">5 of 5 — Price</div>
+<div class="shot" id="s5">
+
+  <!-- Tentacle: on cream bg the app icon bg disappears -->
+  <img class="s5-tentacle"
+       src="../assets/stemacle-tentacle.png"
+       onerror="this.src='../assets/release-icons/stemacle-release-icon-05.png'"
+       alt="">
+
+  <div class="s5-block">
+    <div class="s5-eyebrow">One-time purchase · No subscription</div>
+    <div class="s5-price">$2.99</div>
+    <div class="s5-once">Yours. Forever.</div>
+  </div>
+
+  <div class="s5-chips">
+    <span class="s5-chip">No uploads</span>
+    <span class="s5-chip">No account</span>
+    <span class="s5-chip">On-device</span>
+    <span class="s5-chip">Offline after first run</span>
+  </div>
+
+</div>
+
+
+<!-- ── spectrogram bar generation ── -->
+<script>
+function sr(n){const x=Math.sin(n*9301+49297)*233280;return x-Math.floor(x);}
+function drums(n){return Array.from({length:n},(_,i)=>{const k=[0,1,21,22,42,43,63,64].includes(i)?0.78+sr(i*3)*0.22:0;const s=[10,11,31,32,52,53].includes(i)?0.6+sr(i*7)*0.3:0;const h=i>38?sr(i*11)*0.42+0.05:sr(i*9)*0.16;return Math.min(0.97,k+s+h*0.5+sr(i*23)*0.1);});}
+function bass(n){return Array.from({length:n},(_,i)=>{const f=Math.max(0,0.96-i*0.044)*(0.55+sr(i*7)*0.45);const h=i<22?Math.max(0,0.55-i*0.025)*(0.5+sr(i*11)*0.5):0;return Math.min(0.95,f*0.6+h*0.4+sr(i)*0.07);});}
+function vocals(n){return Array.from({length:n},(_,i)=>{const f1=Math.exp(-Math.pow((i-18)/7,2))*0.85;const f2=Math.exp(-Math.pow((i-38)/8,2))*0.8;const f3=Math.exp(-Math.pow((i-56)/7,2))*0.62;return Math.min(0.94,(f1+f2+f3)*(0.55+sr(i*3)*0.45)+sr(i*11)*0.12);});}
+function melody(n){return Array.from({length:n},(_,i)=>{const sp=Math.exp(-Math.pow((i-42)/22,2))*0.8;const br=Math.exp(-Math.pow((i-65)/15,2))*0.55;return Math.min(0.92,(sp+br)*(0.5+sr(i*5)*0.5)+sr(i*7)*0.14);});}
+
+function buildBars(id,scales,color,h){
+  const el=document.getElementById(id);if(!el)return;
+  scales.forEach(s=>{const b=document.createElement('div');b.className='bar';b.style.cssText=`height:${Math.max(3,s*h)}px;background:${color};opacity:0.84;`;el.appendChild(b);});
+}
+
+const N=85;
+buildBars('s2-drums', drums(N),  'var(--drums)',  120);
+buildBars('s2-bass',  bass(N),   'var(--bass)',   120);
+buildBars('s2-vocals',vocals(N), 'var(--vocals)', 120);
+buildBars('s2-melody',melody(N), 'var(--melody)', 120);
+
+buildBars('s3-drums', drums(N),  'var(--drums)',  89);
+buildBars('s3-bass',  bass(N),   'var(--bass)',   89);
+buildBars('s3-vocals',vocals(N), 'var(--vocals)', 89);
+buildBars('s3-melody',melody(N), 'var(--melody)', 89);
+</script>
+
+</body>
+</html>

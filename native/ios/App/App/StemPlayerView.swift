@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -8,27 +9,45 @@ struct StemPlayerView: View {
     @ObservedObject var viewModel: StemPlayerViewModel
     @State private var showingImporter = false
 
+    @AppStorage("stemacle.keepScreenAwake") private var keepScreenAwake = true
+    @AppStorage("stemacle.preferSoloLoopMonitor") private var preferSoloLoopMonitor = false
+    @AppStorage("stemacle.showWaveformHints") private var showWaveformHints = true
+
     private let webRowOrder: [Stem] = [.drums, .bass, .vocals, .melody]
+
+    private func updateIdleTimer() {
+        UIApplication.shared.isIdleTimerDisabled = keepScreenAwake && viewModel.isPlaying
+    }
+
+    /// Shows the native App Store review prompt. Uses `SKStoreReviewController` so
+    /// it works on the iOS 15 deployment target. The system rate-limits how often
+    /// this actually appears, so we only ask at genuinely happy moments.
+    private func requestReview() {
+        guard
+            let scene = UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+        else { return }
+        SKStoreReviewController.requestReview(in: scene)
+    }
 
     var body: some View {
         StemacleScreen {
             ScrollView {
                 VStack(spacing: 0) {
-                    StemacleWordmark()
-                        .padding(.top, 16)
-                        .padding(.bottom, 28)
-
                     StemacleDeviceView(viewModel: viewModel) {
                         showingImporter = true
                     }
+                    .padding(.top, 8)
                     .padding(.bottom, 22)
 
-                    Text(viewModel.isReady ? READY_HINT : "Drop a track to begin")
-                        .font(.caption2.weight(.semibold))
-                        .textCase(.uppercase)
-                        .foregroundStyle(StemacleDesign.inkSoft)
-                        .multilineTextAlignment(.center)
-                        .padding(.bottom, viewModel.isReady ? 20 : 10)
+                    if showWaveformHints || !viewModel.isReady {
+                        Text(viewModel.isReady ? READY_HINT : "Drop a track to begin")
+                            .font(.caption2.weight(.semibold))
+                            .textCase(.uppercase)
+                            .foregroundStyle(StemacleDesign.inkSoft)
+                            .multilineTextAlignment(.center)
+                            .padding(.bottom, viewModel.isReady ? 20 : 10)
+                    }
 
                     StemLocalProjectHint(viewModel: viewModel) {
                         showingImporter = true
@@ -98,6 +117,27 @@ struct StemPlayerView: View {
                 showingImporter = false
                 viewModel.load(audioAt: url)
             }
+        }
+        .onAppear {
+            viewModel.preferSoloLoopMonitor = preferSoloLoopMonitor
+            updateIdleTimer()
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        .onChange(of: preferSoloLoopMonitor) { newValue in
+            viewModel.preferSoloLoopMonitor = newValue
+        }
+        .onChange(of: keepScreenAwake) { _ in
+            updateIdleTimer()
+        }
+        .onChange(of: viewModel.isPlaying) { _ in
+            updateIdleTimer()
+        }
+        .onChange(of: viewModel.shouldRequestReview) { shouldAsk in
+            guard shouldAsk else { return }
+            requestReview()
+            viewModel.didRequestReview()
         }
     }
 }
@@ -799,6 +839,19 @@ struct ProcessingOverlay: View {
                     .foregroundStyle(StemacleDesign.inkGhost)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)
+
+                Button {
+                    viewModel.cancelLoad()
+                } label: {
+                    Text("Cancel")
+                        .font(.caption2.weight(.bold))
+                        .textCase(.uppercase)
+                        .frame(minWidth: 140, minHeight: 42)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(StemacleDesign.inkSoft)
+                .overlay(Capsule().stroke(StemacleDesign.track, lineWidth: 1))
+                .padding(.top, 4)
             }
             .padding(28)
         }

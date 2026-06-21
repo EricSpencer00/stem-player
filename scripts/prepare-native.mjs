@@ -19,6 +19,8 @@ await mkdir(outDir, { recursive: true });
 await cp(join(root, 'native', 'index.html'), join(outDir, 'index.html'));
 await copyIntoBundle('app');
 await copyIntoBundle('apps');
+await copyIntoBundle('privacy');
+await copyIntoBundle('support');
 await copyIntoBundle('assets');
 await copyIntoBundle('samples');
 

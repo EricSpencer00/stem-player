@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
-		7A00000160A2202600000009 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 7A00010160A2202600000009 /* onnxruntime */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -24,8 +23,6 @@
 		7A00000160A2202600000006 /* StemPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A00010160A2202600000006 /* StemPlayerView.swift */; };
 		7A00000160A2202600000007 /* StemShuffleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A00010160A2202600000007 /* StemShuffleView.swift */; };
 		7A00000160A2202600000008 /* StemacleSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A00010160A2202600000008 /* StemacleSettingsView.swift */; };
-		7A00000160A220260000000A /* StemacleHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A00010160A220260000000A /* StemacleHaptics.swift */; };
-		7A00000160A220260000000B /* StemResultCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A00010160A220260000000B /* StemResultCache.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,8 +43,6 @@
 		7A00010160A2202600000006 /* StemPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StemPlayerView.swift; sourceTree = "<group>"; };
 		7A00010160A2202600000007 /* StemShuffleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StemShuffleView.swift; sourceTree = "<group>"; };
 		7A00010160A2202600000008 /* StemacleSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StemacleSettingsView.swift; sourceTree = "<group>"; };
-		7A00010160A220260000000A /* StemacleHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StemacleHaptics.swift; sourceTree = "<group>"; };
-		7A00010160A220260000000B /* StemResultCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StemResultCache.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -56,7 +51,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A00000160A2202600000009 /* onnxruntime in Frameworks */,
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -94,8 +88,6 @@
 				7A00010160A2202600000006 /* StemPlayerView.swift */,
 				7A00010160A2202600000007 /* StemShuffleView.swift */,
 				7A00010160A2202600000008 /* StemacleSettingsView.swift */,
-				7A00010160A220260000000A /* StemacleHaptics.swift */,
-				7A00010160A220260000000B /* StemResultCache.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -121,10 +113,9 @@
 			);
 			dependencies = (
 			);
-			name = Stemacle;
+			name = App;
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
-				7A00010160A2202600000009 /* onnxruntime */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -156,7 +147,6 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
-				7A0000A160A2202600000009 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -197,8 +187,6 @@
 				7A00000160A2202600000006 /* StemPlayerView.swift in Sources */,
 				7A00000160A2202600000007 /* StemShuffleView.swift in Sources */,
 				7A00000160A2202600000008 /* StemacleSettingsView.swift in Sources */,
-				7A00000160A220260000000A /* StemacleHaptics.swift in Sources */,
-				7A00000160A220260000000B /* StemResultCache.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -411,27 +399,11 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		7A0000A160A2202600000009 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.24.2;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		4D22ABE82AF431CB00220026 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
-		};
-		7A00010160A2202600000009 /* onnxruntime */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 7A0000A160A2202600000009 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
-			productName = onnxruntime;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

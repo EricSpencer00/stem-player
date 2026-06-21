@@ -41,7 +41,8 @@
     "@capacitor/cli": "^8.4.1",
     "@capacitor/ios": "^8.4.1",
     "electron": "^42.4.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "puppeteer": "^25.1.0"
   },
   "build": {
     "appId": "com.stemacle.app",
@@ -55,7 +56,9 @@
       "app/**/*",
       "apps/**/*",
       "assets/**/*",
+      "privacy/**/*",
       "samples/**/*",
+      "support/**/*",
       "native/**/*",
       "scripts/**/*",
       "capacitor.config.json",

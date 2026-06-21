@@ -195,23 +195,21 @@ struct StemacleMacSidebar: View {
             .padding(.vertical, 12)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                StemacleDesktopAppIcon(size: 42)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Stemacle")
-                        .font(.system(size: 24, weight: .heavy))
-                        .foregroundStyle(stemaclePlum)
-                    Text(summary.storageReady ? "local library ready" : "preparing storage")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(stemacleMuted)
-                }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Stemacle")
+                    .font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(stemaclePlum)
+                Text(summary.storageReady ? "local library ready" : "preparing storage")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(stemacleMuted)
                 Text(summary.countText)
                     .font(.caption2)
                     .foregroundStyle(stemacleMuted)
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
         }
         .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
         .scrollContentBackground(.hidden)
@@ -308,15 +306,22 @@ struct StemacleInstrumentPane: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: mode) { _, newMode in
-                    bridge.navigate(to: newMode.urlString)
+                    if newMode == .splitter {
+                        bridge.navigate(to: newMode.urlString)
+                    }
                 }
 
-                StemacleWebInstrument(bridge: bridge, initialURLString: mode.urlString)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                    )
+                if mode == .shuffle {
+                    StemacleMacShuffleView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    StemacleWebInstrument(bridge: bridge, initialURLString: mode.urlString)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                }
             }
         }
     }
@@ -347,6 +352,242 @@ enum StemacleInstrumentMode: String, CaseIterable, Identifiable {
         case .splitter: return "stemacle://app/app/index.html"
         case .shuffle: return "stemacle://app/apps/stem-shuffle/index.html"
         }
+    }
+}
+
+private struct MacShuffleTrack: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let bpm: Int
+    let key: String
+}
+
+private enum MacMixDeck: String, CaseIterable, Identifiable {
+    case track1 = "1"
+    case track2 = "2"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .track1: return "Track 1"
+        case .track2: return "Track 2"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .track1: return stemaclePlum
+        case .track2: return Color(red: 0.82, green: 0.51, blue: 0.2)
+        }
+    }
+}
+
+struct StemacleMacShuffleView: View {
+    @State private var track1 = MacShuffleTrack(id: "sample-1", title: "Stem Sample 1", bpm: 122, key: "Am")
+    @State private var track2 = MacShuffleTrack(id: "sample-2", title: "Stem Sample 2", bpm: 124, key: "C")
+    @State private var stemSources: [String: MacMixDeck] = [
+        "vocals": .track1,
+        "bass": .track1,
+        "drums": .track2,
+        "melody": .track2
+    ]
+    @State private var isPlaying = false
+    @State private var syncedBPM = 123
+    @State private var trackSettingsDeck: MacMixDeck?
+    @State private var nextMixHint = "Next mix queues automatically"
+
+    private let mixStemOrder = ["vocals", "bass", "drums", "melody"]
+    private let pool = [
+        MacShuffleTrack(id: "sample-1", title: "Stem Sample 1", bpm: 122, key: "Am"),
+        MacShuffleTrack(id: "sample-2", title: "Stem Sample 2", bpm: 124, key: "C"),
+        MacShuffleTrack(id: "sample-3", title: "Stem Sample 3", bpm: 118, key: "Dm"),
+    ]
+
+    var body: some View {
+        VStack(spacing: 16) {
+            macMixStatusBar
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                macTrackPad(deck: .track1, track: track1)
+                macTrackPad(deck: .track2, track: track2)
+                ForEach(mixStemOrder, id: \.self) { stemID in
+                    macStemPad(stemID: stemID)
+                }
+            }
+            .frame(maxWidth: 520)
+
+            Text("Tap a stem to swap Track 1 or Track 2. Pitch and tempo sync automatically while the DJ queue brings in the next pair.")
+                .font(.caption)
+                .foregroundStyle(stemacleMuted)
+                .frame(maxWidth: 520, alignment: .leading)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .sheet(item: $trackSettingsDeck) { deck in
+            macTrackSettingsSheet(deck: deck)
+        }
+    }
+
+    private var macMixStatusBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Label("Synced", systemImage: "link")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(stemaclePlum)
+                Text("\(syncedBPM) bpm")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(stemacleInk.opacity(0.78))
+                Spacer()
+                Button { isPlaying.toggle() } label: {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(stemacleInk)
+                Button(action: shufflePair) {
+                    Label("Shuffle", systemImage: "shuffle")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(stemaclePaper.opacity(0.9))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(stemacleLine, lineWidth: 1))
+            )
+
+            Text(nextMixHint)
+                .font(.caption2)
+                .foregroundStyle(stemacleMuted)
+        }
+        .frame(maxWidth: 520, alignment: .leading)
+    }
+
+    private func macTrackPad(deck: MacMixDeck, track: MacShuffleTrack) -> some View {
+        Button { trackSettingsDeck = deck } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(deck.label)
+                        .font(.caption.weight(.black))
+                    Spacer()
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.caption2.weight(.bold))
+                }
+                Text(track.title)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                HStack(spacing: 10) {
+                    Text("\(track.bpm) bpm")
+                    Text(track.key)
+                }
+                .font(.caption)
+                .foregroundStyle(stemacleMuted)
+            }
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+            .padding(12)
+            .background(macPadBackground(accent: deck.tint))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func macStemPad(stemID: String) -> some View {
+        let source = stemSources[stemID] ?? .track1
+        return Button {
+            stemSources[stemID] = source == .track1 ? .track2 : .track1
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(macStemTitle(stemID))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(stemaclePlum)
+                Text(source.label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(source.tint)
+                Text("Click to swap")
+                    .font(.caption2)
+                    .foregroundStyle(stemacleMuted)
+            }
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+            .padding(12)
+            .background(macPadBackground(accent: source.tint))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func macPadBackground(accent: Color) -> some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(stemacleRaised)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(accent.opacity(0.35), lineWidth: 1.5)
+            )
+    }
+
+    private func macStemTitle(_ stemID: String) -> String {
+        switch stemID {
+        case "vocals": return "Vocals"
+        case "bass": return "Bass"
+        case "drums": return "Drums"
+        case "melody": return "Melody"
+        default: return stemID.capitalized
+        }
+    }
+
+    private func macTrackSettingsSheet(deck: MacMixDeck) -> some View {
+        let track = deck == .track1 ? track1 : track2
+        return VStack(alignment: .leading, spacing: 16) {
+            Text("\(deck.label) settings")
+                .font(.title3.weight(.bold))
+            LabeledContent("Title", value: track.title)
+            LabeledContent("Tempo", value: "\(track.bpm) bpm")
+            LabeledContent("Key", value: track.key)
+            Button("Bring in a new track") {
+                shuffleTrack(for: deck)
+                trackSettingsDeck = nil
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(stemaclePlum)
+            Spacer()
+        }
+        .padding(24)
+        .frame(minWidth: 320, minHeight: 240)
+    }
+
+    private func track(for deck: MacMixDeck) -> MacShuffleTrack {
+        deck == .track1 ? track1 : track2
+    }
+
+    private func shuffleTrack(for deck: MacMixDeck) {
+        let currentIDs = Set([track1.id, track2.id])
+        let candidates = pool.filter { !currentIDs.contains($0.id) || pool.count <= 2 }
+        guard let next = candidates.randomElement() else { return }
+        if deck == .track1 {
+            track1 = next
+        } else {
+            track2 = next
+        }
+        refreshSync()
+    }
+
+    private func shufflePair() {
+        guard pool.count >= 2 else { return }
+        var candidates = pool.shuffled()
+        track1 = candidates.removeFirst()
+        track2 = candidates.first(where: { $0.id != track1.id }) ?? pool[1]
+        stemSources = [
+            "vocals": Bool.random() ? .track1 : .track2,
+            "bass": .track1,
+            "drums": .track2,
+            "melody": Bool.random() ? .track1 : .track2
+        ]
+        nextMixHint = "Queued · \(track1.title) × \(track2.title)"
+        refreshSync()
+    }
+
+    private func refreshSync() {
+        syncedBPM = Int(round(Double(track1.bpm + track2.bpm) / 2))
     }
 }
 
@@ -436,6 +677,19 @@ struct StemacleMacSettingsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("High-quality engine")
+                    .font(.headline)
+                    .foregroundStyle(stemacleInk)
+                Text("Fast preview runs entirely on-device and is always available. High-quality 4/6-stem separation uses a local copy of Demucs in the downloadable desktop build — install Demucs and ffmpeg, then reopen Stemacle to unlock it.")
+                    .font(.callout)
+                    .foregroundStyle(stemacleMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Link("High-quality setup guide", destination: URL(string: "https://stemacle.com/support/#high-quality")!)
+                    .font(.callout.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             HStack {
                 Button("Reveal Stemacle Data") {
                     bridge.revealApplicationSupportFromMenu()
@@ -455,21 +709,21 @@ struct StemacleMacPage<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(eyebrow.uppercased())
                     .font(.caption.weight(.bold))
-                    .tracking(2.2)
+                    .tracking(1.6)
                     .foregroundStyle(stemacleMuted)
                 Text(title)
-                    .font(.system(size: 46, weight: .heavy))
+                    .font(.system(size: 28, weight: .heavy))
                     .foregroundStyle(stemacleInk)
             }
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding(24)
+        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(stemacleRaised)
     }

@@ -63,6 +63,8 @@ function createWindow() {
     height: 880,
     minWidth: 920,
     minHeight: 720,
+    fullscreenable: true,
+    maximizable: true,
     title: 'Stemacle',
     backgroundColor: '#e8dfcf',
     icon: path.join(appRoot, 'native', 'electron', 'icon.png'),
@@ -146,6 +148,15 @@ function installMenu() {
       submenu: [
         { role: 'reload' },
         { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Toggle Full Screen',
+          accelerator: process.platform === 'darwin' ? 'Ctrl+Command+F' : 'F11',
+          click: () => {
+            const win = BrowserWindow.getFocusedWindow() || mainWindow;
+            if (win) win.setFullScreen(!win.isFullScreen());
+          },
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },

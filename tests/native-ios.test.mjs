@@ -45,15 +45,20 @@ test('ios native splitter ports the browser spectral separation pipeline', () =>
   assert.match(splitter, /fftSize\s*=\s*4096/);
   assert.match(splitter, /hopSize\s*=\s*1024/);
   assert.match(splitter, /modelBins\s*=\s*1024/);
+  assert.match(splitter, /import OnnxRuntimeBindings/);
+  assert.match(splitter, /ORTEnv/);
+  assert.match(splitter, /ORTSession/);
+  assert.match(splitter, /ORTValue/);
   assert.match(splitter, /func stft\(/);
   assert.match(splitter, /func istft\(/);
   assert.match(splitter, /func hpss\(/);
   assert.match(splitter, /func buildVocalMask\(/);
   assert.match(splitter, /func lowPassSpectrogram\(/);
   assert.match(splitter, /func spectralOverview\(/);
-  assert.match(splitter, /webDSPFallback/);
+  assert.match(splitter, /downloadModelFile\(/);
+  assert.match(splitter, /modelCache/);
+  assert.doesNotMatch(splitter, /fastFullTrackFallback/);
   assert.doesNotMatch(splitter, /bandPass\(centered/);
-  assert.doesNotMatch(splitter, /Finding drum transients/);
 });
 
 test('ios HPSS uses true median filters so vocals do not smear into drum stems', () => {
@@ -67,6 +72,17 @@ test('ios HPSS uses true median filters so vocals do not smear into drum stems',
   assert.match(medFilter, /sampleBin >= 0 && sampleBin < binCount/);
   assert.doesNotMatch(medFilter, /prefix\[/);
   assert.doesNotMatch(medFilter, /\/ Float\(length\)/);
+});
+
+test('ios stem overview compresses dynamics before drawing spectrogram lanes', () => {
+  const splitter = swift('NativeStemSplitter.swift');
+  const overview = splitter.match(/private func spectralOverview\([\s\S]*?private func emptyRows/)?.[0] ?? '';
+
+  assert.match(overview, /log1p|log10/);
+  assert.match(overview, /sorted\(\)/);
+  assert.match(overview, /percentile|reference/);
+  assert.doesNotMatch(overview, /peak \* 2\.2/);
+  assert.doesNotMatch(overview, /rms \* 5\.8/);
 });
 
 test('native splitter cancels stale background imports instead of burning CPU', () => {
@@ -90,6 +106,7 @@ test('native stem player exposes the original web player controls with iOS eleme
   assert.match(root, /return "Shuffle"/);
   assert.match(root, /return "Library"/);
   assert.match(root, /return "Settings"/);
+  assert.match(root, /StemLibraryView\(viewModel:\s*player\)/);
   assert.match(player, /StemacleDeviceView/);
   assert.match(player, /StemControlRow/);
   assert.match(player, /LoopControlRow/);
@@ -102,6 +119,19 @@ test('native stem player exposes the original web player controls with iOS eleme
   assert.match(audioEngine, /scheduleBuffer/);
   assert.match(audioEngine, /looping/);
   assert.match(audioEngine, /updateMix/);
+});
+
+test('ios audio engine routes through the playback session so the silent switch and lock screen do not kill sound', () => {
+  const audioEngine = swift('StemAudioEngine.swift');
+  const info = swift('Info.plist');
+
+  assert.match(audioEngine, /AVAudioSession\.sharedInstance\(\)/);
+  assert.match(audioEngine, /setCategory\(\.playback/);
+  assert.match(audioEngine, /setActive\(true/);
+  assert.match(audioEngine, /AVAudioSession\.interruptionNotification/);
+  assert.match(audioEngine, /var onInterruption/);
+  assert.match(info, /<key>UIBackgroundModes<\/key>/);
+  assert.match(info, /<string>audio<\/string>/);
 });
 
 test('native audio engine binds each player output to the loaded stem buffer format before scheduling', () => {
@@ -249,7 +279,7 @@ test('ios native shell keeps system bars opaque so artwork cannot clash behind c
   assert.match(appDelegate, /tabs\.backgroundEffect\s*=\s*nil/);
   assert.match(appDelegate, /normal\.iconColor\s*=\s*muted/);
   assert.match(appDelegate, /selected\.iconColor\s*=\s*purple/);
-  assert.match(design, /\.frame\(maxWidth:\s*\.infinity,\s*maxHeight:\s*\.infinity\)/);
+  assert.match(design, /\.frame\(maxWidth:\s*\.infinity,\s*maxHeight:\s*\.infinity/);
   assert.match(root, /\.background\(StemacleDesign\.paper\.ignoresSafeArea\(\)\)/);
   assert.match(root, /StemacleRootTabBar\(selection:\s*\$selectedTab,\s*showTopDivider:/);
   assert.match(root, /toolbar\(\.hidden,\s*for:\s*\.tabBar\)/);
@@ -283,8 +313,82 @@ test('ios loading a new file clears stale loop and monitoring state', () => {
   assert.match(viewModel, /private func resetTrackStateForNewFile\(\)/);
   assert.match(viewModel, /loops = Dictionary\(uniqueKeysWithValues: Stem\.allCases\.map \{ \(\$0, StemLoop\.inactive\) \}\)/);
   assert.match(viewModel, /headphonesStem = nil/);
-  assert.match(viewModel, /loopMonitorMode = \.mix/);
-  assert.match(viewModel, /func load\(audioAt url: URL\) \{[\s\S]*stop\(\)[\s\S]*resetTrackStateForNewFile\(\)/);
+  assert.match(viewModel, /loopMonitorMode = preferSoloLoopMonitor \? \.solo : \.mix/);
+  assert.match(viewModel, /func load\(audioAt url: URL,\s*persistToLibrary: Bool = true,\s*displayTitle: String\? = nil,\s*sourceName: String\? = nil,\s*cacheKey: String\? = nil\) \{/);
+  assert.match(viewModel, /Preparing local import and split|Loading on-device splitter/);
+  assert.match(viewModel, /Importing audio into the local library/);
+  assert.match(viewModel, /stop\(\)[\s\S]*resetTrackStateForNewFile\(\)/);
+});
+
+test('ios persists separated stems so reopening a library track is instant', () => {
+  const cache = swift('StemResultCache.swift');
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  assert.match(cache, /struct StemResultCache/);
+  assert.match(cache, /func cachedResult\(/);
+  assert.match(cache, /func store\(/);
+  assert.match(cache, /AVAudioFile\(forWriting/);
+  assert.match(cache, /AVAudioFile\(forReading/);
+  assert.match(cache, /meta\.json/);
+  assert.match(cache, /applicationSupportDirectory/);
+
+  assert.match(viewModel, /private let stemCache = StemResultCache\(\)/);
+  // Cache is consulted before paying for a full separation, and filled after one.
+  assert.match(viewModel, /loadCachedResult\(/);
+  assert.match(viewModel, /storeResult\(/);
+  assert.match(viewModel, /func load\(audioAt url: URL,[\s\S]*?cacheKey: String\?/);
+});
+
+test('ios fires haptics so the device feels physical', () => {
+  const haptics = swift('StemacleHaptics.swift');
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  assert.match(haptics, /enum StemacleHaptics/);
+  assert.match(haptics, /UIImpactFeedbackGenerator/);
+  assert.match(haptics, /UINotificationFeedbackGenerator/);
+  assert.match(viewModel, /StemacleHaptics\./);
+});
+
+test('ios asks for an App Store rating at a happy moment with the native prompt', () => {
+  const player = swift('StemPlayerView.swift');
+  const viewModel = swift('StemPlayerViewModel.swift');
+  const settings = swift('StemacleSettingsView.swift');
+
+  // Native StoreKit review prompt, gated on repeated successful splits.
+  assert.match(player, /import StoreKit/);
+  assert.match(player, /requestReview/);
+  assert.match(viewModel, /successfulSplitCount/);
+  assert.match(viewModel, /shouldRequestReview/);
+  // Settings link points at the real App Store write-review deep link.
+  assert.match(settings, /apps\.apple\.com\/app\/id6782539749/);
+  assert.match(settings, /action=write-review/);
+});
+
+test('ios processing overlay can be cancelled instead of trapping the user', () => {
+  const player = swift('StemPlayerView.swift');
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  assert.match(viewModel, /func cancelLoad\(\)/);
+  assert.match(viewModel, /loadTask\?\.cancel\(\)/);
+  const overlay = player.match(/struct ProcessingOverlay: View \{[\s\S]*?^}/m)?.[0] ?? '';
+  assert.match(overlay, /viewModel\.cancelLoad\(\)/);
+  assert.match(overlay, /Cancel/);
+});
+
+test('ios settings toggles are actually wired into playback behavior', () => {
+  const player = swift('StemPlayerView.swift');
+  const viewModel = swift('StemPlayerViewModel.swift');
+
+  // Keep screen awake controls the idle timer while a track is playing.
+  assert.match(player, /@AppStorage\("stemacle\.keepScreenAwake"\)/);
+  assert.match(player, /isIdleTimerDisabled/);
+  // Waveform scrub hint visibility is gated by its setting.
+  assert.match(player, /@AppStorage\("stemacle\.showWaveformHints"\)/);
+  assert.match(player, /showWaveformHints/);
+  // Solo-loop-monitor preference feeds the default monitor mode on new tracks.
+  assert.match(player, /@AppStorage\("stemacle\.preferSoloLoopMonitor"\)/);
+  assert.match(viewModel, /var preferSoloLoopMonitor/);
+  assert.match(viewModel, /loopMonitorMode = preferSoloLoopMonitor \? \.solo : \.mix/);
 });
 
 test('native stem player explains the local-first import path on first run', () => {
@@ -304,11 +408,21 @@ test('native stem shuffle stays focused and separate from the stem player', () =
 
   assert.match(shuffle, /struct StemShuffleView/);
   assert.match(shuffle, /shufflePair/);
-  assert.match(shuffle, /crossfade/);
-  assert.match(shuffle, /DeckCard/);
+  assert.match(shuffle, /rankCompatiblePairs/);
+  assert.match(shuffle, /scoreCompatibility/);
+  assert.match(shuffle, /MixLeadMode/);
+  assert.match(shuffle, /compatibilityMeta/);
+  assert.match(shuffle, /MixStatusBar/);
+  assert.match(shuffle, /MixPadGrid/);
+  assert.match(shuffle, /TrackSettingsSheet/);
+  assert.match(shuffle, /Lead 1/);
+  assert.match(shuffle, /Blend/);
+  assert.match(shuffle, /Lead 2/);
+  assert.match(shuffle, /Bring in a stronger local match/);
   assert.match(root, /StemShuffleView\(\)/);
   assert.doesNotMatch(shuffle, /StemPlayerViewModel/);
   assert.doesNotMatch(shuffle, /Primitive shuffle/);
+  assert.doesNotMatch(shuffle, /Bool\.random/);
 });
 
 test('ios utility tabs use compact native density instead of large zoomed panels', () => {
@@ -317,12 +431,18 @@ test('ios utility tabs use compact native density instead of large zoomed panels
   const settings = swift('StemacleSettingsView.swift');
 
   assert.match(root, /navigationBarTitleDisplayMode\(\.inline\)/);
-  assert.match(shuffle, /private let utilityContentWidth: CGFloat = 520/);
-  assert.match(shuffle, /\.frame\(maxWidth:\s*utilityContentWidth\)/);
-  assert.match(shuffle, /Text\(side\)\s*\.font\(\.headline\.weight\(\.black\)\)/);
+  assert.match(shuffle, /StemacleScreen\(showsTentacleFooter:\s*true\)/);
+  assert.match(shuffle, /LazyVGrid\(columns: columns,\s*spacing:\s*8\)/);
+  assert.match(shuffle, /TrackSettingsSheet/);
+  assert.match(shuffle, /presentationDetents\(\[\.medium\]\)/);
+  assert.match(shuffle, /frame\(maxWidth:\s*\.infinity,\s*minHeight:\s*76,\s*alignment:\s*\.leading\)/);
   assert.doesNotMatch(shuffle, /\.largeTitle/);
   assert.doesNotMatch(shuffle, /\.padding\(18\)/);
+  assert.match(settings, /StemacleIdentityPanel\(\)/);
   assert.match(settings, /StemacleAppIconMark\(size:\s*44\)/);
+  assert.match(settings, /Privacy Policy/);
+  assert.match(settings, /Leave a Review/);
+  assert.match(settings, /stemacle\.com\/privacy/);
   assert.doesNotMatch(settings, /StemacleAppIconMark\(size:\s*64\)/);
 });
 
@@ -340,12 +460,14 @@ test('ios native surfaces use Stemacle assets and document the new direction', (
   assert.match(design, /var label: String/);
   assert.match(design, /Bottom tentacle border/);
   assert.match(design, /Background texture/);
-  assert.match(design, /private let backgroundArtworkLift: CGFloat = -44/);
+  assert.match(design, /private let backgroundArtworkLift: CGFloat = -62/);
   assert.match(design, /\.offset\(y:\s*backgroundArtworkLift\)/);
   assert.match(design, /TentacleFooter/);
   assert.match(design, /StemacleBackground/);
-  assert.match(settings, /TentacleFooter/);
   assert.match(settings, /StemacleIdentityPanel/);
+  assert.match(settings, /Privacy Policy/);
+  assert.match(settings, /Leave a Review/);
+  assert.match(settings, /All local for now/);
   assert.doesNotMatch(settings, /AssetManifestSection/);
   assert.doesNotMatch(settings, /NativeStemSplitter/);
   assert.match(doc, /native Swift/i);
@@ -356,6 +478,8 @@ test('ios native surfaces use Stemacle assets and document the new direction', (
   assert.match(doc, /Stem Shuffle remains separate/i);
   assert.doesNotMatch(doc, /iOS app uses the Capacitor bundle/i);
   assert.match(prepareNative, /await copyIntoBundle\('assets'\)/);
+  assert.match(prepareNative, /await copyIntoBundle\('privacy'\)/);
+  assert.match(prepareNative, /await copyIntoBundle\('support'\)/);
   assert.ok(existsSync(new URL('assets/tentacle-b-roll/graphics/tentacle-bottom-border.png', repoRoot)));
   assert.ok(existsSync(new URL('assets/tentacle-b-roll/graphics/suction-cup-pattern-bg.png', repoRoot)));
 });

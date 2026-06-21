@@ -257,14 +257,17 @@ test('ios native shell keeps the original Stemacle circle and hides app chrome',
   assert.match(html, /data-ios-view="library"/);
   assert.match(html, /data-ios-view="settings"/);
   assert.match(html, /data-ios-action="import-track"/);
-  assert.match(html, /data-ios-action="try-sample"/);
   assert.match(html, /data-ios-action="new-project"/);
+  assert.match(html, /data-ios-action="open-settings"/);
   assert.match(html, /id="iosProjectSheet"/);
   assert.match(html, /id="iosProjectDetail"/);
   assert.match(html, /id="iosRecentProjectStrip"/);
   assert.match(html, /id="iosProjectsList"/);
   assert.match(html, /id="iosProjectNotes"/);
   assert.match(html, /id="iosProjectName"/);
+  assert.match(html, /id="iosLibraryTrackList"/);
+  assert.match(html, /id="iosLibraryQueueList"/);
+  assert.match(html, /id="iosLibraryCount"/);
   assert.match(html, /Create and Open Splitter/);
   assert.match(html, /Create and Open Shuffle/);
   assert.doesNotMatch(html, /id="iosTabbar"/);
@@ -274,6 +277,13 @@ test('ios native shell keeps the original Stemacle circle and hides app chrome',
   assert.doesNotMatch(html, /New Project<\/button>\s*<\/div>\s*<div class="ios-metrics"/);
   assert.match(html, /data-tool="splitter"/);
   assert.match(html, /data-tool="shuffle"/);
+  assert.match(html, /data-ios-library-sort="recent"/);
+  assert.match(html, /data-ios-library-sort="status"/);
+  assert.match(html, /data-ios-library-sort="name"/);
+  assert.match(html, /data-ios-library-filter="all"/);
+  assert.match(html, /data-ios-library-filter="ready"/);
+  assert.match(html, /data-ios-library-filter="queued"/);
+  assert.match(html, /data-ios-library-filter="error"/);
   assert.match(html, /data-ios-filter="recent"/);
   assert.match(html, /data-ios-filter="needs-analysis"/);
   assert.match(html, /data-ios-filter="ready"/);
@@ -283,6 +293,9 @@ test('ios native shell keeps the original Stemacle circle and hides app chrome',
   assert.match(html, /data-ios-action="duplicate-project"/);
   assert.match(html, /data-ios-action="archive-project"/);
   assert.match(html, /data-ios-action="delete-project"/);
+  assert.match(html, /data-ios-action="leave-review"/);
+  assert.match(html, /href="\/privacy\/"/);
+  assert.match(html, /href="\/support\/"/);
   assert.match(html, /stemacle\.ios\.projects\.v1/);
   assert.doesNotMatch(html, /stemacle\.ios\.onboarding\.v1/);
   assert.match(html, /stemacle:activeProject/);
@@ -343,6 +356,33 @@ test('electron bridge exposes native desktop operations and menu handlers', () =
 
   assert.match(main, /Menu\.buildFromTemplate/);
   assert.match(main, /CommandOrControl\+K/);
+  assert.match(main, /fullscreenable:\s*true/);
+  assert.match(main, /Toggle Full Screen/);
+  assert.match(main, /F11/);
+});
+
+test('desktop shell turns missing Demucs into an actionable high-quality setup card', () => {
+  const html = readRepo('native/index.html');
+
+  assert.match(html, /id="hqSetupCard"/);
+  assert.match(html, /id="hqInstallCommand"/);
+  assert.match(html, /data-hq-action="copy-install"/);
+  assert.match(html, /data-hq-action="recheck"/);
+  assert.match(html, /pipx install demucs|pip install demucs/);
+  // A real guide link, and JS that toggles the card on Demucs availability.
+  assert.match(html, /support\/#high-quality/);
+  assert.match(html, /renderHQSetup/);
+  assert.match(html, /tools\?\.demucs\?\.available/);
+});
+
+test('macos settings explain the high-quality engine path honestly', () => {
+  const app = readRepo('native/macos/Sources/StemacleMac/StemacleMacApp.swift');
+
+  assert.match(app, /High-quality engine/i);
+  assert.match(app, /Demucs/);
+  assert.match(app, /Fast preview/i);
+  assert.match(app, /Link\(/);
+  assert.match(app, /support\/#high-quality/);
 });
 
 test('product surface document explains web, desktop, and ios differences', () => {

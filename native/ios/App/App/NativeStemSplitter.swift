@@ -1,5 +1,8 @@
 import AVFoundation
 import Foundation
+import OnnxRuntimeBindings
+
+private let modelDownloadBaseURL = URL(string: "https://huggingface.co/csukuangfj/sherpa-onnx-spleeter-2stems/resolve/main/")!
 
 enum Stem: String, CaseIterable, Identifiable, Hashable {
     case drums
@@ -77,6 +80,49 @@ struct StemSplitResult {
     let overview: [Stem: [Float]]
 }
 
+private struct ModelSessions: @unchecked Sendable {
+    let vocals: ORTSession
+    let accompaniment: ORTSession
+}
+
+private final class ModelCache {
+    private let lock = NSLock()
+    private var cachedSessions: ModelSessions?
+    private var loadingTask: Task<ModelSessions, Error>?
+
+    func sessions(progress: @escaping @Sendable (Double, String) -> Void) async throws -> ModelSessions {
+        lock.lock()
+        if let cachedSessions {
+            lock.unlock()
+            return cachedSessions
+        }
+        if let loadingTask {
+            lock.unlock()
+            return try await loadingTask.value
+        }
+
+        let task = Task {
+            try await NativeStemSplitter.loadModelSessions(progress: progress)
+        }
+        loadingTask = task
+        lock.unlock()
+
+        do {
+            let sessions = try await task.value
+            lock.lock()
+            cachedSessions = sessions
+            loadingTask = nil
+            lock.unlock()
+            return sessions
+        } catch {
+            lock.lock()
+            loadingTask = nil
+            lock.unlock()
+            throw error
+        }
+    }
+}
+
 enum StemSplitterError: LocalizedError {
     case unreadableAudio
     case unsupportedFormat
@@ -142,10 +188,11 @@ final class NativeStemSplitter: @unchecked Sendable {
     private let bpmPreferredMin = 80.0
     private let bpmPreferredMax = 180.0
     private let tempoMinConfidence = 0.04
+    private static let modelCache = ModelCache()
 
     func split(audioAt url: URL, progress: @escaping @Sendable (Double, String) -> Void = { _, _ in }) async throws -> StemSplitResult {
         let task = Task.detached(priority: .userInitiated) { [self] in
-            try performSplit(audioAt: url, progress: progress)
+            try await performSplit(audioAt: url, progress: progress)
         }
 
         return try await withTaskCancellationHandler(operation: {
@@ -158,7 +205,7 @@ final class NativeStemSplitter: @unchecked Sendable {
     private func performSplit(
         audioAt url: URL,
         progress: @escaping @Sendable (Double, String) -> Void
-    ) throws -> StemSplitResult {
+    ) async throws -> StemSplitResult {
         try Task.checkCancellation()
         progress(0.03, "Reading audio with AVFoundation")
         let source = try readAudio(url)
@@ -169,7 +216,13 @@ final class NativeStemSplitter: @unchecked Sendable {
         let tempo = estimateTempo(source.mono, sampleRate: source.sampleRate)
 
         try Task.checkCancellation()
-        let stemSamples = try webDSPFallback(source: source, duration: duration, progress: progress)
+        let sessions = try await Self.modelCache.sessions(progress: progress)
+        let stemSamples = try modelBackedSplit(
+            source: source,
+            duration: duration,
+            sessions: sessions,
+            progress: progress
+        )
 
         try Task.checkCancellation()
         progress(0.9, "Preparing native buffers")
@@ -195,15 +248,12 @@ final class NativeStemSplitter: @unchecked Sendable {
         )
     }
 
-    private func webDSPFallback(
+    private func modelBackedSplit(
         source: AudioFrameData,
         duration: TimeInterval,
+        sessions: ModelSessions,
         progress: @escaping @Sendable (Double, String) -> Void
     ) throws -> [Stem: [Float]] {
-        if duration > nativeSpectralDurationLimit {
-            return try fastFullTrackFallback(source: source, progress: progress)
-        }
-
         try Task.checkCancellation()
         let window = hann(fftSize)
 
@@ -234,9 +284,14 @@ final class NativeStemSplitter: @unchecked Sendable {
         }
 
         try Task.checkCancellation()
-        progress(0.44, "Separating vocals with native DSP")
-        let vocalMask = buildVocalMask(leftMagnitude: leftMagnitude, rightMagnitude: rightMagnitude, frameCount: frameCount) { fraction in
-            progress(0.44 + (0.24 * fraction), "Separating vocals with native DSP")
+        progress(0.44, "Separating vocals with local model")
+        let vocalMask = try buildVocalMask(
+            leftMagnitude: leftMagnitude,
+            rightMagnitude: rightMagnitude,
+            frameCount: frameCount,
+            sessions: sessions
+        ) { fraction in
+            progress(0.44 + (0.24 * fraction), "Separating vocals with local model")
         }
 
         progress(0.70, "Applying masks")
@@ -336,81 +391,66 @@ final class NativeStemSplitter: @unchecked Sendable {
         ]
     }
 
-    private func fastFullTrackFallback(
-        source: AudioFrameData,
-        progress: @escaping @Sendable (Double, String) -> Void
-    ) throws -> [Stem: [Float]] {
-        progress(0.12, "Preparing full-track native preview")
-        let count = source.mono.count
-        let bassAlpha = lowPassAlpha(cutoff: 260, sampleRate: source.sampleRate)
-        let lowBodyAlpha = lowPassAlpha(cutoff: 90, sampleRate: source.sampleRate)
-        let vocalHighAlpha = lowPassAlpha(cutoff: 3_600, sampleRate: source.sampleRate)
-        let vocalLowAlpha = lowPassAlpha(cutoff: 140, sampleRate: source.sampleRate)
-        let trebleAlpha = lowPassAlpha(cutoff: 300, sampleRate: source.sampleRate)
+    fileprivate static func loadModelSessions(progress: @escaping @Sendable (Double, String) -> Void) async throws -> ModelSessions {
+        progress(0.10, "Opening vocals model")
+        let env = try ORTEnv(loggingLevel: ORTLoggingLevel.warning)
+        let options = try ORTSessionOptions()
+        try options.setLogSeverityLevel(ORTLoggingLevel.warning)
+        try options.setIntraOpNumThreads(1)
 
-        var drums = [Float](repeating: 0, count: count)
-        var vocals = [Float](repeating: 0, count: count)
-        var bass = [Float](repeating: 0, count: count)
-        var melody = [Float](repeating: 0, count: count)
-
-        var bassState: Float = 0
-        var lowBodyState: Float = 0
-        var vocalHighState: Float = 0
-        var vocalLowState: Float = 0
-        var trebleState: Float = 0
-        var previousMono: Float = 0
-        var drumPeak: Float = 0
-        var vocalPeak: Float = 0
-        var bassPeak: Float = 0
-        var melodyPeak: Float = 0
-        let stride = max(1, count / 12)
-
-        for index in 0..<count {
-            let mono = source.mono[index]
-            let center = ((source.left[index] + source.right[index]) * 0.5) - (abs(source.left[index] - source.right[index]) * 0.22)
-
-            bassState += bassAlpha * (mono - bassState)
-            lowBodyState += lowBodyAlpha * (mono - lowBodyState)
-            vocalHighState += vocalHighAlpha * (center - vocalHighState)
-            vocalLowState += vocalLowAlpha * (vocalHighState - vocalLowState)
-            trebleState += trebleAlpha * (mono - trebleState)
-
-            let derivative = abs(mono - previousMono)
-            previousMono = mono
-            let transient = min(Float(1.25), Float(0.18) + derivative * 12)
-            let drumSample = limitSample((mono - lowBodyState) * transient)
-            let vocalSample = limitSample(vocalHighState - vocalLowState)
-            let bassSample = bassState
-            let melodySample = limitSample((mono - trebleState) - (vocalSample * 0.45) - (drumSample * 0.22))
-
-            drums[index] = drumSample
-            vocals[index] = vocalSample
-            bass[index] = bassSample
-            melody[index] = melodySample
-            drumPeak = max(drumPeak, abs(drumSample))
-            vocalPeak = max(vocalPeak, abs(vocalSample))
-            bassPeak = max(bassPeak, abs(bassSample))
-            melodyPeak = max(melodyPeak, abs(melodySample))
-
-            if index % stride == 0 {
-                try Task.checkCancellation()
-                progress(0.12 + 0.66 * Double(index) / Double(count), "Separating full track")
+        let vocalsURL = try await downloadModelFile(
+            named: "vocals.onnx",
+            remoteURL: modelDownloadBaseURL.appendingPathComponent("vocals.onnx"),
+            progress: { percent, message in
+                progress(0.10 + (0.32 * percent), message)
             }
+        )
+        progress(0.44, "Preparing vocals model")
+        let vocals = try ORTSession(env: env, modelPath: vocalsURL.path, sessionOptions: options)
+
+        progress(0.52, "Opening accompaniment model")
+        let accompanimentURL = try await downloadModelFile(
+            named: "accompaniment.onnx",
+            remoteURL: modelDownloadBaseURL.appendingPathComponent("accompaniment.onnx"),
+            progress: { percent, message in
+                progress(0.52 + (0.40 * percent), message)
+            }
+        )
+        progress(0.94, "Preparing accompaniment model")
+        let accompaniment = try ORTSession(env: env, modelPath: accompanimentURL.path, sessionOptions: options)
+
+        progress(1.0, "Separation models ready")
+        return ModelSessions(vocals: vocals, accompaniment: accompaniment)
+    }
+
+    private static func downloadModelFile(
+        named: String,
+        remoteURL: URL,
+        progress: @escaping @Sendable (Double, String) -> Void
+    ) async throws -> URL {
+        let directory = try modelCacheDirectory()
+        let localURL = directory.appendingPathComponent(named)
+        if FileManager.default.fileExists(atPath: localURL.path) {
+            progress(1.0, "Loaded cached \(named)")
+            return localURL
         }
 
-        try Task.checkCancellation()
-        progress(0.80, "Balancing stems")
-        normalizeSamplesInPlace(&drums, peak: drumPeak, ceiling: 0.95)
-        normalizeSamplesInPlace(&vocals, peak: vocalPeak, ceiling: 0.92)
-        normalizeSamplesInPlace(&bass, peak: bassPeak, ceiling: 0.95)
-        normalizeSamplesInPlace(&melody, peak: melodyPeak, ceiling: 0.9)
+        progress(0.05, "Downloading \(named)")
+        let (data, response) = try await URLSession.shared.data(from: remoteURL)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw StemSplitterError.unreadableAudio
+        }
+        try data.write(to: localURL, options: .atomic)
+        progress(1.0, "Downloaded \(named)")
+        return localURL
+    }
 
-        return [
-            .drums: drums,
-            .vocals: vocals,
-            .bass: bass,
-            .melody: melody,
-        ]
+    private static func modelCacheDirectory() throws -> URL {
+        let baseDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let directory = baseDirectory.appendingPathComponent("Stemacle/Model Cache", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     private func readAudio(_ url: URL) throws -> AudioFrameData {
@@ -691,21 +731,84 @@ final class NativeStemSplitter: @unchecked Sendable {
         leftMagnitude: [[Float]],
         rightMagnitude: [[Float]],
         frameCount: Int,
+        sessions: ModelSessions,
         onProgress: ((Double) -> Void)? = nil
-    ) -> [Float] {
+    ) throws -> [Float] {
         var mask = [Float](repeating: 0, count: frameCount * modelBins)
-        let stride = max(1, frameCount / 24)
-        for frame in 0..<frameCount {
-            for bin in 0..<modelBins {
-                let left = leftMagnitude[frame][bin]
-                let right = rightMagnitude[frame][bin]
-                mask[(frame * modelBins) + bin] = min(left, right) / ((0.5 * (left + right)) + 1e-8)
+        let segmentCount = max(1, Int(ceil(Double(frameCount) / Double(segmentFrames))))
+        let stride = max(1, segmentCount / 12)
+        let inputShape: [NSNumber] = [
+            NSNumber(value: 2),
+            NSNumber(value: 1),
+            NSNumber(value: segmentFrames),
+            NSNumber(value: modelBins),
+        ]
+
+        for segment in 0..<segmentCount {
+            var segmentData = [Float](repeating: 0, count: 2 * segmentFrames * modelBins)
+            let segmentBase = segment * segmentFrames
+            for frameIndex in 0..<segmentFrames {
+                let frame = segmentBase + frameIndex
+                guard frame < frameCount else { break }
+                let leftBase = frameIndex * modelBins
+                let rightBase = (segmentFrames + frameIndex) * modelBins
+                for bin in 0..<modelBins {
+                    segmentData[leftBase + bin] = leftMagnitude[frame][bin]
+                    segmentData[rightBase + bin] = rightMagnitude[frame][bin]
+                }
             }
-            if frame % stride == 0 || frame == frameCount - 1 {
-                onProgress?(Double(frame + 1) / Double(frameCount))
+
+            let vocalsOutput = try runModel(session: sessions.vocals, inputData: segmentData, inputShape: inputShape)
+            let accompanimentOutput = try runModel(session: sessions.accompaniment, inputData: segmentData, inputShape: inputShape)
+
+            for frameIndex in 0..<segmentFrames {
+                let frame = segmentBase + frameIndex
+                guard frame < frameCount else { break }
+                let leftBase = frameIndex * modelBins
+                let rightBase = (segmentFrames + frameIndex) * modelBins
+                for bin in 0..<modelBins {
+                    let vocalPower = (vocalsOutput[leftBase + bin] * vocalsOutput[leftBase + bin]) + (vocalsOutput[rightBase + bin] * vocalsOutput[rightBase + bin])
+                    let accompanimentPower = (accompanimentOutput[leftBase + bin] * accompanimentOutput[leftBase + bin]) + (accompanimentOutput[rightBase + bin] * accompanimentOutput[rightBase + bin])
+                    mask[(frame * modelBins) + bin] = vocalPower / (vocalPower + accompanimentPower + 1e-10)
+                }
+            }
+
+            if segment % stride == 0 || segment == segmentCount - 1 {
+                onProgress?(Double(segment + 1) / Double(segmentCount))
             }
         }
         return mask
+    }
+
+    private func runModel(
+        session: ORTSession,
+        inputData: [Float],
+        inputShape: [NSNumber]
+    ) throws -> [Float] {
+        let inputBytes = inputData.withUnsafeBufferPointer { buffer -> NSMutableData in
+            guard let baseAddress = buffer.baseAddress else {
+                return NSMutableData()
+            }
+            return NSMutableData(bytes: baseAddress, length: buffer.count * MemoryLayout<Float>.size)
+        }
+        let inputValue = try ORTValue(
+            tensorData: inputBytes,
+            elementType: ORTTensorElementDataType.float,
+            shape: inputShape
+        )
+        let outputs = try session.run(
+            withInputs: ["x": inputValue],
+            outputNames: Set(["y"]),
+            runOptions: nil
+        )
+        guard let outputValue = outputs["y"] else {
+            throw StemSplitterError.unableToCreateBuffer
+        }
+        let outputBytes = try outputValue.tensorData()
+        let outputData = Data(bytes: outputBytes.bytes, count: outputBytes.length)
+        return outputData.withUnsafeBytes { bytes in
+            Array(bytes.bindMemory(to: Float.self))
+        }
     }
 
     private func istft(
@@ -987,9 +1090,13 @@ final class NativeStemSplitter: @unchecked Sendable {
                 count += 1
             }
             rms = sqrt(rms / max(1, count))
-            values[bucket] = min(1, max(peak * 2.2, rms * 5.8))
+            let combined = max(peak, rms)
+            values[bucket] = log1p(combined * 14)
         }
-        return values
+        let sorted = values.sorted()
+        let referenceIndex = min(sorted.count - 1, max(0, Int(Double(sorted.count - 1) * 0.92)))
+        let reference = max(sorted[referenceIndex], 1e-6)
+        return values.map { min(1, max(0, $0 / reference)) }
     }
 
     private func emptyRows(frameCount: Int, binCount: Int) -> [[Float]] {

@@ -15,8 +15,22 @@ final class StemAudioEngine {
     private(set) var duration: TimeInterval = 0
     private(set) var isPlaying = false
 
+    /// Called on the main queue when the system interrupts playback (phone call,
+    /// Siri, another app taking the audio route). The view model uses this to drop
+    /// its `isPlaying` state so the transport UI stays truthful.
+    var onInterruption: (() -> Void)?
+    private var interruptionObserver: NSObjectProtocol?
+
     init() {
+        configureAudioSession()
         configureGraph()
+        registerInterruptionObserver()
+    }
+
+    deinit {
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+        }
     }
 
     func load(_ result: StemSplitResult) throws {
@@ -158,6 +172,44 @@ final class StemAudioEngine {
         }
     }
 
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // `.playback` makes Stemacle audible even with the ring/silent switch on
+            // and keeps sound alive while the screen locks (paired with the `audio`
+            // UIBackgroundMode in Info.plist).
+            try session.setCategory(.playback, mode: .default, options: [])
+            try session.setActive(true, options: [])
+        } catch {
+            // A failed session config should not crash playback setup; the engine
+            // still attempts to start and surfaces errors through normal play paths.
+        }
+    }
+
+    private func registerInterruptionObserver() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleInterruption(notification)
+        }
+    }
+
+    private func handleInterruption(_ notification: Notification) {
+        guard
+            let info = notification.userInfo,
+            let rawType = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+            let type = AVAudioSession.InterruptionType(rawValue: rawType)
+        else { return }
+
+        if type == .began {
+            stopPlayers()
+            isPlaying = false
+            onInterruption?()
+        }
+    }
+
     private func configureGraph() {
         for stem in Stem.allCases {
             let player = AVAudioPlayerNode()
@@ -189,6 +241,7 @@ final class StemAudioEngine {
 
     private func startEngineIfNeeded() throws {
         if !engine.isRunning {
+            try? AVAudioSession.sharedInstance().setActive(true, options: [])
             try engine.start()
         }
     }

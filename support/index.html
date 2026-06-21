@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Stemacle Support</title>
+<meta name="description" content="Stemacle support page for help, feedback, and release information.">
+<link rel="icon" type="image/png" href="/assets/stemacle-tentacle.png">
+<link rel="apple-touch-icon" href="/assets/stemacle-tentacle.png">
+<style>
+:root {
+  --page: oklch(96% 0.016 84);
+  --page-2: oklch(92% 0.020 83);
+  --paper: oklch(98% 0.006 84);
+  --ink: oklch(23% 0.030 314);
+  --ink-soft: oklch(40% 0.022 314);
+  --line: oklch(74% 0.014 74 / 0.46);
+  --plum: oklch(32% 0.110 315);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(96% 72% at 102% -4%, oklch(76% 0.042 316 / 0.16) 0%, oklch(76% 0.042 316 / 0) 42%),
+    linear-gradient(180deg, var(--page) 0%, var(--page-2) 100%);
+  color: var(--ink);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+.shell {
+  width: min(760px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 42px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-size: 10px;
+  color: var(--ink-soft);
+}
+.brand img { width: 28px; height: 28px; border-radius: 8px; }
+h1 {
+  margin: 24px 0 10px;
+  font-family: Georgia, "Iowan Old Style", serif;
+  font-size: clamp(42px, 8vw, 76px);
+  line-height: 0.92;
+  font-weight: 600;
+  color: var(--plum);
+}
+p, li { line-height: 1.6; color: var(--ink-soft); }
+.panel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: oklch(98% 0.008 84 / 0.78);
+  box-shadow: 0 12px 30px oklch(24% 0.012 70 / 0.08);
+}
+.panel h2 {
+  margin: 0 0 10px;
+  font-family: Georgia, "Iowan Old Style", serif;
+  color: var(--ink);
+  font-size: 24px;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  text-decoration: none;
+}
+.review-note {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: oklch(96% 0.012 84 / 0.74);
+}
+</style>
+</head>
+<body>
+  <main class="shell">
+    <a class="brand" href="/">
+      <img src="/assets/stemacle-tentacle.png" alt="">
+      <span>Stemacle</span>
+    </a>
+    <h1>Support</h1>
+    <p>If you run into trouble, want to suggest a feature, or need help with an export, this is the place to start.</p>
+
+    <section class="panel">
+      <h2>Help and feedback</h2>
+      <p>For bugs, feature requests, and follow-up questions, open an issue in the repository. That keeps the thread visible and helps us ship fixes faster.</p>
+      <div class="buttons">
+        <a class="button" href="https://github.com/EricSpencer00/stem-player/issues/new" target="_blank" rel="noreferrer">Open GitHub issue</a>
+        <a class="button" href="/">Back to Stemacle</a>
+      </div>
+    </section>
+
+    <section class="panel" id="review">
+      <h2>Leave a Review</h2>
+      <p class="review-note">In the app, tap <strong>Leave a Review</strong> from Settings to jump here. When the App Store listing is live, this is where the review flow should route from the native shell.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Release notes</h2>
+      <p>Stemacle is local-first by default. When new features land, the iOS app and this support page will call out any new privacy or workflow changes.</p>
+    </section>
+  </main>
+</body>
+</html>

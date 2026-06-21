@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "appstore-screenshots",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "7893", "--directory", "/Users/eric/GitHub/stem-player"],
+      "port": 7893,
+      "autoPort": false,
+      "url": "http://localhost:7893/appstore-screenshots/landing.html"
+    }
+  ]
+}

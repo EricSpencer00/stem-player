@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=430">
+<title>Stemacle — App Store Screenshots v2</title>
+<!--
+  430×932 each · export at 3× for 1290×2796 iPhone 6.7"
+  Save new assets first:
+    assets/tentacle-s-curve.png  ← the S-shaped tentacle you shared
+    assets/tentacle-arch.png     ← the arching loop tentacle you shared
+-->
+<style>
+
+:root {
+  --paper:     #F2E8D1;
+  --page-two:  #E3D9BD;
+  --ink:       #261E26;
+  --ink-soft:  #473D45;
+  --muted:     #756863;
+  --ghost:     #9E9182;
+  --purple:    #4A2659;
+  --amber:     #D18233;
+  --drums:     #8A3D57;
+  --bass:      #2E565C;
+  --vocals:    #4A2659;
+  --melody:    #D18233;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #181014;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  padding: 48px 20px;
+}
+
+/* ── SHOT CONTAINER ── */
+.shot {
+  width: 428px;
+  height: 926px;
+  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.shot-num {
+  position: absolute;
+  top: -26px;
+  left: 0;
+  font-size: 10px;
+  color: #4a3540;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── TENTACLE IMAGES ── */
+.t-top-right {
+  position: absolute;
+  top: -20px;
+  right: -24px;
+  width: 310px;
+  height: 310px;
+  object-fit: contain;
+  object-position: top right;
+  pointer-events: none;
+}
+
+.t-bottom-left {
+  position: absolute;
+  bottom: 80px;
+  left: -30px;
+  width: 260px;
+  height: 260px;
+  object-fit: contain;
+  object-position: bottom left;
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+
+.t-left-side {
+  position: absolute;
+  top: 50%;
+  left: -20px;
+  transform: translateY(-50%) rotate(-15deg);
+  width: 200px;
+  height: 380px;
+  object-fit: contain;
+  object-position: center left;
+  pointer-events: none;
+}
+
+.t-full-right {
+  position: absolute;
+  top: 20px;
+  right: -30px;
+  width: 360px;
+  height: 500px;
+  object-fit: contain;
+  object-position: top right;
+  pointer-events: none;
+}
+
+.t-bottom-center {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 430px;
+  pointer-events: none;
+}
+
+/* ── SPECTROGRAM ── */
+.spec-band {
+  position: absolute;
+  left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.spec-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  padding: 0 6px;
+  position: relative;
+}
+
+.spec-label {
+  position: absolute;
+  left: 10px;
+  bottom: 3px;
+  font-size: 6px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  z-index: 2;
+  mix-blend-mode: screen;
+}
+
+.bar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── EYEBROW / HEADLINE / SUB ── */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.headline {
+  font-size: 46px;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1.0;
+  letter-spacing: -0.028em;
+}
+
+.headline em {
+  font-style: normal;
+  color: var(--purple);
+}
+
+.sub {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  max-width: 340px;
+}
+
+/* ── STEM TAG ── */
+.stem-tags {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stem-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 12px;
+}
+
+/* ── PRICE TAG ── */
+.price-tag {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.price-amount {
+  font-size: 52px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.price-desc {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── ABSTRACT MIXER (screen 3) ── */
+.mixer {
+  position: absolute;
+  left: 28px; right: 28px;
+}
+
+.mix-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mix-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.mix-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(38,30,38,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mix-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.mix-solo {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--purple);
+  color: white;
+  flex-shrink: 0;
+}
+
+.mix-mute {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: rgba(38,30,38,0.12);
+  color: var(--ghost);
+  flex-shrink: 0;
+}
+
+/* ── DROP ILLUSTRATION (screen 4) ── */
+.drop-scene {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.file-chip {
+  background: white;
+  border-radius: 16px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(38,30,38,0.18), 0 2px 6px rgba(38,30,38,0.10);
+  width: 230px;
+}
+
+.file-chip-icon {
+  width: 36px;
+  height: 44px;
+  background: var(--purple);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.file-chip-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-chip-meta {
+  font-size: 9px;
+  color: var(--ghost);
+  margin-top: 2px;
+}
+
+.drop-arrow-big {
+  font-size: 40px;
+  color: var(--ink);
+  opacity: 0.15;
+  line-height: 1;
+  margin: 4px 0;
+}
+
+.drop-circle-big {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #E3D9BD, #D1C4A8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 3px 8px rgba(255,255,255,0.4),
+    inset 0 -3px 8px rgba(38,30,38,0.14),
+    0 12px 40px rgba(38,30,38,0.2);
+}
+
+.drop-circle-inner {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: #E0D6BD;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.3);
+}
+
+.drop-circle-core {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #CCBD9C;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: inset 0 1px 3px rgba(255,255,255,0.3);
+}
+
+.drop-core-arrow {
+  font-size: 18px;
+  color: var(--ink-soft);
+  line-height: 1;
+}
+
+.drop-core-lbl {
+  font-size: 5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ── STEMS REVEAL (below drop circle) ── */
+.stems-reveal {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.stem-pill {
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: white;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  SCREEN 1 · "Finally hear the bassline."             -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div style="position:relative;">
+  <div class="shot-num">1 of 5 — Hero</div>
+  <div class="shot" id="s1">
+
+    <!-- Large tentacle, top-right anchor -->
+    <img class="t-top-right"
+         src="../assets/tentacle-arch.png"
+         onerror="this.src='../assets/stemacle-tentacle.png'"
+         alt="">
+
+    <!-- Full-width spectrogram band — the hero visual -->
+    <div class="spec-band" style="top:290px;">
+      <div class="spec-row" style="height:52px;background:rgba(138,61,87,0.08);" id="r1-drums">
+        <span class="spec-label">Drums</span>
+      </div>
+      <div class="spec-row" style="height:52px;background:rgba(46,86,92,0.08);" id="r1-bass">
+        <span class="spec-label">Bass</span>
+      </div>
+      <div class="spec-row" style="height:52px;background:rgba(74,38,89,0.08);" id="r1-vocals">
+        <span class="spec-label">Vocals</span>
+      </div>
+      <div class="spec-row" style="height:52px;background:rgba(209,130,51,0.08);" id="r1-melody">
+        <span class="spec-label">Melody</span>
+      </div>
+    </div>
+
+    <!-- Text block -->
+    <div style="position:absolute;bottom:116px;left:28px;right:28px;">
+      <div class="eyebrow" style="margin-bottom:12px;">Stem Splitter · Stemacle</div>
+      <div class="headline">Finally hear<br>the <em>bassline.</em></div>
+      <div class="sub" style="margin-top:14px;">Drop any song. Stemacle pulls it apart so you can hear every layer — separately.</div>
+    </div>
+
+    <!-- Bottom tentacle border -->
+    <img class="t-bottom-center"
+         src="../assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="">
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  SCREEN 2 · "Learn any song from the inside out."    -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div style="position:relative;">
+  <div class="shot-num">2 of 5 — For musicians</div>
+  <div class="shot" id="s2">
+
+    <!-- Text at top -->
+    <div style="position:absolute;top:52px;left:28px;right:28px;">
+      <div class="eyebrow" style="margin-bottom:12px;">For curious ears</div>
+      <div class="headline" style="font-size:40px;">Learn any song<br>from the <em>inside out.</em></div>
+    </div>
+
+    <!-- Large spectrogram band — taller rows, labeled -->
+    <div class="spec-band" style="top:250px;">
+      <div class="spec-row" style="height:68px;background:rgba(138,61,87,0.10);" id="r2-drums">
+        <span class="spec-label" style="font-size:7.5px;">Drums</span>
+      </div>
+      <div class="spec-row" style="height:68px;background:rgba(46,86,92,0.10);" id="r2-bass">
+        <span class="spec-label" style="font-size:7.5px;">Bass</span>
+      </div>
+      <div class="spec-row" style="height:68px;background:rgba(74,38,89,0.10);" id="r2-vocals">
+        <span class="spec-label" style="font-size:7.5px;">Vocals</span>
+      </div>
+      <div class="spec-row" style="height:68px;background:rgba(209,130,51,0.10);" id="r2-melody">
+        <span class="spec-label" style="font-size:7.5px;">Melody</span>
+      </div>
+    </div>
+
+    <!-- S-curve tentacle, bottom-left -->
+    <img class="t-bottom-left"
+         src="../assets/tentacle-s-curve.png"
+         onerror="this.src='../assets/release-icons/stemacle-release-icon-05.png'"
+         alt="">
+
+    <!-- Sub text -->
+    <div style="position:absolute;bottom:116px;left:28px;right:28px;">
+      <div class="sub">Solo the vocals. Loop the guitar. Hear what you've always been missing.</div>
+      <div class="stem-tags" style="margin-top:16px;">
+        <span class="stem-tag" style="background:rgba(138,61,87,0.12);color:var(--drums);">Solo</span>
+        <span class="stem-tag" style="background:rgba(209,130,51,0.15);color:var(--melody);">Loop</span>
+        <span class="stem-tag" style="background:rgba(74,38,89,0.12);color:var(--vocals);">Mute</span>
+      </div>
+    </div>
+
+    <img class="t-bottom-center"
+         src="../assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="">
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  SCREEN 3 · "Make it louder. Make it yours."         -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div style="position:relative;">
+  <div class="shot-num">3 of 5 — Control</div>
+  <div class="shot" id="s3">
+
+    <!-- Tentacle, right side -->
+    <img style="position:absolute;top:-10px;right:-20px;width:200px;height:400px;object-fit:contain;object-position:top right;pointer-events:none;opacity:0.9;"
+         src="../assets/tentacle-arch.png"
+         onerror="this.src='../assets/stemacle-tentacle.png'"
+         alt="">
+
+    <!-- Headline -->
+    <div style="position:absolute;top:52px;left:28px;right:220px;">
+      <div class="eyebrow" style="margin-bottom:12px;">Volume · Solo · Loop</div>
+      <div class="headline" style="font-size:38px;line-height:1.05;">Make it<br>louder.<br>Make it<br><em>yours.</em></div>
+    </div>
+
+    <!-- Abstract mixer visualization -->
+    <div class="mixer" style="top:430px;">
+
+      <div class="mix-row">
+        <span class="mix-label" style="color:var(--drums);">Drums</span>
+        <div class="mix-track">
+          <div class="mix-fill" style="width:88%;background:var(--drums);"></div>
+        </div>
+        <span class="mix-mute">Mute</span>
+      </div>
+
+      <div class="mix-row">
+        <span class="mix-label" style="color:var(--bass);">Bass</span>
+        <div class="mix-track">
+          <div class="mix-fill" style="width:100%;background:var(--bass);"></div>
+        </div>
+        <span class="mix-mute">Mute</span>
+      </div>
+
+      <div class="mix-row" style="transform:scale(1.04);transform-origin:left center;">
+        <span class="mix-label" style="color:var(--vocals);font-size:10px;">Vocals</span>
+        <div class="mix-track" style="height:11px;box-shadow:0 0 12px rgba(74,38,89,0.35);">
+          <div class="mix-fill" style="width:75%;background:var(--vocals);"></div>
+        </div>
+        <span class="mix-solo">Solo</span>
+      </div>
+
+      <div class="mix-row" style="opacity:0.4;">
+        <span class="mix-label" style="color:var(--melody);">Melody</span>
+        <div class="mix-track">
+          <div class="mix-fill" style="width:55%;background:var(--melody);"></div>
+        </div>
+        <span class="mix-mute">Mute</span>
+      </div>
+
+    </div>
+
+    <!-- Spectrogram strip below mixer -->
+    <div class="spec-band" style="top:670px;">
+      <div class="spec-row" style="height:32px;" id="r3-drums"></div>
+      <div class="spec-row" style="height:32px;" id="r3-bass"></div>
+      <div class="spec-row" style="height:32px;" id="r3-vocals"></div>
+      <div class="spec-row" style="height:32px;" id="r3-melody"></div>
+    </div>
+
+    <div style="position:absolute;bottom:120px;left:28px;right:28px;">
+      <div class="sub" style="font-size:14px;">Turn any stem up or down. Focus on what matters in the moment.</div>
+    </div>
+
+    <img class="t-bottom-center"
+         src="../assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="">
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  SCREEN 4 · "Just drop it."                          -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div style="position:relative;">
+  <div class="shot-num">4 of 5 — Drop flow</div>
+  <div class="shot" id="s4">
+
+    <!-- Top half: large headline -->
+    <div style="position:absolute;top:52px;left:28px;right:28px;">
+      <div class="eyebrow" style="margin-bottom:14px;">Any file · Any format</div>
+      <div class="headline" style="font-size:54px;line-height:0.96;">Just<br>drop<br>it.</div>
+    </div>
+
+    <!-- Drop scene centered -->
+    <div class="drop-scene" style="top:348px;width:100%;">
+      <!-- File card -->
+      <div class="file-chip">
+        <div class="file-chip-icon">♪</div>
+        <div>
+          <div class="file-chip-name">red_light_blues.mp3</div>
+          <div class="file-chip-meta">Alex &amp; UnrealDM · 5.2 MB</div>
+        </div>
+      </div>
+
+      <!-- Arrow -->
+      <div class="drop-arrow-big">↓</div>
+
+      <!-- Drop circle -->
+      <div class="drop-circle-big">
+        <div class="drop-circle-inner">
+          <div class="drop-circle-core">
+            <span class="drop-core-arrow">↓</span>
+            <span class="drop-core-lbl">Drop Audio</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stems appear below -->
+      <div class="stems-reveal">
+        <span class="stem-pill" style="background:var(--drums);">Drums</span>
+        <span class="stem-pill" style="background:var(--bass);">Bass</span>
+        <span class="stem-pill" style="background:var(--vocals);">Vocals</span>
+        <span class="stem-pill" style="background:var(--melody);">Melody</span>
+      </div>
+    </div>
+
+    <!-- S-curve tentacle, bottom left -->
+    <img style="position:absolute;bottom:80px;left:-15px;width:180px;opacity:0.85;pointer-events:none;"
+         src="../assets/tentacle-s-curve.png"
+         onerror="this.src='../assets/release-icons/stemacle-release-icon-05.png'"
+         alt="">
+
+    <div style="position:absolute;bottom:128px;right:28px;left:160px;text-align:right;">
+      <div class="sub" style="font-size:13px;max-width:none;">No account.<br>No upload.<br>No waiting.</div>
+    </div>
+
+    <img class="t-bottom-center"
+         src="../assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="">
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!--  SCREEN 5 · "One song. Four stems. Forever."         -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div style="position:relative;">
+  <div class="shot-num">5 of 5 — Value / CTA</div>
+  <div class="shot" id="s5">
+
+    <!-- Large arch tentacle, dominant -->
+    <img style="position:absolute;top:-30px;left:50%;transform:translateX(-50%);width:460px;opacity:0.92;pointer-events:none;"
+         src="../assets/tentacle-arch.png"
+         onerror="this.src='../assets/stemacle-tentacle.png'"
+         alt="">
+
+    <!-- Centered text block, sits over tentacle -->
+    <div style="position:absolute;top:290px;left:28px;right:28px;z-index:5;">
+
+      <div class="eyebrow" style="margin-bottom:16px;color:var(--ghost);">Stemacle · $2.99</div>
+
+      <div style="font-size:52px;font-weight:900;color:var(--ink);letter-spacing:-0.03em;line-height:1.0;">
+        One song.<br>
+        <span style="color:var(--drums);">Drums.</span><br>
+        <span style="color:var(--bass);">Bass.</span><br>
+        <span style="color:var(--vocals);">Vocals.</span><br>
+        <span style="color:var(--melody);">Melody.</span>
+      </div>
+
+    </div>
+
+    <!-- Spectrogram at very bottom before border -->
+    <div class="spec-band" style="top:790px;">
+      <div class="spec-row" style="height:28px;" id="r5-drums"></div>
+      <div class="spec-row" style="height:28px;" id="r5-bass"></div>
+    </div>
+
+    <!-- Price callout -->
+    <div style="position:absolute;bottom:124px;left:28px;right:28px;display:flex;align-items:flex-end;justify-content:space-between;">
+      <div class="price-tag">
+        <div class="price-amount">$2.99</div>
+        <div class="price-desc">One-time · No subscription</div>
+      </div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--ghost);text-align:right;line-height:1.6;">
+        No uploads<br>No account<br>Yours forever
+      </div>
+    </div>
+
+    <img class="t-bottom-center"
+         src="../assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="">
+
+  </div>
+</div>
+
+
+<!-- ── SPECTROGRAM DATA ── -->
+<script>
+/* Seeded pseudo-random for consistent renders */
+function sr(seed) {
+  const x = Math.sin(seed * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+/* Frequency envelope models */
+function makeDrums(n) {
+  return Array.from({length: n}, (_, i) => {
+    const kick = [0,21,42,63].some(k => Math.abs(i-k) < 2) ? 75+sr(i*3)*25 : 0;
+    const snare = [10,11,31,32,52,53].some(k => k===i) ? 60+sr(i*7)*30 : 0;
+    const hat = i > 35 ? sr(i*13)*40 + 10 : sr(i*11)*15;
+    const noise = sr(i*17)*20;
+    return Math.min(96, kick + snare + hat*0.5 + noise);
+  });
+}
+
+function makeBass(n) {
+  return Array.from({length: n}, (_, i) => {
+    const fundamental = Math.max(0, 95 - i*4.5) * (0.6 + sr(i*7)*0.4);
+    const harmonic = i < 20 ? Math.max(0, 55 - i*2) * (0.5+sr(i*11)*0.5) : 0;
+    return Math.min(95, fundamental*0.6 + harmonic*0.4 + sr(i)*8);
+  });
+}
+
+function makeVocals(n) {
+  return Array.from({length: n}, (_, i) => {
+    const formant1 = Math.exp(-Math.pow((i-18)/7,2)) * 85;
+    const formant2 = Math.exp(-Math.pow((i-38)/8,2)) * 80;
+    const formant3 = Math.exp(-Math.pow((i-55)/6,2)) * 60;
+    const noise = sr(i*11)*18;
+    return Math.min(94, (formant1+formant2+formant3) * (0.6+sr(i*3)*0.4) + noise);
+  });
+}
+
+function makeMelody(n) {
+  return Array.from({length: n}, (_, i) => {
+    const spread = Math.exp(-Math.pow((i-42)/22,2)) * 80;
+    const harmonic = Math.exp(-Math.pow((i-65)/15,2)) * 55;
+    const noise = sr(i*7)*22;
+    return Math.min(92, (spread+harmonic) * (0.5+sr(i*5)*0.5) + noise);
+  });
+}
+
+/* Render bars into a container */
+function renderSpec(id, heights, color, opacity=0.75) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const n = heights.length;
+  heights.forEach((h, i) => {
+    const b = document.createElement('div');
+    b.className = 'bar';
+    b.style.height = Math.max(4, h) + '%';
+    b.style.background = color;
+    b.style.opacity = opacity;
+    el.appendChild(b);
+  });
+}
+
+/* Generate data — 85 bars per row */
+const N = 85;
+const D = makeDrums(N), B = makeBass(N), V = makeVocals(N), M = makeMelody(N);
+
+/* Screen 1 */
+renderSpec('r1-drums',  D, 'var(--drums)');
+renderSpec('r1-bass',   B, 'var(--bass)');
+renderSpec('r1-vocals', V, 'var(--vocals)');
+renderSpec('r1-melody', M, 'var(--melody)');
+
+/* Screen 2 — shift pattern for variety */
+const D2 = D.map((v,i) => D[(i+12)%N]);
+const B2 = B.map((v,i) => B[(i+8)%N]);
+const V2 = V.map((v,i) => V[(i+20)%N]);
+const M2 = M.map((v,i) => M[(i+5)%N]);
+renderSpec('r2-drums',  D2, 'var(--drums)');
+renderSpec('r2-bass',   B2, 'var(--bass)');
+renderSpec('r2-vocals', V2, 'var(--vocals)');
+renderSpec('r2-melody', M2, 'var(--melody)');
+
+/* Screen 3 — smaller band at bottom */
+renderSpec('r3-drums',  D, 'var(--drums)', 0.55);
+renderSpec('r3-bass',   B, 'var(--bass)', 0.55);
+renderSpec('r3-vocals', V, 'var(--vocals)', 0.7);
+renderSpec('r3-melody', M, 'var(--melody)', 0.35);
+
+/* Screen 5 — 2-row mini */
+renderSpec('r5-drums', D, 'var(--drums)', 0.5);
+renderSpec('r5-bass',  B, 'var(--bass)', 0.5);
+</script>
+
+</body>
+</html>
