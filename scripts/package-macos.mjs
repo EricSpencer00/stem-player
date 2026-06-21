@@ -19,6 +19,7 @@ const contents = join(appBundle, 'Contents');
 const macOSDir = join(contents, 'MacOS');
 const resourcesDir = join(contents, 'Resources');
 const binaryName = 'StemacleMac';
+const appIconName = 'StemacleIcon.icns';
 const binaryCandidates = [
   join(root, 'native/macos/.build/release/StemacleMac'),
   join(root, 'native/macos/.build/apple/Products/Release/StemacleMac'),
@@ -41,6 +42,28 @@ function run(command, args, options = {}) {
   }
 }
 
+function capture(command, args) {
+  return spawnSync(command, args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function findDeveloperIdApplicationIdentity() {
+  const result = capture('security', ['find-identity', '-v', '-p', 'codesigning']);
+  if (result.status !== 0) {
+    return '';
+  }
+
+  const match = result.stdout.match(/"([^"]*Developer ID Application: [^"]+)"/);
+  return match?.[1] ?? '';
+}
+
+function signingLabel(identity) {
+  return identity === '-' ? 'ad-hoc signature' : identity;
+}
+
 rmSync(appBundle, { recursive: true, force: true });
 mkdirSync(macOSDir, { recursive: true });
 mkdirSync(resourcesDir, { recursive: true });
@@ -48,6 +71,7 @@ mkdirSync(resourcesDir, { recursive: true });
 cpSync(binaryPath, join(macOSDir, binaryName));
 chmodSync(join(macOSDir, binaryName), 0o755);
 
+cpSync(join(root, 'native', 'electron', 'icon.icns'), join(resourcesDir, appIconName));
 cpSync(join(root, 'dist/native'), join(resourcesDir, 'repo/dist/native'), { recursive: true });
 cpSync(join(root, 'assets'), join(resourcesDir, 'repo/assets'), { recursive: true });
 cpSync(join(root, 'app'), join(resourcesDir, 'repo/app'), { recursive: true });
@@ -66,6 +90,8 @@ writeFileSync(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8
   <string>${binaryName}</string>
   <key>CFBundleIdentifier</key>
   <string>com.stemacle.mac</string>
+  <key>CFBundleIconFile</key>
+  <string>${appIconName}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -89,24 +115,34 @@ writeFileSync(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8
 const distribution = process.env.STEMACLE_MAC_DISTRIBUTION || 'github';
 const identity = distribution === 'appstore'
   ? process.env.MAC_APP_STORE_IDENTITY
-  : (process.env.MAC_DEVELOPER_ID || '-');
-const entitlements = join(root, 'native/macos/StemacleMac.entitlements');
+  : (process.env.STEMACLE_MAC_SIGNING_IDENTITY
+      || process.env.MAC_DEVELOPER_ID
+      || findDeveloperIdApplicationIdentity()
+      || '-');
+const appEntitlements = distribution === 'appstore'
+  ? join(root, 'native/macos/StemacleMac.entitlements')
+  : '';
 
 if (distribution === 'appstore' && !identity) {
   console.error('Missing MAC_APP_STORE_IDENTITY for App Store signing.');
   process.exit(1);
 }
 
-run('codesign', [
+console.log(`Signing ${appName}.app with ${signingLabel(identity)}.`);
+const appSignArgs = [
   '--force',
   '--sign',
   identity,
-  '--entitlements',
-  entitlements,
+];
+if (appEntitlements) {
+  appSignArgs.push('--entitlements', appEntitlements);
+}
+appSignArgs.push(
   '--options',
   'runtime',
   appBundle,
-]);
+);
+run('codesign', appSignArgs);
 
 const outputArch = process.env.STEMACLE_MAC_ARCH || (arch === 'arm64' ? 'arm64' : 'x64');
 const versionedBaseName = `Stemacle-${version}-${outputArch}`;
@@ -130,6 +166,11 @@ run('hdiutil', [
   'UDZO',
   dmgPath,
 ]);
+if (identity !== '-') {
+  run('codesign', ['--force', '--sign', identity, dmgPath]);
+} else {
+  console.warn('Skipping DMG codesign because no Developer ID Application identity was found.');
+}
 cpSync(zipPath, latestZipPath);
 cpSync(dmgPath, latestDmgPath);
 

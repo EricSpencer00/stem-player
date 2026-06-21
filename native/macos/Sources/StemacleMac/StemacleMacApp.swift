@@ -46,12 +46,12 @@ struct StemacleMacApp: App {
                 Divider()
 
                 Button("Open Stem Splitter") {
-                    bridge.navigate(to: "stemacle://app/app/index.html")
+                    bridge.showInstrument(urlString: "stemacle://app/app/index.html")
                 }
                 .keyboardShortcut("1", modifiers: [.command])
 
                 Button("Open Stem Shuffle") {
-                    bridge.navigate(to: "stemacle://app/apps/stem-shuffle/index.html")
+                    bridge.showInstrument(urlString: "stemacle://app/apps/stem-shuffle/index.html")
                 }
                 .keyboardShortcut("2", modifiers: [.command])
 
@@ -136,6 +136,10 @@ struct StemacleMacShell: View {
             }
         }
         .background(stemaclePaper)
+        .onReceive(bridge.$requestedRoute) { route in
+            guard let route else { return }
+            selection = route
+        }
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -153,8 +157,7 @@ struct StemacleMacShell: View {
                 }
 
                 Button {
-                    selection = .instrument
-                    bridge.navigate(to: "stemacle://app/app/index.html")
+                    bridge.showInstrument(urlString: "stemacle://app/app/index.html")
                 } label: {
                     Label("Open Splitter", systemImage: "waveform")
                 }
@@ -168,9 +171,28 @@ struct StemacleMacSidebar: View {
     let summary: StemacleDesktopSummary
 
     var body: some View {
-        List(StemacleMacRoute.allCases, selection: $selection) { route in
-            Label(route.title, systemImage: route.systemImage)
-                .tag(route as StemacleMacRoute?)
+        ScrollView {
+            VStack(spacing: 6) {
+                ForEach(StemacleMacRoute.allCases) { route in
+                    Button {
+                        selection = route
+                    } label: {
+                        Label(route.title, systemImage: route.systemImage)
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(selection == route ? stemacleInk.opacity(0.82) : Color.clear)
+                            )
+                            .foregroundStyle(selection == route ? stemacleRaised : stemacleInk.opacity(0.72))
+                            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
@@ -750,6 +772,7 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
     @Published private(set) var sessions: [[String: Any]] = []
     @Published private(set) var exports: [[String: Any]] = []
     @Published private(set) var releases: [StemacleReleaseArtifact] = StemacleReleaseArtifact.all
+    @Published var requestedRoute: StemacleMacRoute?
 
     private weak var webView: WKWebView?
     private let createdAt = ISO8601DateFormatter().string(from: Date())
@@ -772,7 +795,13 @@ final class StemacleNativeBridge: NSObject, ObservableObject, WKScriptMessageHan
         webView?.load(URLRequest(url: url))
     }
 
+    func showInstrument(urlString: String) {
+        requestedRoute = .instrument
+        navigate(to: urlString)
+    }
+
     func openSelectedTrackInInstrument(_ trackId: String) {
+        requestedRoute = .instrument
         evaluate("localStorage.setItem('stemacle:pendingTrackId', \(jsonString(trackId)))")
         navigate(to: "stemacle://app/app/index.html")
     }

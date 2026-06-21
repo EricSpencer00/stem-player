@@ -255,8 +255,11 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /StemacleMacShell\(bridge: bridge\)/);
   assert.match(swift, /struct StemacleMacShell: View/);
   assert.match(swift, /NavigationSplitView/);
+  assert.match(swift, /\.onReceive\(bridge\.\$requestedRoute/);
   assert.match(swift, /enum StemacleMacRoute: String, CaseIterable, Identifiable/);
   assert.match(swift, /struct StemacleMacSidebar: View/);
+  assert.match(swift, /ScrollView\s*\{/);
+  assert.match(swift, /Button\s*\{\s*selection = route/);
   assert.match(swift, /struct StemacleMacLibraryView: View/);
   assert.match(swift, /struct StemacleMacQueueView: View/);
   assert.match(swift, /struct StemacleMacReleaseView: View/);
@@ -272,6 +275,8 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /@Published private\(set\) var roots: \[StemacleRoot\]/);
   assert.match(swift, /@Published private\(set\) var queue: \[StemacleJob\]/);
   assert.match(swift, /@Published private\(set\) var releases: \[StemacleReleaseArtifact\]/);
+  assert.match(swift, /@Published var requestedRoute: StemacleMacRoute\?/);
+  assert.match(swift, /func showInstrument\(urlString:/);
   assert.match(swift, /let artPath: String/);
   assert.match(swift, /release\.artPath/);
   assert.match(swift, /stemacle-release-icon-01\.png/);
@@ -289,6 +294,7 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /Button\("Reveal Stemacle Data"\)/);
   assert.match(swift, /Button\("Reload Instrument"\)/);
   assert.match(swift, /Button\("Clear Desktop State"\)/);
+  assert.match(swift, /bridge\.showInstrument\(urlString: "stemacle:\/\/app\/app\/index\.html"\)/);
   assert.match(swift, /private func internalStemacleRoute\(for url: URL\) -> URL\?/);
   assert.match(swift, /stemacle:\/\/app\/app\/index\.html/);
   assert.match(swift, /stemacle:\/\/app\/apps\/stem-shuffle\/index\.html/);
@@ -361,6 +367,14 @@ test('release workflow publishes comprehensive macOS desktop assets to GitHub Re
   assert.match(pagesWorkflow, /node-version:\s*24/);
   assert.equal(pkg.build.productName, 'Stemacle Web Workbench');
   assert.match(packageScript, /packageJson\.version/);
+  assert.match(packageScript, /const appIconName = 'StemacleIcon\.icns'/);
+  assert.match(packageScript, /CFBundleIconFile[\s\S]*\$\{appIconName\}/);
+  assert.match(packageScript, /native', 'electron', 'icon\.icns'/);
+  assert.match(packageScript, /findDeveloperIdApplicationIdentity/);
+  assert.match(packageScript, /Developer ID Application:/);
+  assert.match(packageScript, /const appEntitlements = distribution === 'appstore'/);
+  assert.match(packageScript, /if \(appEntitlements\)/);
+  assert.match(packageScript, /codesign[\s\S]*dmgPath/);
   assert.match(packageScript, /CFBundleShortVersionString[\s\S]*\$\{version\}/);
   assert.match(packageScript, /versionedBaseName = `Stemacle-\$\{version\}-\$\{outputArch\}`/);
   assert.match(packageScript, /\$\{versionedBaseName\}\.dmg/);
