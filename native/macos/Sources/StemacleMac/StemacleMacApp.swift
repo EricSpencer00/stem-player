@@ -1311,20 +1311,20 @@ struct StemacleReleaseArtifact: Identifiable, Equatable {
         StemacleReleaseArtifact(
             id: "mac-dmg",
             title: "Stemacle DMG",
-            detail: "Apple Silicon installer image for v0.1.0.",
+            detail: "Apple Silicon installer image for v0.2.0.",
             actionTitle: "Download",
             systemImage: "opticaldiscdrive",
             artPath: "assets/release-icons/stemacle-release-icon-03.png",
-            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg")!
+            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/download/v0.2.0/Stemacle-0.2.0-arm64.dmg")!
         ),
         StemacleReleaseArtifact(
             id: "mac-zip",
             title: "App zip",
-            detail: "Portable Apple Silicon app bundle for v0.1.0.",
+            detail: "Portable Apple Silicon app bundle for v0.2.0.",
             actionTitle: "Download",
             systemImage: "archivebox",
             artPath: "assets/release-icons/stemacle-release-icon-02.png",
-            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64-mac.zip")!
+            url: URL(string: "https://github.com/EricSpencer00/stem-player/releases/download/v0.2.0/Stemacle-0.2.0-arm64-mac.zip")!
         ),
         StemacleReleaseArtifact(
             id: "ios",

@@ -1,4 +1,4 @@
-import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { arch, platform } from 'node:process';
 import { spawnSync } from 'node:child_process';
@@ -10,6 +10,9 @@ if (platform !== 'darwin') {
 
 const root = resolve(new URL('..', import.meta.url).pathname);
 const releaseRoot = join(root, 'release');
+const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+const version = process.env.STEMACLE_RELEASE_VERSION || packageJson.version;
+const buildNumber = process.env.STEMACLE_BUILD_NUMBER || version.replace(/\D/g, '') || '1';
 const appName = 'Stemacle';
 const appBundle = join(releaseRoot, `${appName}.app`);
 const contents = join(appBundle, 'Contents');
@@ -70,9 +73,9 @@ writeFileSync(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>${version}</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>${buildNumber}</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.music</string>
   <key>LSMinimumSystemVersion</key>
@@ -106,9 +109,29 @@ run('codesign', [
 ]);
 
 const outputArch = process.env.STEMACLE_MAC_ARCH || (arch === 'arm64' ? 'arm64' : 'x64');
-const zipPath = join(releaseRoot, `Stemacle-mac-${outputArch}.zip`);
-rmSync(zipPath, { force: true });
+const versionedBaseName = `Stemacle-${version}-${outputArch}`;
+const zipPath = join(releaseRoot, `${versionedBaseName}-mac.zip`);
+const dmgPath = join(releaseRoot, `${versionedBaseName}.dmg`);
+const latestZipPath = join(releaseRoot, `Stemacle-mac-${outputArch}.zip`);
+const latestDmgPath = join(releaseRoot, `Stemacle-mac-${outputArch}.dmg`);
+for (const artifact of [zipPath, dmgPath, latestZipPath, latestDmgPath]) {
+  rmSync(artifact, { force: true });
+  rmSync(`${artifact}.blockmap`, { force: true });
+}
 run('ditto', ['-c', '-k', '--keepParent', appBundle, zipPath], { cwd: releaseRoot });
+run('hdiutil', [
+  'create',
+  '-volname',
+  appName,
+  '-srcfolder',
+  appBundle,
+  '-ov',
+  '-format',
+  'UDZO',
+  dmgPath,
+]);
+cpSync(zipPath, latestZipPath);
+cpSync(dmgPath, latestDmgPath);
 
 if (distribution === 'appstore') {
   const installerIdentity = process.env.MAC_INSTALLER_IDENTITY;
@@ -130,3 +153,4 @@ if (distribution === 'appstore') {
 
 console.log(`Packaged ${appBundle}`);
 console.log(`Created ${zipPath}`);
+console.log(`Created ${dmgPath}`);

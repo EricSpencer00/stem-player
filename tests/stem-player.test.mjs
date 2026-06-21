@@ -46,6 +46,14 @@ function loadReleaseWorkflow() {
   return readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 }
 
+function loadGitignore() {
+  return readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
+}
+
+function loadPackageMacosScript() {
+  return readFileSync(new URL('../scripts/package-macos.mjs', import.meta.url), 'utf8');
+}
+
 function readRepo(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 }
@@ -77,8 +85,9 @@ test('landing page is a release-only shelf with durable public links', () => {
   assert.match(html, /EricSpencer00\/stem-player/);
   assert.match(html, /https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
   assert.match(html, /open web app/);
-  assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64\.dmg/);
-  assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64-mac\.zip/);
+  assert.match(html, /v0\.2\.0/);
+  assert.match(html, /releases\/download\/v0\.2\.0\/Stemacle-0\.2\.0-arm64\.dmg/);
+  assert.match(html, /releases\/download\/v0\.2\.0\/Stemacle-0\.2\.0-arm64-mac\.zip/);
   assert.match(html, /href="\/ios-coming-soon\/"/);
   assert.match(main, /Stemacle/);
   assert.doesNotMatch(html, /stemacle-ios-project-0\.1\.0\.zip/);
@@ -167,6 +176,7 @@ test('landing page keeps release labels terse and avoids platform-aware CTA scri
   assert.match(html, />mac dmg<\/a>/);
   assert.match(html, />mac zip<\/a>/);
   assert.match(html, /Latest GitHub release/);
+  assert.match(html, /href="https:\/\/ericspencer\.us\/"/);
   assert.match(html, /href=\"https:\/\/github\.com\/EricSpencer00\/stem-player\/releases\/latest/);
   assert.doesNotMatch(html, /class=\"cta primary\"/);
   assert.doesNotMatch(html, /navigator\.platform|userAgent|matchMedia/);
@@ -326,10 +336,28 @@ test('404 fallback redirects legacy paths without looping stemacle app routes', 
   assert.doesNotMatch(html, /path === '\/app' \|\| path\.startsWith\('\/app\/'\)\) \{/);
 });
 
-test('release workflow publishes durable multi-platform desktop assets to GitHub Releases', () => {
+test('release workflow publishes comprehensive macOS desktop assets to GitHub Releases', () => {
   const pkg = loadPackageJson();
+  const workflow = loadReleaseWorkflow();
+  const packageScript = loadPackageMacosScript();
+  const gitignore = loadGitignore();
+
+  assert.equal(pkg.version, '0.2.0');
   assert.equal(pkg.build.productName, 'Stemacle Web Workbench');
-  assert.ok(true);
+  assert.match(packageScript, /packageJson\.version/);
+  assert.match(packageScript, /CFBundleShortVersionString[\s\S]*\$\{version\}/);
+  assert.match(packageScript, /versionedBaseName = `Stemacle-\$\{version\}-\$\{outputArch\}`/);
+  assert.match(packageScript, /\$\{versionedBaseName\}\.dmg/);
+  assert.match(packageScript, /\$\{versionedBaseName\}-mac\.zip/);
+  assert.match(workflow, /runs-on:\s*macos-latest/);
+  assert.match(workflow, /npm run macos:package/);
+  assert.match(workflow, /Stemacle-\$\{version\}-arm64\.dmg/);
+  assert.match(workflow, /Stemacle-\$\{version\}-arm64-mac\.zip/);
+  assert.match(workflow, /Stemacle-\$\{version\}-SHA256SUMS\.txt/);
+  assert.match(workflow, /release-assets\/Stemacle-\*-arm64\.dmg/);
+  assert.match(workflow, /release-assets\/Stemacle-\*-arm64-mac\.zip/);
+  assert.doesNotMatch(workflow, /Stemacle-windows|Stemacle-linux|WIN_CSC_LINK/);
+  assert.match(gitignore, /native\/macos\/\.build\//);
 });
 
 class FakeClassList {
