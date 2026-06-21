@@ -1,25 +1,18 @@
 {
   "images" : [
     {
-      "filename" : "stemacle-tentacle-20x20.png",
-      "idiom" : "ipad",
-      "platform" : "ios",
-      "scale" : "1x",
-      "size" : "20x20"
-    },
-    {
       "filename" : "stemacle-tentacle-40x40.png",
-      "idiom" : "ipad",
+      "idiom" : "iphone",
       "platform" : "ios",
       "scale" : "2x",
       "size" : "20x20"
     },
     {
-      "filename" : "stemacle-tentacle-29x29.png",
+      "filename" : "stemacle-tentacle-60x60.png",
       "idiom" : "iphone",
       "platform" : "ios",
-      "scale" : "1x",
-      "size" : "29x29"
+      "scale" : "3x",
+      "size" : "20x20"
     },
     {
       "filename" : "stemacle-tentacle-58x58.png",
@@ -36,7 +29,7 @@
       "size" : "29x29"
     },
     {
-      "filename" : "stemacle-tentacle-40x40.png",
+      "filename" : "stemacle-tentacle-80x80.png",
       "idiom" : "iphone",
       "platform" : "ios",
       "scale" : "2x",
@@ -62,6 +55,34 @@
       "platform" : "ios",
       "scale" : "3x",
       "size" : "60x60"
+    },
+    {
+      "filename" : "stemacle-tentacle-20x20.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "1x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "stemacle-tentacle-40x40.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "stemacle-tentacle-29x29.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "1x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "stemacle-tentacle-58x58.png",
+      "idiom" : "ipad",
+      "platform" : "ios",
+      "scale" : "2x",
+      "size" : "29x29"
     },
     {
       "filename" : "stemacle-tentacle-40x40.png",
