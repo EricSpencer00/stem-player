@@ -117,6 +117,33 @@ button:focus-visible {
   user-select: none;
 }
 
+.tentacle-sweep,
+.tentacle-border {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+.tentacle-sweep {
+  right: max(-280px, -18vw);
+  top: clamp(420px, 58vw, 720px);
+  width: min(980px, 86vw);
+  opacity: 0.68;
+  transform: rotate(-4deg);
+  mix-blend-mode: multiply;
+}
+
+.tentacle-border {
+  left: 0;
+  right: 0;
+  bottom: -24px;
+  width: 100%;
+  min-width: 980px;
+  opacity: 0.54;
+  mix-blend-mode: multiply;
+}
+
 .nav {
   position: relative;
   z-index: 2;
@@ -134,6 +161,14 @@ button:focus-visible {
   align-items: center;
   gap: 12px;
   min-width: 0;
+}
+
+.wordmark img {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: 0 4px 14px oklch(24% 0.012 70 / 0.14);
 }
 
 .wordmark span,
@@ -201,8 +236,38 @@ button:focus-visible {
   padding: clamp(58px, 8vw, 104px) 0 clamp(40px, 7vw, 80px);
 }
 
+.hero.hero-centered {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+  min-height: min(820px, calc(100svh - 54px));
+}
+
 .hero-copy {
   max-width: 720px;
+}
+
+.hero-centered .hero-copy {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.hero-centered .dek,
+.hero-centered .body-copy {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-app-icon {
+  width: clamp(56px, 7vw, 86px);
+  height: clamp(56px, 7vw, 86px);
+  margin: 0 auto 24px;
+  border-radius: 24px;
+  display: block;
+  object-fit: cover;
+  box-shadow:
+    inset 0 0 0 1px oklch(100% 0 0 / 0.42),
+    0 14px 34px oklch(24% 0.012 70 / 0.20);
 }
 
 .eyebrow {
@@ -242,6 +307,7 @@ h1 {
 .actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 30px;
@@ -271,7 +337,7 @@ h1 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   max-width: 760px;
-  margin: 34px 0 0;
+  margin: 34px auto 0;
   padding: 18px 0 0;
   border-top: 1px solid var(--line);
 }
@@ -298,6 +364,11 @@ h1 {
   place-items: center;
   min-height: 500px;
   filter: drop-shadow(0 18px 54px oklch(24% 0.012 70 / 0.16));
+}
+
+.hero-centered .object {
+  margin-top: clamp(24px, 4vw, 42px);
+  min-height: clamp(330px, 42vw, 500px);
 }
 
 .device {
@@ -661,6 +732,10 @@ footer {
     padding: 12px 0 20px;
   }
 
+  .hero-centered .object {
+    order: 0;
+  }
+
   .signal-list {
     grid-template-columns: 1fr;
     gap: 14px;
@@ -706,9 +781,14 @@ footer {
   }
 
   .tentacle {
-    left: -220px;
-    width: 520px;
-    opacity: 0.62;
+    display: none;
+  }
+
+  .tentacle-sweep {
+    top: 620px;
+    right: -340px;
+    width: 760px;
+    opacity: 0.24;
   }
 
   h1 {
@@ -771,9 +851,12 @@ footer {
 <body>
 <div class="site">
   <img class="tentacle" src="/assets/stemacle-tentacle-cutout.png" alt="" aria-hidden="true">
+  <img class="tentacle-sweep" src="/assets/tentacle-b-roll/optimized/tentacle-wide-sweep-web.png" alt="" aria-hidden="true">
+  <img class="tentacle-border" src="/assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="" aria-hidden="true">
 
   <nav class="nav" aria-label="Primary">
     <a class="wordmark" href="/" aria-label="Stemacle home">
+      <img src="/assets/stemacle-tentacle.png" alt="" aria-hidden="true">
       <span>stemacle</span>
       <i class="rule"></i>
       <span>local stems</span>
@@ -781,37 +864,25 @@ footer {
     <div class="nav-links">
       <a href="https://stemacle.com/app/">web app</a>
       <a href="#desktop">desktop</a>
+      <a href="/ios-coming-soon/">get for ios</a>
       <a href="#downloads">downloads</a>
-      <a href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">workflow</a>
     </div>
   </nav>
 
   <main>
-    <section class="hero" aria-labelledby="title">
+    <section class="hero hero-centered" aria-labelledby="title">
       <div class="hero-copy">
-        <span class="eyebrow">browser live · mac download · ios in progress</span>
+        <img class="hero-app-icon" src="/assets/stemacle-tentacle.png" alt="" aria-hidden="true">
+        <span class="eyebrow">browser live · mac download · ios soon</span>
         <h1 id="title">Stemacle</h1>
         <p class="dek">Split songs into stems, lock loops to tempo, shuffle compatible tracks, and export everything without uploading your music.</p>
-        <p class="body-copy">The web app is instant. The desktop app adds indexed libraries, model caches, higher-quality local splitting, downloads, background jobs, and export queues. iOS is in progress, and the public release path stays tied to the stem-player repository instead of a separate workspace.</p>
+        <p class="body-copy">The web app is instant. The desktop app adds indexed libraries, model caches, higher-quality local splitting, downloads, background jobs, and export queues. iOS is being shaped as the same physical instrument for your hand, not a smaller web page.</p>
         <div class="actions" aria-label="Stemacle actions">
           <a class="cta primary" href="https://stemacle.com/app/">open web app</a>
           <a class="cta" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">download mac app</a>
+          <a class="cta" href="/ios-coming-soon/">get for ios</a>
           <a class="cta" href="https://github.com/EricSpencer00/stem-player">view repo</a>
         </div>
-        <dl class="signal-list" aria-label="Current release signal">
-          <div class="signal-item">
-            <dt class="eyebrow">repo</dt>
-            <dd>EricSpencer00/stem-player</dd>
-          </div>
-          <div class="signal-item">
-            <dt class="eyebrow">checks</dt>
-            <dd>`npm test` · `site:prepare` · `native:prepare`</dd>
-          </div>
-          <div class="signal-item">
-            <dt class="eyebrow">public now</dt>
-            <dd>macOS dmg/zip plus the iOS project zip</dd>
-          </div>
-        </dl>
       </div>
       <div class="object" aria-hidden="true">
         <div class="device">
@@ -843,10 +914,10 @@ footer {
           <strong>direct public artifacts</strong>
           <p>Download the files that are already on GitHub Releases, not placeholders for later platforms.</p>
         </a>
-        <a class="route" href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">
-          <span class="route-label">workflow</span>
-          <strong>actions validate it</strong>
-          <p>The public `stem-player` workflow runs tests plus site and native bundle prep before deploy.</p>
+        <a class="route" href="/ios-coming-soon/">
+          <span class="route-label">ios</span>
+          <strong>touch instrument coming</strong>
+          <p>Get the App Store page when the native iPhone build is ready.</p>
         </a>
       </div>
     </section>
@@ -871,40 +942,39 @@ footer {
       </dl>
     </section>
 
-    <section class="section release" id="workflow">
+    <section class="section release" id="local">
       <div>
-        <span class="eyebrow">public repo, public workflow</span>
-        <h2>Built from stem-player, not a private workspace.</h2>
-        <p>The landing page points to the public repository and the public release artifacts. The Validate workflow runs on pull requests to main, pushes to main, and manual dispatch, then prepares the same site and native bundles the release path depends on.</p>
+        <span class="eyebrow">local by design</span>
+        <h2>Your music stays in the room.</h2>
+        <p>Stemacle opens local files, splits locally, and keeps the instrument quiet enough that the track remains the loudest thing on screen. The public repo is there for proof, but the product starts with the circle.</p>
         <div class="actions">
           <a class="mini-link" href="https://github.com/EricSpencer00/stem-player">repo</a>
-          <a class="mini-link" href="https://github.com/EricSpencer00/stem-player/actions/workflows/pages.yml">workflow</a>
           <a class="mini-link" href="https://github.com/EricSpencer00/stem-player/releases/latest">release</a>
         </div>
       </div>
-      <div class="terminal" aria-label="Stemacle validation workflow">
+      <div class="terminal" aria-label="Stemacle local-first contract">
         <header>
-          <span class="caption">workflow</span>
-          <span class="caption">Validate</span>
+          <span class="caption">contract</span>
+          <span class="caption">local first</span>
         </header>
-        <pre><code><span class="dim">$</span> npm test
-<span class="dim">$</span> npm run site:prepare
-<span class="dim">$</span> npm run native:prepare
+        <pre><code>drop audio
+split stems
+lock loops
+shuffle pairs
+export locally
 
-repo
-EricSpencer00/stem-player
-
-release
-v0.1.0</code></pre>
+no account
+no upload
+no server queue</code></pre>
       </div>
     </section>
 
     <section class="section release" id="downloads">
       <div>
         <span class="eyebrow">download manifest</span>
-        <h2>Current public artifacts, linked directly.</h2>
-        <p>If a file is listed here, it exists on the public stem-player release page right now. If a platform is not listed here, it is not public yet.</p>
-        <p class="support-note">The current release is Apple Silicon only on desktop. Windows, Linux, and public iOS install links appear here once they actually ship.</p>
+        <h2>Current public downloads, linked directly.</h2>
+        <p>Mac builds link straight to the public release files. iOS points to the coming-soon page until the App Store install is real.</p>
+        <p class="support-note">The current desktop release is Apple Silicon only. Windows, Linux, and App Store install links appear here once they actually ship.</p>
       </div>
       <div class="manifest-list" aria-label="Download manifest">
         <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/Stemacle-0.1.0-arm64.dmg">
@@ -923,13 +993,13 @@ v0.1.0</code></pre>
           </div>
           <span class="manifest-cta">download</span>
         </a>
-        <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/download/v0.1.0/stemacle-ios-project-0.1.0.zip">
+        <a class="manifest-row" href="/ios-coming-soon/">
           <div>
-            <span class="manifest-kicker">iOS project zip</span>
-            <strong>Native project snapshot</strong>
-            <p>Open the iOS shell in Xcode or Simulator while public install links are still in progress.</p>
+            <span class="manifest-kicker">iOS</span>
+            <strong>Stemacle for iOS</strong>
+            <p>Open the coming-soon page for the native iPhone release path.</p>
           </div>
-          <span class="manifest-cta">download</span>
+          <span class="manifest-cta">get</span>
         </a>
         <a class="manifest-row" href="https://github.com/EricSpencer00/stem-player/releases/latest">
           <div>
@@ -943,8 +1013,9 @@ v0.1.0</code></pre>
     </section>
 
     <section class="ios-note" id="ios-status">
-      <span class="eyebrow">iOS</span>
-      <p>iOS work is still in progress. The native shell and project files are in the repo, and the current public artifact is the project zip. App Store and TestFlight install links belong here only when they are real.</p>
+      <span class="eyebrow">get for ios</span>
+      <p>The iPhone app is being prepared as a native local-first instrument. The App Store page will live on the coming-soon path when the public install is ready.</p>
+      <p><a class="mini-link" href="/ios-coming-soon/">open ios page</a></p>
     </section>
   </main>
 

@@ -9,12 +9,22 @@
     "test": "node --test tests/*.test.mjs",
     "site:prepare": "node scripts/prepare-site.mjs",
     "native:prepare": "node scripts/prepare-native.mjs",
-    "desktop:dev": "npm run native:prepare && electron .",
-    "desktop:pack": "npm run native:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
-    "desktop:dist": "npm run native:prepare && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
+    "desktop:dev": "node scripts/desktop-dispatch.mjs dev",
+    "desktop:pack": "node scripts/desktop-dispatch.mjs pack",
+    "desktop:dist": "node scripts/desktop-dispatch.mjs dist",
+    "macos:dev": "npm run native:prepare && swift run --package-path native/macos StemacleMac --repo-root \"$PWD\"",
+    "macos:build": "npm run native:prepare && swift build --package-path native/macos -c release",
+    "macos:package": "npm run macos:build && node scripts/package-macos.mjs",
+    "macos:appstore": "STEMACLE_MAC_DISTRIBUTION=appstore npm run macos:package",
+    "windows:dev": "npm run native:prepare && electron .",
+    "windows:dist": "npm run native:prepare && electron-builder --win nsis --x64",
+    "linux:dist": "npm run native:prepare && electron-builder --linux AppImage deb --x64",
+    "webui:dev": "npm run native:prepare && node scripts/serve-native.mjs",
     "ios:add": "npm run native:prepare && cap add ios",
     "ios:sync": "npm run native:prepare && cap sync ios",
-    "ios:open": "npm run ios:sync && cap open ios"
+    "ios:open": "npm run ios:sync && cap open ios",
+    "ios:archive": "bash scripts/ios-release.sh archive",
+    "ios:testflight": "bash scripts/ios-release.sh testflight"
   },
   "keywords": [
     "audio",
@@ -35,7 +45,8 @@
   },
   "build": {
     "appId": "com.stemacle.app",
-    "productName": "Stemacle",
+    "productName": "Stemacle Web Workbench",
+    "forceCodeSigning": true,
     "directories": {
       "output": "release"
     },
@@ -50,15 +61,8 @@
       "capacitor.config.json",
       "package.json"
     ],
-    "mac": {
-      "category": "public.app-category.music",
-      "icon": "native/electron/icon.icns",
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
     "win": {
+      "artifactName": "Stemacle-windows-${arch}-setup.${ext}",
       "target": [
         "nsis"
       ]
@@ -66,6 +70,7 @@
     "linux": {
       "category": "Audio",
       "icon": "native/electron/icon.png",
+      "artifactName": "Stemacle-linux-${arch}.${ext}",
       "target": [
         "AppImage",
         "deb"

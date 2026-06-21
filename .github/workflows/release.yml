@@ -1,0 +1,190 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to release (for example v0.2.0)'
+        required: true
+        type: string
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run regression tests
+        run: npm test
+
+      - name: Prepare site bundle
+        run: npm run site:prepare
+
+      - name: Prepare native bundle
+        run: npm run native:prepare
+
+  build:
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: stemacle-macos
+            build_command: npm run macos:package
+            artifact_paths: |
+              release/Stemacle-mac-arm64.zip
+          - os: windows-latest
+            artifact_name: stemacle-windows
+            build_command: npm run windows:dist
+            artifact_paths: |
+              release/Stemacle-windows-x64-setup.exe
+          - os: ubuntu-latest
+            artifact_name: stemacle-linux
+            build_command: npm run linux:dist
+            artifact_paths: |
+              release/Stemacle-linux-x64.AppImage
+              release/Stemacle-linux-x64.deb
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare native bundle
+        run: npm run native:prepare
+
+      - name: Validate macOS signing and notarization inputs
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK || secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+
+          for name in CSC_LINK CSC_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required macOS signing secret ${name}."
+              exit 1
+            fi
+          done
+
+          has_apple_id_auth=true
+          for name in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              has_apple_id_auth=false
+            fi
+          done
+
+          has_api_key_auth=true
+          for name in APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            if [[ -z "${!name:-}" ]]; then
+              has_api_key_auth=false
+            fi
+          done
+
+          if [[ "${has_apple_id_auth}" != "true" && "${has_api_key_auth}" != "true" ]]; then
+            echo "::error::Missing notarization credentials. Provide APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID or APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER."
+            exit 1
+          fi
+
+      - name: Validate Windows signing inputs
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          for name in WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required Windows signing secret ${name}."
+              exit 1
+            fi
+          done
+
+      - name: Build desktop artifacts
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK || secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          STEMACLE_MAC_ARCH: arm64
+        run: ${{ matrix.build_command }}
+
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          if-no-files-found: error
+          path: ${{ matrix.artifact_paths }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Show release asset manifest
+        shell: bash
+        run: |
+          find release-assets -maxdepth 2 -type f | sort
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+          files: |
+            release-assets/Stemacle-mac-arm64.zip
+            release-assets/Stemacle-windows-x64-setup.exe
+            release-assets/Stemacle-linux-x64.AppImage
+            release-assets/Stemacle-linux-x64.deb

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stemacle for iOS</title>
+<meta name="description" content="Stemacle for iOS is coming soon. Use the web app today and watch for the native local-first iPhone release.">
+<link rel="icon" type="image/png" href="/assets/stemacle-tentacle.png">
+<link rel="apple-touch-icon" href="/assets/stemacle-tentacle.png">
+<style>
+:root {
+  --page: oklch(92% 0.012 84);
+  --page-2: oklch(86% 0.018 78);
+  --paper: oklch(96% 0.009 84);
+  --ink: oklch(24% 0.012 64);
+  --ink-soft: oklch(42% 0.011 68);
+  --ink-faint: oklch(54% 0.010 70);
+  --track: oklch(70% 0.01 70 / 0.44);
+  --plum: oklch(28% 0.082 320);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(78% 56% at 50% -10%, oklch(98% 0.006 84 / 0.72), transparent 70%),
+    linear-gradient(180deg, var(--page), var(--page-2));
+  color: var(--ink);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--plum);
+  outline-offset: 4px;
+}
+
+.page {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  overflow: hidden;
+}
+
+.side-rail {
+  position: fixed;
+  right: max(-220px, -16vw);
+  top: 0;
+  width: min(560px, 68vw);
+  height: 100svh;
+  object-fit: cover;
+  opacity: 0.6;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.bottom-border {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: -32px;
+  width: 100%;
+  min-width: 900px;
+  opacity: 0.5;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  width: min(820px, 100%);
+  text-align: center;
+}
+
+.app-icon {
+  width: clamp(64px, 9vw, 96px);
+  height: clamp(64px, 9vw, 96px);
+  border-radius: 26px;
+  object-fit: cover;
+  box-shadow:
+    inset 0 0 0 1px oklch(100% 0 0 / 0.44),
+    0 16px 42px oklch(24% 0.012 70 / 0.22);
+}
+
+.eyebrow,
+.actions a,
+.status {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  display: block;
+  margin: 28px 0 18px;
+}
+
+h1 {
+  margin: 0;
+  color: var(--plum);
+  font-size: clamp(62px, 13vw, 148px);
+  font-weight: 500;
+  line-height: 0.88;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 720px;
+  margin: 28px auto 0;
+  color: var(--ink);
+  font-size: clamp(21px, 3vw, 36px);
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.copy {
+  max-width: 64ch;
+  margin: 22px auto 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 34px;
+}
+
+.actions a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid var(--track);
+  border-radius: 999px;
+  background: oklch(96% 0.009 84 / 0.52);
+  transition:
+    background 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.actions a:hover {
+  background: oklch(86% 0.015 78);
+  border-color: var(--ink-faint);
+  transform: translateY(-1px);
+}
+
+.actions .primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 38px;
+  padding-top: 18px;
+  border-top: 1px solid var(--track);
+}
+
+.status::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: oklch(64% 0.13 64);
+  box-shadow: 0 0 18px oklch(64% 0.13 64 / 0.42);
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding: 24px 16px 56px;
+  }
+
+  .actions a {
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <img class="side-rail" src="/assets/tentacle-b-roll/optimized/tentacle-mobile-side-rail-web.png" alt="" aria-hidden="true">
+  <img class="bottom-border" src="/assets/tentacle-b-roll/optimized/tentacle-bottom-border-web.png" alt="" aria-hidden="true">
+
+  <section class="content" aria-labelledby="title">
+    <img class="app-icon" src="/assets/stemacle-tentacle.png" alt="" aria-hidden="true">
+    <span class="eyebrow">native iPhone instrument</span>
+    <h1 id="title">Stemacle for iOS</h1>
+    <p class="lede">The same local-first splitter is being shaped for touch, Files, projects, and App Store release.</p>
+    <p class="copy">Use the web app today. The iOS app will stay true to the circle, the four stems, the loop contract, and the no-upload promise before it adds phone-native import, projects, and share flows.</p>
+    <nav class="actions" aria-label="Stemacle iOS links">
+      <a class="primary" href="https://stemacle.com/app/">open web app</a>
+      <a href="/">back to stemacle</a>
+      <a href="https://github.com/EricSpencer00/stem-player/releases/latest">release notes</a>
+    </nav>
+    <span class="status">App Store page coming soon</span>
+  </section>
+</main>
+</body>
+</html>

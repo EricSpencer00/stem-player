@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/master.swiftdeps"
+  },
+  "/Users/eric/GitHub/stem-player/native/macos/Sources/StemacleMac/StemacleMacApp.swift": {
+    "dependencies": "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.d",
+    "object": "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.swift.o",
+    "swiftmodule": "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.swiftdeps",
+    "diagnostics": "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.dia"
+  }
+}

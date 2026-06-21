@@ -13,11 +13,31 @@ at `/app/`. Drop any audio file; Stemacle splits it into drums, bass, vocals, an
 melody using a client-side ML model. Each stem is independently playable, mutable,
 and loopable. No accounts, no uploads, no server.
 
+## Canonical Surface Contract
+
+`https://stemacle.com/app/` is the perfect canonical Stemacle web app. Treat it as
+the gold master for playback behavior, visual hierarchy, stem controls, loop
+semantics, and tactile feel. Do not redesign or "polish" the web app unless Eric
+explicitly asks for web-app changes.
+
+`https://ericspencer.us/stem-player` is a legacy entry point that points users to
+`https://stemacle.com/app/`. Documentation, tests, and release notes should describe
+that URL as a redirect to the perfect canonical app, not as a separate product
+surface.
+
+Desktop and iOS are native parity-plus surfaces. Their first obligation is to match
+the web app's working splitter experience closely enough that a user recognizes the
+same product immediately. Only after that parity is preserved should they add
+native advantages such as local libraries, project history, file-system integration,
+share/export flows, background jobs, and platform-native polish.
+
 ## Feature List
 - Present `https://stemacle.com/` as the landing and download entry point for the
-  browser app, desktop app, iOS app, GitHub repo, and CLI.
+  browser app, SwiftUI desktop app, iOS app, and GitHub repo.
 - Package the existing app design into a native Stemacle shell with Stem Splitter,
   Stem Shuffle, and a local music library surface.
+- Keep desktop and iOS visually and behaviorally aligned with the perfect web app
+  before adding native-only features.
 - Keep product-surface differences documented in
   [docs/STEMACLE_SURFACES.md](./docs/STEMACLE_SURFACES.md).
 - Keep the working browser instrument available at `/app/`.
