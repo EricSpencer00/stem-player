@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "StemacleMac-arm64-apple-macosx26.0-debug.exe": ["<StemacleMac-arm64-apple-macosx26.0-debug.exe>"]
+  "StemacleMac-arm64-apple-macosx26.0-debug.module": ["<StemacleMac-arm64-apple-macosx26.0-debug.module>"]
+  "main": ["<StemacleMac-arm64-apple-macosx26.0-debug.exe>","<StemacleMac-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<StemacleMac-arm64-apple-macosx26.0-debug.exe>","<StemacleMac-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/eric/GitHub/stem-player/native/macos/Sources/StemacleMac/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac":
+    is-mutated: true
+commands:
+  "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac-entitlement.plist"]
+    description: "Write auxiliary file /Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac-entitlement.plist"
+
+  "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/eric/GitHub/stem-player/native/macos/Sources/StemacleMac/StemacleMacApp.swift"]
+    outputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/sources"]
+    description: "Write auxiliary file /Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/sources"
+
+  "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.swift.o"]
+    outputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.product/Objects.LinkFileList"
+
+  "/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<StemacleMac-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<StemacleMac-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<StemacleMac-arm64-apple-macosx26.0-debug.exe>"]
+
+  "<StemacleMac-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.swift.o","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/Modules/StemacleMac.swiftmodule"]
+    outputs: ["<StemacleMac-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.StemacleMac-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.swift.o","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.product/Objects.LinkFileList"]
+    outputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/StemacleMac"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug","-o","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac","-module-name","StemacleMac","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_StemacleMac_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.product/Objects.LinkFileList","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/Modules/StemacleMac.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.StemacleMac-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac-entitlement.plist"]
+    outputs: ["<StemacleMac-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/StemacleMac"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac-entitlement.plist","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac"]
+
+  "C.StemacleMac-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/eric/GitHub/stem-player/native/macos/Sources/StemacleMac/StemacleMacApp.swift","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/sources"]
+    outputs: ["/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/StemacleMacApp.swift.o","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/Modules/StemacleMac.swiftmodule"]
+    description: "Compiling Swift Module 'StemacleMac' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","StemacleMac","-emit-dependencies","-emit-module","-emit-module-path","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/Modules/StemacleMac.swiftmodule","-output-file-map","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/output-file-map.json","-incremental","-c","@/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/StemacleMac.build/sources","-I","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j10","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/eric/GitHub/stem-player/native/macos/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","StemacleMac_main","-parse-as-library","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","macos"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/eric/GitHub/stem-player/native/macos/Sources/StemacleMac/","/Users/eric/GitHub/stem-player/native/macos/Package.swift","/Users/eric/GitHub/stem-player/native/macos/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

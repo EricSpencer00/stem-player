@@ -1,8 +1,12 @@
 # Stemacle Desktop Workbench Implementation Plan
 
+Status: superseded as the desktop product plan. Keep this plan only as historical context for compatibility web workbench behavior. Current desktop work is SwiftUI parity-plus: match the perfect web app at `https://stemacle.com/app/` first, document that `https://ericspencer.us/stem-player` points to it, then add native desktop features above and beyond.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the desktop wrapper into a working local music workbench with real library indexing, queue execution, tool/model detection, downloads, exports, and native handoff into the Stem Splitter route.
+**Historical Goal:** Turn the desktop wrapper into a working local music workbench with real library indexing, queue execution, tool/model detection, downloads, exports, and native handoff into the Stem Splitter route.
+
+**Current Goal:** Build the SwiftUI desktop app as the product surface. Preserve perfect web-app parity first, then add library indexing, queue execution, tool/model detection, downloads, exports, and native handoff as SwiftUI-native capabilities.
 
 **Architecture:** Keep the browser routes intact while moving desktop-only responsibilities into a persistent Electron-side store and job runner. The native shell renders that state and invokes desktop jobs over IPC, while `/app/` consumes native file bytes when launched from the library.
 
@@ -10,7 +14,9 @@
 
 ## Global Constraints
 
-- Preserve the existing browser app at `/app/`.
+- Preserve the perfect browser app at `/app/`.
+- Preserve the legacy `ericspencer.us/stem-player` redirect to `https://stemacle.com/app/`.
+- Do not let Electron compatibility work redefine desktop away from SwiftUI parity-plus.
 - Keep the existing Stem Shuffle app at `/apps/stem-shuffle/`.
 - Desktop-only capabilities must degrade gracefully when native tools are missing.
 - Prefer stable per-track cache directories under the desktop data root.

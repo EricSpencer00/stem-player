@@ -14,6 +14,10 @@ function loadLandingHtml() {
   return readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 }
 
+function loadIosComingSoonHtml() {
+  return readFileSync(new URL('../ios-coming-soon/index.html', import.meta.url), 'utf8');
+}
+
 function loadNativeShellHtml() {
   return readFileSync(new URL('../native/index.html', import.meta.url), 'utf8');
 }
@@ -34,6 +38,10 @@ function loadPrepareSiteScript() {
   return readFileSync(new URL('../scripts/prepare-site.mjs', import.meta.url), 'utf8');
 }
 
+function loadNotFoundHtml() {
+  return readFileSync(new URL('../404.html', import.meta.url), 'utf8');
+}
+
 function loadReleaseWorkflow() {
   return readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 }
@@ -44,6 +52,10 @@ function readRepo(path) {
 
 function loadMacEntitlements(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+}
+
+function loadMacSwiftApp() {
+  return readFileSync(new URL('../native/macos/Sources/StemacleMac/StemacleMacApp.swift', import.meta.url), 'utf8');
 }
 
 function loadIosProject() {
@@ -60,7 +72,8 @@ test('landing page exposes current web, repo, and durable multi-platform release
   assert.match(html, /open web app/);
   assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64\.dmg/);
   assert.match(html, /releases\/download\/v0\.1\.0\/Stemacle-0\.1\.0-arm64-mac\.zip/);
-  assert.match(html, /releases\/download\/v0\.1\.0\/stemacle-ios-project-0\.1\.0\.zip/);
+  assert.match(html, /href="\/ios-coming-soon\/"/);
+  assert.doesNotMatch(html, /stemacle-ios-project-0\.1\.0\.zip/);
   assert.doesNotMatch(html, /href=\"\/app\//);
   assert.doesNotMatch(html, /EricSpencer00\/stem-workstation/);
   assert.doesNotMatch(html, /ericspencer\.us\/stem-player/);
@@ -71,6 +84,49 @@ test('landing page exposes current web, repo, and durable multi-platform release
   assert.doesNotMatch(html, /One repo, four surfaces/i);
   assert.doesNotMatch(html, /CLI binaries/i);
   assert.doesNotMatch(html, new RegExp(`${'Stem'} ${'Player'}|${'stem'} ${'player'}`));
+});
+
+test('web app keeps the Stemacle app icon visible in the product chrome', () => {
+  const html = loadHtml();
+  const appMarkBlock = html.match(/\.app-mark \{[\s\S]*?\n\}/)?.[0] ?? '';
+
+  assert.match(html, /class="app-mark"/);
+  assert.match(html, /aria-label="Stemacle app home"/);
+  assert.match(html, /src="\/assets\/stemacle-tentacle\.png"/);
+  assert.match(html, /class="brand-tentacle" src="\/assets\/stemacle-tentacle-cutout\.png"/);
+  assert.doesNotMatch(appMarkBlock, /backdrop-filter/);
+  assert.doesNotMatch(html, /class="brand-tentacle" src="assets\//);
+});
+
+test('landing page centers the Stemacle title and uses tentacle art with iOS coming soon routing', () => {
+  const html = loadLandingHtml();
+  const mobileCss = html.slice(html.indexOf('@media (max-width: 560px)'));
+
+  assert.match(html, /class="hero hero-centered"/);
+  assert.match(html, /class="hero-app-icon"/);
+  assert.match(html, /src="\/assets\/stemacle-tentacle\.png"/);
+  assert.match(html, /tentacle-b-roll\/optimized\/tentacle-wide-sweep-web\.png/);
+  assert.match(html, /tentacle-b-roll\/optimized\/tentacle-bottom-border-web\.png/);
+  assert.match(html, /id="title">Stemacle<\/h1>/);
+  assert.match(html, /\.hero-centered \.object \{\s*order: 0;\s*\}/);
+  assert.match(mobileCss, /\.tentacle \{[\s\S]*?display: none;[\s\S]*?\}/);
+  assert.match(mobileCss, /\.tentacle-sweep \{[\s\S]*?top: 620px;[\s\S]*?opacity: 0\.24;[\s\S]*?\}/);
+  assert.match(html, />get for ios<\/a>/i);
+  assert.match(html, /href="\/ios-coming-soon\/"/);
+  assert.doesNotMatch(html, /Current release signal/);
+  assert.doesNotMatch(html, /actions validate it/i);
+});
+
+test('ios coming soon page is a real branded destination, not a dead link', () => {
+  const html = loadIosComingSoonHtml();
+
+  assert.match(html, /<title>Stemacle for iOS/);
+  assert.match(html, /href="https:\/\/stemacle\.com\/app\/"/);
+  assert.match(html, /href="\/"/);
+  assert.match(html, /src="\/assets\/stemacle-tentacle\.png"/);
+  assert.match(html, /tentacle-b-roll\/optimized\/tentacle-mobile-side-rail-web\.png/);
+  assert.match(html, /App Store/i);
+  assert.doesNotMatch(html, /TestFlight is the next surface/i);
 });
 
 test('landing page routes the primary download CTA by platform with a release-page fallback', () => {
@@ -144,6 +200,34 @@ test('macOS packaging uses the SwiftUI workbench while Windows and Linux keep th
   assert.match(project, /PRODUCT_BUNDLE_IDENTIFIER = com\.stemacle\.app;/);
 });
 
+test('macOS SwiftUI app wraps the canonical web instrument with native desktop polish', () => {
+  const swift = loadMacSwiftApp();
+
+  assert.match(swift, /StemacleDesktopWorkbench\(bridge: bridge\)/);
+  assert.match(swift, /struct StemacleDesktopWorkbench: View/);
+  assert.match(swift, /\.safeAreaInset\(edge: \.top, spacing: 0\)/);
+  assert.match(swift, /struct StemacleDesktopTitleBar: View/);
+  assert.match(swift, /struct StemacleDesktopAppIcon: View/);
+  assert.match(swift, /stemacle-tentacle\.png/);
+  assert.match(swift, /\.safeAreaInset\(edge: \.bottom\)/);
+  assert.match(swift, /struct StemacleDesktopStatusBar: View/);
+  assert.match(swift, /@Published private\(set\) var desktopSummary = StemacleDesktopSummary/);
+  assert.match(swift, /struct StemacleDesktopSummary: Equatable/);
+  assert.match(swift, /private func refreshDesktopSummary\(from state: \[String: Any\]\)/);
+  assert.match(swift, /Button\("Rescan Library"\)/);
+  assert.match(swift, /Button\("Reveal Stemacle Data"\)/);
+  assert.match(swift, /Button\("Reload Instrument"\)/);
+  assert.match(swift, /Button\("Clear Desktop State"\)/);
+  assert.match(swift, /private func internalStemacleRoute\(for url: URL\) -> URL\?/);
+  assert.match(swift, /stemacle:\/\/app\/app\/index\.html/);
+  assert.match(swift, /stemacle:\/\/app\/apps\/stem-shuffle\/index\.html/);
+  assert.match(swift, /webView\.load\(URLRequest\(url: internalURL\)\)/);
+  assert.match(swift, /prepareApplicationSupportDirectories\(\)/);
+  assert.match(swift, /createDirectory\(at: directory, withIntermediateDirectories: true\)/);
+  assert.match(swift, /"storageReady": desktopSummary\.storageReady/);
+  assert.match(swift, /"localFirst": true/);
+});
+
 test('cloudflare pages build publishes the complete Stemacle site', () => {
   const pkg = loadPackageJson();
   const wrangler = loadWranglerConfig();
@@ -154,19 +238,32 @@ test('cloudflare pages build publishes the complete Stemacle site', () => {
   assert.doesNotMatch(wrangler, /ericspencer\.us\/stem-player/);
 });
 
-test('site prepare publishes the browser app at /app/ and /stem-player/', () => {
+test('site prepare preserves the perfect /app bundle and redirects only legacy stem-player paths', () => {
   const script = loadPrepareSiteScript();
 
   assert.match(script, /copyIntoSite\('app'\)/);
   assert.match(script, /copyIntoSite\('apps'\)/);
+  assert.match(script, /copyIntoSite\('ios-coming-soon'\)/);
   assert.match(script, /\/app\b/);
   assert.match(script, /\/app\/\*/);
-  assert.match(script, /'\/app  https:\/\/stemacle\.com\/app  301'/);
-  assert.match(script, /'\/app\/\* https:\/\/stemacle\.com\/app\/:splat  301'/);
+  assert.doesNotMatch(script, /'\/app\s+https:\/\/stemacle\.com\/app\s+301'/);
+  assert.doesNotMatch(script, /'\/app\/\*\s+https:\/\/stemacle\.com\/app\/:splat\s+301'/);
+  assert.doesNotMatch(script, /writeFile\(join\(outDir, 'app', 'index\.html'\)/);
   assert.match(script, /\/stem-player\b/);
   assert.match(script, /\/stem-player\/\*/);
+  assert.match(script, /404\.html/);
   assert.match(script, /Cross-Origin-Embedder-Policy: credentialless/);
   assert.match(script, /Cross-Origin-Opener-Policy: same-origin/);
+});
+
+test('404 fallback redirects legacy paths without looping stemacle app routes', () => {
+  const html = loadNotFoundHtml();
+
+  assert.match(html, /stemPlayerFallbackRedirect/);
+  assert.match(html, /path === '\/stem-player'/);
+  assert.match(html, /https:\/\/stemacle\.com\/app\//);
+  assert.match(html, /window\.location\.hostname\.endsWith\('ericspencer\.us'\)/);
+  assert.doesNotMatch(html, /path === '\/app' \|\| path\.startsWith\('\/app\/'\)\) \{/);
 });
 
 test('release workflow publishes durable multi-platform desktop assets to GitHub Releases', () => {

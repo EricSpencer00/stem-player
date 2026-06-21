@@ -1,8 +1,12 @@
 # Stemacle Desktop Workbench Design
 
+Status: superseded as the desktop product direction. Keep this document only as historical context for compatibility web workbench behavior. Current desktop work is SwiftUI parity-plus: match the perfect web app at `https://stemacle.com/app/` first, recognize that `https://ericspencer.us/stem-player` points to it, then add native desktop capabilities above and beyond.
+
 ## Goal
 
-Turn the Electron desktop app from a static wrapper into a real local workbench that owns library indexing, cache manifests, native analysis/download/export jobs, model/tool detection, and handoff into the Stem Splitter surface.
+Historical goal: turn the Electron desktop app from a static wrapper into a real local workbench that owns library indexing, cache manifests, native analysis/download/export jobs, model/tool detection, and handoff into the Stem Splitter surface.
+
+Current goal: use SwiftUI for the desktop app. Any Electron/web workbench code should be treated as compatibility infrastructure and should not override the SwiftUI desktop direction.
 
 ## Approaches Considered
 
@@ -39,7 +43,9 @@ Why not:
 
 ## Chosen Direction
 
-Implement approach 1: a native desktop service with a thin renderer.
+Historical choice: implement approach 1, a native desktop service with a thin renderer.
+
+Current choice: SwiftUI owns desktop product shape. The service ideas below may still inform native capabilities, but the visible desktop app must preserve web-app parity before adding them.
 
 ## Desktop Responsibilities
 
