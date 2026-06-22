@@ -2426,6 +2426,31 @@ body[data-surface="ios"] .track button {
     });
   }
 
+  function makeTrackRow({ rowClass, status, name, meta, action, detailTag, detailClassName, onDetailClick }) {
+    const row = document.createElement('div');
+    row.className = rowClass || 'ios-track-row';
+    if (status) row.dataset.status = status;
+    const tag = (detailTag || 'div').toLowerCase();
+    const detail = document.createElement(tag);
+    if (detailClassName) detail.className = detailClassName;
+    detail.innerHTML = `<span class="ios-project-title">${name}</span><small>${meta}</small>`;
+    if (tag === 'button' && typeof onDetailClick === 'function') {
+      detail.addEventListener('click', onDetailClick);
+    }
+    row.appendChild(detail);
+    if (action && action.label) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = action.className || 'ios-action';
+      button.textContent = action.label;
+      if (typeof action.onClick === 'function') {
+        button.addEventListener('click', action.onClick);
+      }
+      row.appendChild(button);
+    }
+    return row;
+  }
+
   function renderProjectList(target, projects, compact = false) {
     if (!target) return;
     target.innerHTML = '';
@@ -2437,24 +2462,25 @@ body[data-surface="ios"] .track button {
       return;
     }
     projects.forEach((project) => {
-      const row = document.createElement('div');
-      row.className = 'ios-project-row';
-      row.setAttribute('aria-current', String(project.id === selectedProjectId));
-      const detail = document.createElement('button');
-      detail.type = 'button';
-      detail.className = 'ios-link-button';
-      detail.innerHTML = `<span class="ios-project-title">${project.name}</span><small>${sourceLabel(project.source)} · ${project.analysisStatus || 'not analyzed'}</small>`;
-      detail.addEventListener('click', () => {
-        selectedProjectId = project.id;
-        setIOSView('projects');
-        renderIOSApp();
+      const row = makeTrackRow({
+        rowClass: 'ios-project-row',
+        status: project.analysisStatus || 'not analyzed',
+        name: project.name,
+        meta: `${sourceLabel(project.source)} · ${project.analysisStatus || 'not analyzed'}`,
+        detailTag: 'button',
+        detailClassName: 'ios-link-button',
+        onDetailClick: () => {
+          selectedProjectId = project.id;
+          setIOSView('projects');
+          renderIOSApp();
+        },
+        action: {
+          label: projectPrimaryTool(project) === 'shuffle' ? 'shuffle' : 'split',
+          className: compact ? 'ios-link-button' : 'ios-action',
+          onClick: () => openProjectTool(project, projectPrimaryTool(project)),
+        },
       });
-      const action = document.createElement('button');
-      action.type = 'button';
-      action.className = compact ? 'ios-link-button' : 'ios-action';
-      action.textContent = projectPrimaryTool(project) === 'shuffle' ? 'shuffle' : 'split';
-      action.addEventListener('click', () => openProjectTool(project, projectPrimaryTool(project)));
-      row.append(detail, action);
+      row.setAttribute('aria-current', String(project.id === selectedProjectId));
       target.appendChild(row);
     });
   }
@@ -2473,22 +2499,21 @@ body[data-surface="ios"] .track button {
       return;
     }
     tracks.forEach((track) => {
-      const row = document.createElement('div');
-      row.className = 'ios-track-row';
-      row.dataset.status = track.analysisStatus || 'indexed';
-      const detail = document.createElement('div');
-      detail.innerHTML = `<span class="ios-project-title">${track.name}</span><small>${formatSize(track.size)} · ${formatDuration(track.duration)} · ${trackStatusLabel(track)}</small>`;
-      const create = document.createElement('button');
-      create.type = 'button';
-      create.className = 'ios-action';
-      create.textContent = 'open';
-      create.addEventListener('click', () => {
-        const project = ensureProjectForTrack(track);
-        selectedProjectId = project.id;
-        setIOSView('projects');
-        renderIOSApp();
+      const row = makeTrackRow({
+        rowClass: 'ios-track-row',
+        status: track.analysisStatus || 'indexed',
+        name: track.name,
+        meta: `${formatSize(track.size)} · ${formatDuration(track.duration)} · ${trackStatusLabel(track)}`,
+        action: {
+          label: 'open',
+          onClick: () => {
+            const project = ensureProjectForTrack(track);
+            selectedProjectId = project.id;
+            setIOSView('projects');
+            renderIOSApp();
+          },
+        },
       });
-      row.append(detail, create);
       iosLibraryTrackList.appendChild(row);
     });
   }
@@ -2508,12 +2533,12 @@ body[data-surface="ios"] .track button {
       return;
     }
     queued.forEach((track) => {
-      const row = document.createElement('div');
-      row.className = 'ios-track-row';
-      row.dataset.status = 'queued';
-      const detail = document.createElement('div');
-      detail.innerHTML = `<span class="ios-project-title">${track.name}</span><small>${formatSize(track.size)} · ${formatDuration(track.duration)} · queued</small>`;
-      row.appendChild(detail);
+      const row = makeTrackRow({
+        rowClass: 'ios-track-row',
+        status: 'queued',
+        name: track.name,
+        meta: `${formatSize(track.size)} · ${formatDuration(track.duration)} · queued`,
+      });
       iosLibraryQueueList.appendChild(row);
     });
   }
