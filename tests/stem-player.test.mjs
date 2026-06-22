@@ -384,7 +384,7 @@ test('release workflow publishes comprehensive macOS desktop assets to GitHub Re
   const packageScript = loadPackageMacosScript();
   const gitignore = loadGitignore();
 
-  assert.equal(pkg.version, '0.2.0');
+  assert.equal(pkg.version, '0.2.1');
   assert.doesNotMatch(workflow, /node-version:\s*20/);
   assert.match(workflow, /node-version:\s*24/);
   assert.doesNotMatch(pagesWorkflow, /node-version:\s*20/);
