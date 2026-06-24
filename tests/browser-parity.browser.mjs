@@ -34,6 +34,13 @@ const CANDIDATE_CHROMES = [
   '/Users/eric/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   '/Applications/Chromium.app/Contents/MacOS/Chromium',
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+  process.env.ProgramFiles && `${process.env.ProgramFiles}\\Google\\Chrome\\Application\\chrome.exe`,
+  process.env['ProgramFiles(x86)'] && `${process.env['ProgramFiles(x86)']}\\Google\\Chrome\\Application\\chrome.exe`,
 ].filter(Boolean);
 
 function findChromium() {
@@ -43,17 +50,19 @@ function findChromium() {
   return null;
 }
 
+const chromiumExecutable = findChromium();
+const browserTest = chromiumExecutable ? test : test.skip;
+
 async function launchBrowser() {
-  const executable = findChromium();
-  if (!executable) {
+  if (!chromiumExecutable) {
     throw new Error(
       'No Chromium binary found. Set PUPPETEER_EXECUTABLE_PATH to a Chrome for Testing binary, ' +
-      'or install Chrome at /Applications/Google Chrome.app/.',
+      'or install Chrome at a standard macOS, Linux, or Windows path.',
     );
   }
   return puppeteer.launch({
     headless: true,
-    executablePath: executable,
+    executablePath: chromiumExecutable,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -67,15 +76,17 @@ async function launchBrowser() {
 let serverHandle = null;
 let browser = null;
 
-test.before(async () => {
-  serverHandle = await startStaticServer({ root: REPO_ROOT, port: 0 });
-  browser = await launchBrowser();
-});
+if (chromiumExecutable) {
+  test.before(async () => {
+    serverHandle = await startStaticServer({ root: REPO_ROOT, port: 0 });
+    browser = await launchBrowser();
+  });
 
-test.after(async () => {
-  if (browser) await browser.close();
-  if (serverHandle) await serverHandle.close();
-});
+  test.after(async () => {
+    if (browser) await browser.close();
+    if (serverHandle) await serverHandle.close();
+  });
+}
 
 async function newPage() {
   const page = await browser.newPage();
@@ -107,7 +118,7 @@ function screenshotPath(name) {
 // 1. Boot + structural parity
 // ===========================================================================
 
-test('canonical web app boots in a real browser without console errors', async () => {
+browserTest('canonical web app boots in a real browser without console errors', async () => {
   const page = await newPage();
   try {
     const { consoleErrors } = await loadApp(page);
@@ -126,7 +137,7 @@ test('canonical web app boots in a real browser without console errors', async (
   }
 });
 
-test('canonical web app exposes the four stems in the documented visual order', async () => {
+browserTest('canonical web app exposes the four stems in the documented visual order', async () => {
   const page = await newPage();
   try {
     await loadApp(page);
@@ -149,7 +160,7 @@ test('canonical web app exposes the four stems in the documented visual order', 
   }
 });
 
-test('canonical web app exposes the loop contract: 1/4, 1/2, 1, 2 per stem + an All row', async () => {
+browserTest('canonical web app exposes the loop contract: 1/4, 1/2, 1, 2 per stem + an All row', async () => {
   const page = await newPage();
   try {
     await loadApp(page);
@@ -174,7 +185,7 @@ test('canonical web app exposes the loop contract: 1/4, 1/2, 1, 2 per stem + an 
   }
 });
 
-test('canonical web app exposes the center circle, play button, and level meter', async () => {
+browserTest('canonical web app exposes the center circle, play button, and level meter', async () => {
   const page = await newPage();
   try {
     await loadApp(page);
@@ -197,7 +208,7 @@ test('canonical web app exposes the center circle, play button, and level meter'
   }
 });
 
-test('Mix/Solo loop audition attributes: Mix starts pressed, Solo starts unpressed', async () => {
+browserTest('Mix/Solo loop audition attributes: Mix starts pressed, Solo starts unpressed', async () => {
   // The Solo button lives inside #stems-panel which is display:none
   // until a track is loaded. We can read its aria-pressed attribute
   // regardless (it is always in the DOM), but we cannot click it
@@ -218,7 +229,7 @@ test('Mix/Solo loop audition attributes: Mix starts pressed, Solo starts unpress
   }
 });
 
-test('clicking Solo flips the Mix/Solo loop audition state', async (t) => {
+browserTest('clicking Solo flips the Mix/Solo loop audition state', async (t) => {
   // Solo is in #stems-panel which is hidden until a track loads.
   // The click is only meaningful after a real splitter run, so gate
   // it on the e2e flag.
@@ -259,7 +270,7 @@ test('clicking Solo flips the Mix/Solo loop audition state', async (t) => {
 // 2. Sample button + audio splitter end-to-end
 // ===========================================================================
 
-test('sample button is rendered with the bundled track titles', async () => {
+browserTest('sample button is rendered with the bundled track titles', async () => {
   const page = await newPage();
   try {
     await loadApp(page);
@@ -277,7 +288,7 @@ test('sample button is rendered with the bundled track titles', async () => {
   }
 });
 
-test('clicking a sample triggers the splitter and reaches a ready state', async (t) => {
+browserTest('clicking a sample triggers the splitter and reaches a ready state', async (t) => {
   // The real splitter is heavy: it tries to download an ONNX model
   // (~80 MB) and runs the inference in WebAssembly. The first run is
   // typically 60-180 seconds on a modern Mac. We allow 4 minutes to
@@ -329,7 +340,7 @@ test('clicking a sample triggers the splitter and reaches a ready state', async 
 // 3. Loop control parity
 // ===========================================================================
 
-test('loop button toggles the aria-pressed / active class for the right stem only', async (t) => {
+browserTest('loop button toggles the aria-pressed / active class for the right stem only', async (t) => {
   if (process.env.STEMACLE_BROWSER_E2E !== '1') {
     t.skip('loop UI test requires a loaded track — gated on STEMACLE_BROWSER_E2E=1');
     return;
@@ -376,7 +387,7 @@ test('loop button toggles the aria-pressed / active class for the right stem onl
 // 4. Native / desktop shell parity
 // ===========================================================================
 
-test('native desktop shell loads and exposes the iOS nav and the bundled apps', async () => {
+browserTest('native desktop shell loads and exposes the iOS nav and the bundled apps', async () => {
   const page = await newPage();
   try {
     const url = `${serverHandle.url}/native/index.html`;

@@ -219,6 +219,10 @@ test('desktop shell surfaces downloads, roots, caches, queue, session, export, s
 test('native shell keeps desktop controls while optionally layering iOS affordances', () => {
   const html = readRepo('native/index.html');
 
+  assert.match(html, /desktop shell/);
+  assert.match(html, /Stemacle desktop surfaces/);
+  assert.match(html, /Stemacle desktop and iOS surfaces/);
+  assert.match(html, /Separate from iOS, same product\./);
   assert.match(html, /<span>iOS<\/span>/);
   assert.match(html, /data-native-action="pick-library"/);
   assert.match(html, /data-native-action="pick-folder"/);
@@ -392,6 +396,9 @@ test('product surface document explains web, desktop, and ios differences', () =
   assert.match(doc, /## Web App/);
   assert.match(doc, /## Desktop App/);
   assert.match(doc, /## iOS App/);
+  assert.match(doc, /native\/index\.html/);
+  assert.match(doc, /Desktop: Library, Stem Splitter, Stem Shuffle, Settings/);
+  assert.match(doc, /iOS: Splitter, Shuffle, Projects, Library, Settings/);
   assert.match(doc, /cache/i);
   assert.match(doc, /Demucs/i);
   assert.match(doc, /same tactile splitter/i);

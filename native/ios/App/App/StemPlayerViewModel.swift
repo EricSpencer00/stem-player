@@ -720,8 +720,12 @@ final class StemPlayerViewModel: ObservableObject {
                 self.currentTime = self.audioEngine.currentOffset()
                 self.updateSpectralWindow(self.currentTime)
                 if self.currentTime >= self.duration - 0.02 {
-                    self.isPlaying = false
-                    self.stopTimer()
+                    // Match the web gold master's tick(): on reaching the end, stop
+                    // ALL audio and rewind to 0. Previously this only flipped the
+                    // isPlaying flag, so a looped stem (scheduled with .loops) kept
+                    // playing audibly after the UI said "Ended", and the playhead was
+                    // stranded at the end instead of returning to the start.
+                    self.stop()
                     self.status = "Ended"
                 }
             }

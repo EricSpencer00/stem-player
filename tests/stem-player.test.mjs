@@ -286,7 +286,9 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /struct StemacleMacQueueView: View/);
   assert.match(swift, /struct StemacleMacReleaseView: View/);
   assert.match(swift, /struct StemacleReleaseArtwork: View/);
-  assert.match(swift, /struct StemacleInstrumentPane: View/);
+  assert.match(swift, /struct StemacleSplitterPane: View/);
+  assert.match(swift, /Label\("Desktop splitter", systemImage: "waveform"\)/);
+  assert.match(swift, /desktop shell, web splitter/);
   assert.match(swift, /ContentUnavailableView/);
   assert.match(swift, /Table\(bridge\.tracks(?:,|\))/);
   assert.match(swift, /ToolbarItemGroup/);
@@ -298,7 +300,7 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /@Published private\(set\) var queue: \[StemacleJob\]/);
   assert.match(swift, /@Published private\(set\) var releases: \[StemacleReleaseArtifact\]/);
   assert.match(swift, /@Published var requestedRoute: StemacleMacRoute\?/);
-  assert.match(swift, /func showInstrument\(urlString:/);
+  assert.match(swift, /private func navigateToSplitter\(urlString:/);
   assert.match(swift, /let artPath: String/);
   assert.match(swift, /release\.artPath/);
   assert.match(swift, /stemacle-release-icon-01\.png/);
@@ -310,13 +312,13 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /id: "repo"/);
   assert.match(swift, /struct StemacleDesktopSummary: Equatable/);
   assert.match(swift, /private func refreshDesktopSummary\(from state: \[String: Any\]\)/);
-  assert.match(swift, /func openSelectedTrackInInstrument\(/);
+  assert.match(swift, /func openSelectedTrackInSplitter\(/);
   assert.match(swift, /func openRelease\(_ release: StemacleReleaseArtifact\)/);
   assert.match(swift, /Button\("Rescan Library"\)/);
   assert.match(swift, /Button\("Reveal Stemacle Data"\)/);
-  assert.match(swift, /Button\("Reload Instrument"\)/);
+  assert.match(swift, /Button\("Reload Splitter"\)/);
   assert.match(swift, /Button\("Clear Desktop State"\)/);
-  assert.match(swift, /bridge\.showInstrument\(urlString: "stemacle:\/\/app\/app\/index\.html"\)/);
+  assert.match(swift, /bridge\.showSplitter\(\)/);
   assert.match(swift, /private func internalStemacleRoute\(for url: URL\) -> URL\?/);
   assert.match(swift, /stemacle:\/\/app\/app\/index\.html/);
   assert.match(swift, /stemacle:\/\/app\/apps\/stem-shuffle\/index\.html/);
@@ -325,7 +327,7 @@ test('macOS SwiftUI app is a native workbench, not a full-window WebKit wrapper'
   assert.match(swift, /createDirectory\(at: directory, withIntermediateDirectories: true\)/);
   assert.match(swift, /"storageReady": desktopSummary\.storageReady/);
   assert.match(swift, /"localFirst": true/);
-  assert.doesNotMatch(swift, /StemacleWebInstrument\(bridge: bridge\)\s*\n\s*\.ignoresSafeArea\(\)/);
+  assert.doesNotMatch(swift, /StemacleWebSplitter\(bridge: bridge\)\s*\n\s*\.ignoresSafeArea\(\)/);
   assert.doesNotMatch(swift, /struct StemacleDesktopTitleBar: View/);
   assert.doesNotMatch(swift, /struct StemacleDesktopStatusBar: View/);
 });

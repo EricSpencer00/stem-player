@@ -1,114 +1,108 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stem Shuffle</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.3/dist/ort.min.js"></script>
-  <link rel="stylesheet" href="./styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stem Shuffle — Stemacle</title>
+<meta name="description" content="Stem Shuffle now lives in the Stemacle desktop and iOS apps. The web app is the Stem Splitter.">
+<link rel="canonical" href="https://stemacle.com/app/">
+<link rel="icon" type="image/png" href="/assets/stemacle-tentacle.png">
+<style>
+:root {
+  --page: oklch(92% 0.012 84);
+  --page-2: oklch(86% 0.018 78);
+  --paper: oklch(96% 0.009 84);
+  --ink: oklch(24% 0.012 64);
+  --ink-soft: oklch(42% 0.011 68);
+  --track: oklch(70% 0.01 70 / 0.44);
+  --plum: oklch(28% 0.082 320);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: linear-gradient(180deg, var(--page), var(--page-2));
+  color: var(--ink);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+}
+main {
+  width: min(560px, 100%);
+  text-align: center;
+}
+.app-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  object-fit: cover;
+  box-shadow: inset 0 0 0 1px oklch(100% 0 0 / 0.44), 0 16px 42px oklch(24% 0.012 70 / 0.2);
+}
+.eyebrow {
+  display: block;
+  margin: 24px 0 14px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 0;
+  color: var(--plum);
+  font-size: clamp(34px, 7vw, 56px);
+  font-weight: 500;
+  line-height: 1.0;
+  text-wrap: balance;
+}
+p {
+  max-width: 48ch;
+  margin: 20px auto 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.65;
+}
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+.actions a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border: 1px solid var(--track);
+  border-radius: 999px;
+  background: oklch(96% 0.009 84 / 0.52);
+  color: inherit;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+.actions a:hover { background: oklch(86% 0.015 78); transform: translateY(-1px); }
+.actions a:focus-visible { outline: 2px solid var(--plum); outline-offset: 4px; }
+.actions .primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+@media (max-width: 480px) { .actions a { width: 100%; } }
+</style>
 </head>
 <body>
-  <main class="app-shell" id="app">
-    <header class="hero">
-      <p class="hero__eyebrow">Separate App</p>
-      <div>
-        <h1>Stem Shuffle</h1>
-        <p class="hero__copy">Dual-deck stem transitions with a clean future seam for YouTube playlist ingestion.</p>
-      </div>
-      <button type="button" class="hero__samples" id="shufflePair">Shuffle Pair</button>
-    </header>
-
-    <section class="source-grid">
-      <article class="panel source-panel">
-        <div class="panel__header">
-          <h2>Sources</h2>
-          <p>Load samples now, keep YouTube adapters pending for later resolver work.</p>
-        </div>
-
-        <div class="source-actions">
-          <label class="file-picker">
-            <span>Load local audio</span>
-            <input id="fileInput" type="file" accept="audio/*" multiple>
-          </label>
-          <div class="sample-row" id="sampleButtonRow"></div>
-        </div>
-
-        <div class="youtube-capture">
-          <label for="youtubePlaylistUrl">YouTube playlist URL</label>
-          <div class="youtube-capture__row">
-            <input id="youtubePlaylistUrl" type="url" placeholder="https://www.youtube.com/playlist?list=...">
-            <button type="button" id="captureYoutubePlaylist">Capture URL</button>
-          </div>
-        </div>
-
-        <p class="status-line" id="globalStatus">Load samples or local audio to build a pair library.</p>
-
-        <div class="adapter-stack" id="adapterList"></div>
-      </article>
-
-      <article class="panel stage-panel">
-        <div class="panel__header">
-          <h2>Deck Stage</h2>
-          <p id="pairStatus">No compatible pair loaded yet.</p>
-        </div>
-
-        <div class="pair-meta" id="compatibilityMeta">Analyze at least two tracks to unlock the deck stage.</div>
-
-        <div class="pair-stage">
-          <section class="deck-card">
-            <div class="deck-card__header">
-              <span class="deck-card__label">Deck A</span>
-              <span class="deck-card__rate" id="leftTrackRate">rate 1.000x</span>
-            </div>
-            <h3 id="leftTrackName">No left deck</h3>
-            <p id="leftTrackMeta">Shuffle a compatible pair</p>
-            <div class="stem-stack" id="leftStemControls"></div>
-          </section>
-
-          <section class="center-rack">
-            <div class="transport-time" id="transportClock">0:00 / 0:00</div>
-            <div class="transport-row">
-              <button type="button" id="playPair" disabled>Play pair</button>
-              <button type="button" id="stopPair" disabled>Stop</button>
-              <button type="button" id="flipDecks" disabled>Flip</button>
-            </div>
-            <div class="focus-row">
-              <button type="button" id="leadLeft" disabled>Lead A</button>
-              <button type="button" id="blendMode" disabled>Blend</button>
-              <button type="button" id="leadRight" disabled>Lead B</button>
-            </div>
-            <label class="crossfader" for="crossfader">
-              <span>Crossfader</span>
-              <input id="crossfader" type="range" min="0" max="100" value="50" disabled>
-              <span id="crossfaderValue">50 / 100</span>
-            </label>
-          </section>
-
-          <section class="deck-card">
-            <div class="deck-card__header">
-              <span class="deck-card__label">Deck B</span>
-              <span class="deck-card__rate" id="rightTrackRate">rate 1.000x</span>
-            </div>
-            <h3 id="rightTrackName">No right deck</h3>
-            <p id="rightTrackMeta">Shuffle a compatible pair</p>
-            <div class="stem-stack" id="rightStemControls"></div>
-          </section>
-        </div>
-      </article>
-    </section>
-
-    <section class="panel library-panel">
-      <div class="panel__header">
-        <h2>Library</h2>
-        <p>Every ready track becomes a candidate for the next transition pair.</p>
-      </div>
-      <div class="library-list" id="libraryList"></div>
-    </section>
-  </main>
-
-  <script type="module" src="./app.js"></script>
+<main>
+  <img class="app-icon" src="/assets/stemacle-tentacle.png" alt="" aria-hidden="true">
+  <span class="eyebrow">Stemacle</span>
+  <h1>Stem Shuffle has moved.</h1>
+  <p>Shuffle now lives inside the Stemacle desktop and iOS apps, where it can hold a local pair library and run native crossfades. On the web, Stemacle is the Stem Splitter.</p>
+  <nav class="actions" aria-label="Where to go next">
+    <a class="primary" href="/app/">Open Stem Splitter</a>
+    <a href="/">Open desktop shell</a>
+  </nav>
+</main>
 </body>
 </html>

@@ -130,21 +130,37 @@ test('iOS shell still surfaces all four view routes', () => {
   }
 });
 
-test('iOS shell does not use inline XML/HTML string concatenation for user content', () => {
-  // makeTrackRow and friends still use innerHTML with template strings
-  // because the data comes from the user's local IndexedDB. We
-  // document that this is the *only* place left that does it, so a
-  // future contributor adding another row-builder will know to use
-  // the helper.
-  //
-  // The check: every place that builds a row with a status filter and
-  // a `<span class="ios-project-title">` must come from makeTrackRow.
-  // We look for the literal title span and ensure it is not hand-rolled
-  // outside the helper.
-  const handRolled = HTML.match(/innerHTML\s*=?\s*[`'"][^`'"]*ios-project-title/g) || [];
-  // The helper itself counts once. Anything more than that is a smell.
-  assert.ok(
-    handRolled.length <= 1,
-    `expected at most one site that uses the ios-project-title innerHTML pattern (the helper itself); saw ${handRolled.length}`,
+test('iOS shell renders local project and track labels with text nodes', () => {
+  assert.doesNotMatch(
+    HTML,
+    /innerHTML\s*=\s*`[^`]*(?:source\.name|ios-project-title|\$\{name\})/s,
+    'user-controlled project, source, and track names must not be interpolated into HTML',
+  );
+  assert.match(HTML, /title\.textContent = name/);
+  assert.match(HTML, /sourceName\.textContent = source\.name/);
+});
+
+test('native desktop state rows do not interpolate local data into HTML templates', () => {
+  assert.doesNotMatch(
+    HTML,
+    /row\.innerHTML\s*=\s*`/,
+    'desktop model, queue, export, session, root, tool, cache, and recent rows must use textContent',
+  );
+});
+
+test('makeTrackRow keeps detail buttons inert outside explicit clicks', () => {
+  assert.match(
+    HTML,
+    /if \(tag === 'button'\) \{\s*detail\.type = 'button';\s*\}/,
+    'detail buttons must be type=button so they never submit an ancestor form',
+  );
+});
+
+test('makeTrackRow honors onDetailClick for every supported detail tag', () => {
+  assert.match(HTML, /if \(typeof onDetailClick === 'function'\) \{/);
+  assert.doesNotMatch(
+    HTML,
+    /tag === 'button' && typeof onDetailClick === 'function'/,
+    'non-button detail tags must not silently drop a provided click handler',
   );
 });

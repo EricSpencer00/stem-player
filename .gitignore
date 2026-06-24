@@ -6,6 +6,8 @@ build/
 .wrangler/
 .hermes/
 tests/__screenshots__/
+__pycache__/
+*.pyc
 .DS_Store
 *.log
 

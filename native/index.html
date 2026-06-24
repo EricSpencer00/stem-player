@@ -129,7 +129,7 @@ body[data-surface="ios"] .tentacle {
 .status-footer {
   position: relative;
   z-index: 1;
-  width: min(1180px, calc(100% - 40px));
+  width: min(1440px, calc(100% - 40px));
   margin: 0 auto;
 }
 
@@ -187,7 +187,7 @@ body[data-surface="ios"] .tentacle {
 
 .workbench {
   display: grid;
-  grid-template-columns: minmax(0, 0.88fr) minmax(330px, 0.62fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(330px, 0.95fr);
   align-items: center;
   gap: clamp(30px, 6vw, 92px);
   min-height: min(720px, calc(100svh - 86px));
@@ -827,7 +827,7 @@ body:not([data-surface="ios"]) [data-surface-only="ios"] {
 
 .route-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -1367,7 +1367,7 @@ body[data-surface="ios"] .track button {
   .library,
   .desktop-grid,
   .status-footer {
-    width: min(calc(100% - 28px), 1180px);
+    width: min(calc(100% - 28px), 1440px);
   }
 
   .topbar {
@@ -1472,7 +1472,7 @@ body[data-surface="ios"] .track button {
     <a class="wordmark" href="/" aria-label="Stemacle app home">
       <span>stemacle</span>
       <i class="rule"></i>
-      <span data-surface-only="desktop">native shell</span>
+      <span data-surface-only="desktop">desktop shell</span>
       <span data-surface-only="ios">iOS app</span>
     </a>
     <div class="platforms" aria-label="Native targets">
@@ -1483,7 +1483,7 @@ body[data-surface="ios"] .track button {
   </header>
 
   <main>
-    <section class="workbench app-pair" aria-label="Stemacle desktop apps" data-surface-only="desktop">
+    <section class="workbench app-pair" aria-label="Stemacle desktop surfaces" data-surface-only="desktop">
       <div class="app-pair-item">
         <div class="object" aria-hidden="true">
           <div class="device">
@@ -1714,7 +1714,7 @@ body[data-surface="ios"] .track button {
       </div>
     </div>
 
-    <section class="route-strip" aria-label="Stemacle native apps" data-surface-only="desktop">
+    <section class="route-strip" aria-label="Stemacle desktop and iOS surfaces" data-surface-only="desktop">
       <div class="route-grid">
         <a class="route" href="/app/index.html">
           <span class="route-label">splitter</span>
@@ -1735,6 +1735,11 @@ body[data-surface="ios"] .track button {
           <span class="route-label">models</span>
           <strong>Preview plus HQ</strong>
           <p>Use fast preview, local Demucs four-stem, or the optional six-stem model when installed.</p>
+        </a>
+        <a class="route" href="#settings">
+          <span class="route-label">settings</span>
+          <strong>App settings</strong>
+          <p>Review releases, privacy, support, and local storage controls in one place.</p>
         </a>
       </div>
     </section>
@@ -1810,6 +1815,8 @@ body[data-surface="ios"] .track button {
         <div class="library-list" id="libraryList" aria-live="polite"></div>
         <h3>Recent tracks</h3>
         <div class="system-stack" id="recentProjectsList"></div>
+        <h3 data-surface-only="desktop">Analysis queue</h3>
+        <div class="system-stack" id="analysisQueue" data-surface-only="desktop"></div>
       </div>
     </section>
 
@@ -1862,15 +1869,52 @@ body[data-surface="ios"] .track button {
       </div>
     </section>
 
-    <section class="desktop-grid" aria-labelledby="libraryStatusTitle" data-surface-only="desktop">
+    <section class="desktop-grid" id="settings" aria-labelledby="settingsTitle" data-surface-only="desktop">
       <div class="surface-panel">
-        <span class="eyebrow">library</span>
-        <h2 id="libraryStatusTitle">Analyze, export, then come back later.</h2>
-        <p>Desktop tracks keep analysis status, cache paths, export plans, and saved sessions. The app can notify when batches finish without turning into an audio dashboard.</p>
+        <span class="eyebrow">settings</span>
+        <h2 id="settingsTitle">Releases, support, and local controls.</h2>
+        <p>Desktop settings now holds the release shelf, app links, and storage controls that used to be split across separate destinations.</p>
       </div>
       <div class="surface-panel">
-        <h3>Analysis queue</h3>
-        <div id="analysisQueue" class="system-stack"></div>
+        <h3>Releases</h3>
+        <div class="system-stack">
+          <a class="system-row" href="https://github.com/EricSpencer00/stem-player/releases" target="_blank" rel="noopener">
+            <div>
+              <strong>GitHub releases</strong>
+              <small>Version history, installers, and release notes.</small>
+            </div>
+            <span class="quality-pill">open</span>
+          </a>
+          <a class="system-row" href="https://github.com/EricSpencer00/stem-player/releases/latest" target="_blank" rel="noopener">
+            <div>
+              <strong>Latest release</strong>
+              <small>Jump straight to the newest packaged build.</small>
+            </div>
+            <span class="quality-pill">latest</span>
+          </a>
+          <a class="system-row" href="/privacy/" target="_blank" rel="noopener">
+            <div>
+              <strong>Privacy Policy</strong>
+              <small>What stays on-device and what the app does not collect.</small>
+            </div>
+            <span class="quality-pill">policy</span>
+          </a>
+          <a class="system-row" href="/support/" target="_blank" rel="noopener">
+            <div>
+              <strong>Support</strong>
+              <small>Help, troubleshooting, and contact details.</small>
+            </div>
+            <span class="quality-pill">help</span>
+          </a>
+          <a class="system-row" href="https://apps.apple.com/app/id6782539749?action=write-review" target="_blank" rel="noopener">
+            <div>
+              <strong>Leave a Review</strong>
+              <small>Open the App Store review flow when you are ready.</small>
+            </div>
+            <span class="quality-pill">review</span>
+          </a>
+        </div>
+
         <h3>Exports</h3>
         <div id="exportPanel" class="system-stack"></div>
         <h3>Sessions</h3>
@@ -1880,7 +1924,7 @@ body[data-surface="ios"] .track button {
   </main>
 
   <footer class="status-footer">
-    <span data-surface-only="desktop">Stemacle native shell. Same device, more surfaces.</span>
+    <span data-surface-only="desktop">Stemacle desktop shell. Separate from iOS, same product.</span>
     <span data-surface-only="ios">Stemacle for iPhone: local files, tactile splits, no desktop baggage.</span>
   </footer>
 </div>
@@ -2356,10 +2400,14 @@ body[data-surface="ios"] .track button {
       transientStore.removeItem(pendingTrackKey);
       transientStore.removeItem(localLibraryTrackKey);
       if (source.id) {
-        transientStore.setItem(localLibraryTrackKey, JSON.stringify({
-          id: source.id,
-          name: source.name,
-        }));
+        if (window.stemacleNative?.readTrackFile) {
+          transientStore.setItem(pendingTrackKey, source.id);
+        } else {
+          transientStore.setItem(localLibraryTrackKey, JSON.stringify({
+            id: source.id,
+            name: source.name,
+          }));
+        }
       }
     }
     window.location.href = tool === 'shuffle' ? '/apps/stem-shuffle/index.html' : '/app/index.html';
@@ -2420,7 +2468,11 @@ body[data-surface="ios"] .track button {
       button.type = 'button';
       button.className = 'ios-source-option';
       button.setAttribute('aria-pressed', String(source.id === selectedProjectSourceId));
-      button.innerHTML = `<strong>${source.name}</strong><small>${sourceLabel(source)}</small>`;
+      const sourceName = document.createElement('strong');
+      sourceName.textContent = source.name;
+      const sourceMeta = document.createElement('small');
+      sourceMeta.textContent = sourceLabel(source);
+      button.append(sourceName, sourceMeta);
       button.addEventListener('click', () => chooseProjectSource(source.id));
       iosProjectSources.appendChild(button);
     });
@@ -2432,10 +2484,28 @@ body[data-surface="ios"] .track button {
     if (status) row.dataset.status = status;
     const tag = (detailTag || 'div').toLowerCase();
     const detail = document.createElement(tag);
+    if (tag === 'button') {
+      detail.type = 'button';
+    }
     if (detailClassName) detail.className = detailClassName;
-    detail.innerHTML = `<span class="ios-project-title">${name}</span><small>${meta}</small>`;
-    if (tag === 'button' && typeof onDetailClick === 'function') {
+    const title = document.createElement('span');
+    title.className = 'ios-project-title';
+    title.textContent = name;
+    const metaLabel = document.createElement('small');
+    metaLabel.textContent = meta;
+    detail.append(title, metaLabel);
+    if (typeof onDetailClick === 'function') {
       detail.addEventListener('click', onDetailClick);
+      if (tag !== 'button' && tag !== 'a') {
+        detail.setAttribute('role', 'button');
+        detail.tabIndex = 0;
+        detail.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onDetailClick(event);
+          }
+        });
+      }
     }
     row.appendChild(detail);
     if (action && action.label) {
@@ -2842,19 +2912,30 @@ body[data-surface="ios"] .track button {
     render();
   }
 
+  function appendStatusRow(row, { title, meta, pill }) {
+    const body = document.createElement('div');
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = title ?? '';
+    const metaEl = document.createElement('small');
+    metaEl.textContent = meta ?? '';
+    body.append(titleEl, metaEl);
+    const pillEl = document.createElement('span');
+    pillEl.className = 'quality-pill';
+    pillEl.textContent = pill ?? '';
+    row.append(body, pillEl);
+  }
+
   function renderModels() {
     const models = desktopState?.modelCache?.models || previewModels;
     modelCacheList.innerHTML = '';
     models.forEach((model) => {
       const row = document.createElement('div');
       row.className = 'model-row';
-      row.innerHTML = `
-        <div>
-          <strong>${model.label}</strong>
-          <small>${model.stems} stems · ${model.cachePath || model.id}</small>
-        </div>
-        <span class="quality-pill">${model.status || 'ready'}</span>
-      `;
+      appendStatusRow(row, {
+        title: model.label,
+        meta: `${model.stems} stems · ${model.cachePath || model.id}`,
+        pill: model.status || 'ready',
+      });
       modelCacheList.appendChild(row);
     });
   }
@@ -2869,13 +2950,11 @@ body[data-surface="ios"] .track button {
     jobs.slice(0, 6).forEach((job) => {
       const row = document.createElement('div');
       row.className = 'queue-row';
-      row.innerHTML = `
-        <div>
-          <strong>${job.trackName || job.url || job.trackId}</strong>
-          <small>${job.kind}${job.quality ? ` · ${job.quality}` : ''}${job.format ? ` · ${job.format}` : ''} · ${job.message || 'queued'} · ${job.progress || 0}%</small>
-        </div>
-        <span class="quality-pill">${job.status}</span>
-      `;
+      appendStatusRow(row, {
+        title: job.trackName || job.url || job.trackId,
+        meta: `${job.kind}${job.quality ? ` · ${job.quality}` : ''}${job.format ? ` · ${job.format}` : ''} · ${job.message || 'queued'} · ${job.progress || 0}%`,
+        pill: job.status,
+      });
       analysisQueue.appendChild(row);
     });
   }
@@ -2890,13 +2969,11 @@ body[data-surface="ios"] .track button {
     exports.slice(0, 5).forEach((exportItem) => {
       const row = document.createElement('div');
       row.className = 'export-row';
-      row.innerHTML = `
-        <div>
-          <strong>${exportItem.trackName || exportItem.trackId}</strong>
-          <small>${exportItem.kind} · ${exportItem.format}${exportItem.outputPath ? ` · ${exportItem.outputPath}` : ''}</small>
-        </div>
-        <span class="quality-pill">${exportItem.status}</span>
-      `;
+      appendStatusRow(row, {
+        title: exportItem.trackName || exportItem.trackId,
+        meta: `${exportItem.kind} · ${exportItem.format}${exportItem.outputPath ? ` · ${exportItem.outputPath}` : ''}`,
+        pill: exportItem.status,
+      });
       exportPanel.appendChild(row);
     });
   }
@@ -2911,13 +2988,11 @@ body[data-surface="ios"] .track button {
     sessions.slice(0, 5).forEach((session) => {
       const row = document.createElement('div');
       row.className = 'session-row';
-      row.innerHTML = `
-        <div>
-          <strong>${session.name}</strong>
-          <small>${session.trackIds?.length || 0} tracks</small>
-        </div>
-        <span class="quality-pill">saved</span>
-      `;
+      appendStatusRow(row, {
+        title: session.name,
+        meta: `${session.trackIds?.length || 0} tracks`,
+        pill: 'saved',
+      });
       sessionList.appendChild(row);
     });
   }
@@ -2932,13 +3007,11 @@ body[data-surface="ios"] .track button {
     roots.forEach((root) => {
       const row = document.createElement('div');
       row.className = 'system-row';
-      row.innerHTML = `
-        <div>
-          <strong>${root.path}</strong>
-          <small>${root.trackCount || 0} tracks · last indexed ${root.lastIndexedAt || root.addedAt || 'pending'}</small>
-        </div>
-        <span class="quality-pill">root</span>
-      `;
+      appendStatusRow(row, {
+        title: root.path,
+        meta: `${root.trackCount || 0} tracks · last indexed ${root.lastIndexedAt || root.addedAt || 'pending'}`,
+        pill: 'root',
+      });
       libraryRoots.appendChild(row);
     });
   }
@@ -2979,13 +3052,11 @@ body[data-surface="ios"] .track button {
     entries.forEach(([key, tool]) => {
       const row = document.createElement('div');
       row.className = 'system-row';
-      row.innerHTML = `
-        <div>
-          <strong>${tool.label || key}</strong>
-          <small>${tool.command || 'not found'}</small>
-        </div>
-        <span class="quality-pill">${tool.available ? 'ready' : 'missing'}</span>
-      `;
+      appendStatusRow(row, {
+        title: tool.label || key,
+        meta: tool.command || 'not found',
+        pill: tool.available ? 'ready' : 'missing',
+      });
       toolStatusList.appendChild(row);
     });
   }
@@ -3001,13 +3072,11 @@ body[data-surface="ios"] .track button {
     entries.forEach(([key, value]) => {
       const row = document.createElement('div');
       row.className = 'system-row';
-      row.innerHTML = `
-        <div>
-          <strong>${key}</strong>
-          <small>${value}</small>
-        </div>
-        <span class="quality-pill">path</span>
-      `;
+      appendStatusRow(row, {
+        title: key,
+        meta: value,
+        pill: 'path',
+      });
       cacheRootList.appendChild(row);
     });
   }
@@ -3030,13 +3099,11 @@ body[data-surface="ios"] .track button {
     projects.slice(0, 6).forEach((project) => {
       const row = document.createElement('div');
       row.className = 'system-row';
-      row.innerHTML = `
-        <div>
-          <strong>${project.name}</strong>
-          <small>${project.path}</small>
-        </div>
-        <span class="quality-pill">recent</span>
-      `;
+      appendStatusRow(row, {
+        title: project.name,
+        meta: project.path,
+        pill: 'recent',
+      });
       recentProjectsList.appendChild(row);
     });
   }
@@ -3059,6 +3126,7 @@ body[data-surface="ios"] .track button {
         { label: 'Save session', hint: 'cmd/ctrl+s', action: saveSession },
         { label: 'Open Stem Splitter', hint: 'app', action: () => { window.location.href = '/app/index.html'; } },
         { label: 'Open Stem Shuffle', hint: 'decks', action: () => { window.location.href = '/apps/stem-shuffle/index.html'; } },
+        { label: 'Open Settings', hint: 'release shelf', action: openDesktopSettings },
       ];
 
   function renderPalette() {
@@ -3088,6 +3156,17 @@ body[data-surface="ios"] .track button {
   function closePalette() {
     commandPalette.classList.remove('open');
     commandPalette.setAttribute('aria-hidden', 'true');
+  }
+
+  function openDesktopSettings() {
+    const settings = document.getElementById('settings');
+    if (!settings) return;
+    settings.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    settings.setAttribute('tabindex', '-1');
+    settings.focus({ preventScroll: true });
+    setTimeout(() => {
+      settings.removeAttribute('tabindex');
+    }, 500);
   }
 
   document.querySelectorAll('[data-native-action="pick-library"]').forEach((button) => {

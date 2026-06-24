@@ -60,44 +60,42 @@ First release. Drop any track and Stemacle splits it into drums, bass, vocals, a
 
 ---
 
-## Screenshot copy reference (matches screenshots.html)
+## Screenshot copy reference (matches screenshots-v3.html)
 
 | # | Eyebrow                        | Headline              | Sub                                          |
 |---|--------------------------------|-----------------------|----------------------------------------------|
-| 1 | Stemacle · Stem Splitter       | Drop any track.       | It splits into four stems on your device.    |
-| 2 | On-device ML · No cloud        | Four stems, instantly.| Separated locally. Never uploaded.           |
-| 3 | Any format · MP3, WAV, AIFF, M4A | Drop it. Watch it split. | (none — headline carries)               |
-| 4 | Loop · Solo · Mute             | Every stem, your call.| Loop one. Solo another. Build your own mix.  |
-| 5 | Local-first · Private by default | No uploads. No account. Yours. | $2.99, once. No subscription.  |
+| 1 | Step 1 - Split the song        | One song. Four stems. | Vocals, melody, drums, and bass appear in separate lanes you can play right away. |
+| 2 | Step 2 - Import from Files     | Bring in any track from Files. | MP3, WAV, AIFF, or M4A. Pick a song and drop it straight into Stemacle. |
+| 3 | Step 3 - Real spectrogram      | See the actual spectrogram. | Each stem gets its own time view, cursor, and seek lane. |
+| 4 | Step 4 - Practice the part you need | Loop it. Solo it. | Mute the rest and build the mix you want to study. |
 
 ---
 
 ## Export guide
 
-Screenshots are designed at 430×932 CSS pixels (1× logical).
-To produce 1290×2796 PNG files (required for iPhone 6.7"):
+Screenshots are designed at 428×926 CSS pixels (1× logical).
+To produce 1284×2778 PNG files (accepted iPhone 6.5" size):
 
-**Option A — Chrome DevTools**
-1. Open screenshots.html in Chrome
+**Option A — Self-contained exporter**
+```bash
+npm run appstore:export-iphone
+```
+
+**Option B — Chrome DevTools**
+1. Open screenshots-v3.html in Chrome
 2. DevTools → More tools → Sensors → Device pixel ratio: 3
-3. Set viewport to 430×932
+3. Set viewport to 428×926
 4. Screenshot each .shot div individually
 
-**Option B — puppeteer script**
+**Option C — puppeteer script**
 ```js
 const puppeteer = require('puppeteer');
-const browser = await puppeteer.launch({ defaultViewport: { width: 430, height: 932, deviceScaleFactor: 3 } });
+const browser = await puppeteer.launch({ defaultViewport: { width: 428, height: 926, deviceScaleFactor: 3 } });
 const page = await browser.newPage();
-await page.goto('http://localhost:7892/appstore-screenshots/screenshots.html');
-for (let i = 1; i <= 5; i++) {
+await page.goto('http://localhost:7892/appstore-screenshots/screenshots-v3.html');
+for (let i = 1; i <= 4; i++) {
   const shot = await page.$(`#s${i}`);
   await shot.screenshot({ path: `shot-${i}.png` });
 }
 await browser.close();
-```
-
-**Option B, run from project root:**
-```bash
-cd /Users/eric/GitHub/stem-player
-npx puppeteer@latest node appstore-screenshots/export.js
 ```

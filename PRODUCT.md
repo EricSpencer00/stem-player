@@ -34,10 +34,11 @@ share/export flows, background jobs, and platform-native polish.
 ## Feature List
 - Present `https://stemacle.com/` as the landing and download entry point for the
   browser app, SwiftUI desktop app, iOS app, and GitHub repo.
-- Package the existing app design into a native Stemacle shell with Stem Splitter,
-  Stem Shuffle, and a local music library surface.
-- Keep desktop and iOS visually and behaviorally aligned with the perfect web app
-  before adding native-only features.
+- Package the existing app design into separate native desktop and iOS shells.
+  Desktop gets Stem Splitter, Stem Shuffle, and a local music library. iOS gets
+  the touch-first splitter, shuffle, and library flows.
+- Keep desktop and iOS visually and behaviorally aligned with the perfect web app,
+  but do not merge their navigation, wording, or feature ownership.
 - Keep product-surface differences documented in
   [docs/STEMACLE_SURFACES.md](./docs/STEMACLE_SURFACES.md).
 - Keep the working browser instrument available at `/app/`.

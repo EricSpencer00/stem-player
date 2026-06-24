@@ -129,11 +129,6 @@ struct StemShuffleView: View {
                         onTrackSettings: { trackSettingsDeck = $0 },
                         onToggleStem: toggleStemSource
                     )
-
-                    Text("Tap a stem to swap Track 1 or Track 2. Lead mode now starts from the most compatible pair, not a random shuffle.")
-                        .font(.caption2)
-                        .foregroundStyle(StemacleDesign.mutedInk)
-                        .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
@@ -207,8 +202,11 @@ struct StemShuffleView: View {
 
     private func toggleStemSource(_ stem: Stem) {
         guard let current = stemSources[stem] else { return }
-        stemSources[stem] = current.opposite
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
+            stemSources[stem] = current.opposite
+        }
         nextMixHint = "Manual split updated for \(stem.title)."
+        StemacleHaptics.tap()
     }
 
     private func shufflePair() {
@@ -217,12 +215,15 @@ struct StemShuffleView: View {
         guard !ranked.isEmpty else { return }
         pairCycleIndex = (pairCycleIndex + 1) % ranked.count
         let pair = ranked[pairCycleIndex]
-        track1 = pair.left
-        track2 = pair.right
-        leadMode = .blend
-        applyStemSources(for: leadMode)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            track1 = pair.left
+            track2 = pair.right
+            leadMode = .blend
+            applyStemSources(for: leadMode)
+        }
         refreshMixState()
         nextMixHint = "Loaded \(pair.left.title) × \(pair.right.title) · pair \(pairCycleIndex + 1) of \(ranked.count)"
+        StemacleHaptics.loopEngaged()
     }
 
     private func setLeadMode(_ mode: MixLeadMode) {
@@ -280,66 +281,92 @@ private struct MixStatusBar: View {
     let shufflePair: () -> Void
     let setLeadMode: (MixLeadMode) -> Void
 
+    @Namespace private var leadModeNS
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Label("Synced", systemImage: "link")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(StemacleDesign.purple)
-                Text("\(syncedBPM) bpm")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(StemacleDesign.inkSoft)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                HStack(spacing: 5) {
+                    Image(systemName: "link")
+                        .font(.caption2.weight(.bold))
+                    Text("\(syncedBPM)")
+                        .font(.system(.callout, design: .monospaced).weight(.semibold))
+                    Text("bpm")
+                        .font(.caption2)
+                        .foregroundStyle(StemacleDesign.purple.opacity(0.7))
+                }
+                .foregroundStyle(StemacleDesign.purple)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(StemacleDesign.purple.opacity(0.1))
+                        .overlay(Capsule(style: .continuous).stroke(StemacleDesign.purple.opacity(0.22), lineWidth: 1))
+                )
+
                 Spacer(minLength: 0)
+
+                Button(action: shufflePair) {
+                    Image(systemName: "shuffle")
+                        .font(.callout.weight(.semibold))
+                        .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(StemacleDesign.inkSoft)
+                .background(Circle().fill(StemacleDesign.paper.opacity(0.8)))
+                .overlay(Circle().stroke(StemacleDesign.track.opacity(0.5), lineWidth: 1))
+
                 Button(action: togglePlayback) {
                     Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                        .font(.caption.weight(.bold))
-                        .frame(width: 32, height: 32)
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(StemacleDesign.paper)
                 .background(Circle().fill(StemacleDesign.ink))
-                Button(action: shufflePair) {
-                    Image(systemName: "shuffle")
-                        .font(.caption2.weight(.bold))
-                        .frame(width: 32, height: 32)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(StemacleDesign.inkSoft)
-                .overlay(Circle().stroke(StemacleDesign.track, lineWidth: 1))
+                .shadow(color: StemacleDesign.shadow, radius: 8, y: 3)
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: 3) {
                 ForEach(MixLeadMode.allCases) { mode in
                     Button {
-                        setLeadMode(mode)
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                            setLeadMode(mode)
+                        }
                     } label: {
                         Label(mode.label, systemImage: mode.symbolName)
                             .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .frame(maxWidth: .infinity)
                             .foregroundStyle(leadMode == mode ? StemacleDesign.paper : StemacleDesign.inkSoft)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(leadMode == mode ? StemacleDesign.ink : StemacleDesign.paper.opacity(0.72))
-                            )
-                            .overlay(
-                                Capsule(style: .continuous)
-                                    .stroke(StemacleDesign.track.opacity(0.55), lineWidth: 1)
-                            )
                     }
                     .buttonStyle(.plain)
+                    .background {
+                        if leadMode == mode {
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(StemacleDesign.ink)
+                                .matchedGeometryEffect(id: "leadMode", in: leadModeNS)
+                        }
+                    }
                 }
             }
+            .padding(4)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(StemacleDesign.paper.opacity(0.62))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(StemacleDesign.track.opacity(0.4), lineWidth: 1)
+                    )
+            )
 
-            Text(summary)
-                .font(.caption2)
-                .foregroundStyle(StemacleDesign.inkGhost)
-                .lineLimit(1)
-
-            Text(compatibilityMeta)
-                .font(.caption2)
-                .foregroundStyle(StemacleDesign.inkGhost)
-                .lineLimit(1)
+            if !summary.isEmpty {
+                Text(summary)
+                    .font(.caption2)
+                    .foregroundStyle(StemacleDesign.inkGhost)
+                    .lineLimit(1)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -380,32 +407,38 @@ private struct MixTrackPadButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .top) {
                     Text(deck.label)
                         .font(.caption2.weight(.black))
                         .textCase(.uppercase)
-                        .foregroundStyle(StemacleDesign.inkSoft)
+                        .foregroundStyle(deck.tint)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule(style: .continuous).fill(deck.tint.opacity(0.14)))
                     Spacer()
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.caption2.weight(.bold))
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(StemacleDesign.inkGhost)
                 }
                 Text(track.title)
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(StemacleDesign.ink)
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Text("\(track.bpm) bpm")
+                    Text("·").foregroundStyle(StemacleDesign.inkGhost)
                     Text(track.key)
+                    Text("·").foregroundStyle(StemacleDesign.inkGhost)
                     Text(track.durationLabel)
                 }
                 .font(.caption2)
                 .foregroundStyle(StemacleDesign.mutedInk)
             }
             .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-            .padding(10)
-            .background(padBackground(accent: deck.tint))
+            .padding(12)
+            .background(trackPadBackground(deck: deck))
         }
         .buttonStyle(.plain)
     }
@@ -418,32 +451,47 @@ private struct MixStemPadButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Label(stem.title, systemImage: stem.symbolName)
-                    .font(.caption2.weight(.bold))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(StemacleDesign.stemColor(stem))
+
                 Text(source.label)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(source.tint)
-                Text("Tap to swap")
-                    .font(.system(size: 10))
-                    .foregroundStyle(StemacleDesign.inkGhost)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(source.tint.opacity(0.14))
+                    )
             }
             .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-            .padding(10)
-            .background(padBackground(accent: StemacleDesign.stemColor(stem)))
+            .padding(12)
+            .background(stemPadBackground(stem: stem))
         }
         .buttonStyle(.plain)
     }
 }
 
-private func padBackground(accent: Color) -> some View {
-    RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .fill(StemacleDesign.paper.opacity(0.62))
+private func stemPadBackground(stem: Stem) -> some View {
+    let accent = StemacleDesign.stemColor(stem)
+    return RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(accent.opacity(0.07))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(accent.opacity(0.35), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(accent.opacity(0.3), lineWidth: 1.5)
         )
+}
+
+private func trackPadBackground(deck: MixDeck) -> some View {
+    RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .fill(StemacleDesign.paper.opacity(0.72))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(deck.tint.opacity(0.3), lineWidth: 1.5)
+        )
+        .shadow(color: StemacleDesign.shadow, radius: 4, y: 1)
 }
 
 private struct TrackSettingsSheet: View {
@@ -455,50 +503,91 @@ private struct TrackSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationView {
-            List {
-                Section(deck.label) {
-                    settingsRow("Title", value: track.title)
-                    settingsRow("Tempo", value: "\(track.bpm) bpm")
-                    settingsRow("Key", value: track.key)
-                    settingsRow("Duration", value: track.durationLabel)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(StemacleDesign.track.opacity(0.6))
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
+                .padding(.bottom, 22)
 
-                Section("Mix context") {
-                    settingsRow("Lead mode", value: leadMode.label)
-                    settingsRow("Pair", value: compatibilityMeta)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(deck.label)
+                        .font(.caption2.weight(.black))
+                        .textCase(.uppercase)
+                        .foregroundStyle(deck.tint)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule(style: .continuous).fill(deck.tint.opacity(0.14)))
+                    Text(track.title)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(StemacleDesign.ink)
+                        .lineLimit(2)
                 }
+                Spacer()
+                Button("Done") { dismiss() }
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(StemacleDesign.purple)
+            }
+            .padding(.horizontal, 24)
 
-                Section {
-                    Button {
-                        onShuffleTrack()
-                        dismiss()
-                    } label: {
-                        Label("Bring in a stronger local match", systemImage: "arrow.triangle.2.circlepath")
-                    }
-                } footer: {
-                    Text("Stemacle ranks the local sample library first, then keeps the deck split stable until you change the lead.")
-                }
+            StemacleHairline()
+                .padding(.top, 20)
+
+            VStack(spacing: 0) {
+                settingsRow("Tempo", value: "\(track.bpm) bpm")
+                StemacleHairline()
+                settingsRow("Key", value: track.key)
+                StemacleHairline()
+                settingsRow("Duration", value: track.durationLabel)
+                StemacleHairline()
+                settingsRow("Lead", value: leadMode.label)
             }
-            .navigationTitle("Track settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
+            .padding(.top, 6)
+
+            if !compatibilityMeta.isEmpty {
+                Text(compatibilityMeta)
+                    .font(.caption2)
+                    .foregroundStyle(StemacleDesign.inkGhost)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
             }
+
+            Spacer(minLength: 24)
+
+            Button {
+                onShuffleTrack()
+                dismiss()
+                StemacleHaptics.loopEngaged()
+            } label: {
+                Label("Bring in a stronger local match", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.callout.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .foregroundStyle(StemacleDesign.paper)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(StemacleDesign.ink)
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
         }
-        .navigationViewStyle(.stack)
+        .background(StemacleDesign.paper.ignoresSafeArea())
     }
 
     private func settingsRow(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
+                .foregroundStyle(StemacleDesign.inkSoft)
             Spacer()
             Text(value)
                 .foregroundStyle(StemacleDesign.mutedInk)
-                .multilineTextAlignment(.trailing)
         }
+        .font(.callout)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
     }
 }
 

@@ -1,6 +1,14 @@
 # Stemacle Product Surfaces
 
-Stemacle has one identity across web, desktop, and iOS: the warm matte circle, four-stem controls, loop contract, local-first privacy model, and purple tentacle artwork stay recognizable everywhere. The web app is the gold master. Native surfaces match it first, then add platform-native capabilities that make the same instrument feel more powerful on that device.
+Stemacle has one identity across web, desktop, and iOS: the warm matte circle,
+four-stem controls, loop contract, local-first privacy model, and purple tentacle
+artwork stay recognizable everywhere. The web app is the gold master. Desktop and
+iOS are separate native parity-plus surfaces. They share the same product DNA, but
+they do not share navigation language or ownership.
+
+`native/index.html` is a shared preview and QA shell for the native surfaces. It is
+useful for checking desktop and iOS copy side by side, but it is not the production
+Mac app.
 
 ## Web App
 
@@ -21,7 +29,10 @@ Best for:
 
 ## Desktop App
 
-Desktop is the SwiftUI Stemacle app. The desktop product direction is not an Electron wrapper around a website. SwiftUI owns the native workbench and must make the app feel like the same perfect Stemacle instrument, elevated with desktop power.
+Desktop is the SwiftUI Mac app in `native/macos`. The desktop product direction is
+not an Electron wrapper around a website. SwiftUI owns the native workbench and
+must make the app feel like the same perfect Stemacle splitter, elevated with
+desktop power.
 
 The desktop app must match the web app first:
 
@@ -46,11 +57,18 @@ Then desktop should go above and beyond:
 - GitHub Release `.app` zip packaging through `npm run macos:package`
 - App Store package path through `npm run macos:appstore`
 
-Any compatibility package that still uses a web workbench should follow this SwiftUI desktop direction where possible and must not redefine the product direction away from SwiftUI parity-plus.
+Any compatibility package that still uses a web workbench should follow this SwiftUI
+desktop direction where possible and must not redefine the product direction away
+from SwiftUI parity-plus.
 
 ## iOS App
 
-The iOS app is a native SwiftUI Stemacle app. Like desktop, it must match the perfect web app first, then add mobile-native strengths. It boots a SwiftUI shell from `AppDelegate`, uses iOS navigation patterns (`TabView`, `NavigationStack`, menus, sheets, document picker, lists, toggles), and compiles the splitter into Swift through `NativeStemSplitter`. Capacitor remains useful as a packaging/resource legacy, but it is no longer the iOS runtime direction.
+The iOS app is the SwiftUI mobile app in `native/ios`. Like desktop, it must match
+the perfect web app first, then add mobile-native strengths. It boots a SwiftUI
+shell from `AppDelegate`, uses iOS navigation patterns (`TabView`,
+`NavigationStack`, menus, sheets, document picker, lists, toggles), and compiles
+the splitter into Swift through `NativeStemSplitter`. Capacitor remains useful as
+a packaging/resource legacy, but it is no longer the iOS runtime direction.
 
 iOS must keep the same tactile splitter and visual parity with the web player:
 
@@ -81,7 +99,17 @@ iOS then goes above and beyond with mobile-native behavior:
 
 ## Navigation Direction
 
-The native app should feel closer to Apple Music, Suno, and CapCut than to a web page in a web view. The first screen is the working Stem Splitter, visually aligned with the perfect web app. Shuffle, Library, Projects, and Settings are native destinations, not stacked marketing routes. Import uses sheets and document picker. Settings use native forms. Project history belongs in a list. Player controls stay tactile and compact instead of becoming a dashboard.
+The native apps should feel closer to Apple Music, Suno, and CapCut than to a web
+page in a web view. The first screen on each device is the working Stem Splitter,
+visually aligned with the perfect web app. The rest of the navigation differs by
+surface:
+
+- Desktop: Library, Stem Splitter, Stem Shuffle, Settings
+- iOS: Splitter, Shuffle, Projects, Library, Settings
+
+Import uses sheets and document picker on iOS, and file dialogs plus library
+indexing on desktop. Settings use native forms. Project history belongs in a list.
+Player controls stay tactile and compact instead of becoming a dashboard.
 
 ## Release Contract
 
@@ -92,7 +120,7 @@ Every release should verify all surfaces:
 - legacy redirect from `https://ericspencer.us/stem-player` to `https://stemacle.com/app/`
 - desktop SwiftUI bundle: `npm run macos:package` on macOS with release signing credentials for distribution
 - iOS resources: `npm run native:prepare`
-- iOS native compile: `xcodebuild -project native/ios/App/App.xcodeproj -scheme App -configuration Debug -destination 'platform=iOS Simulator,name=<available simulator>' build`
+- iOS native compile: `xcodebuild -project native/ios/App/App.xcodeproj -scheme Stemacle -configuration Debug -destination 'platform=iOS Simulator,name=<available simulator>' build`
 - regression suite: `npm test`
 
 Stemacle.com points at the Cloudflare Pages output in `dist/site`. The current web app remains perfect at `/app/`. Desktop and iOS now compile native SwiftUI surfaces that must match the web app before adding their own platform features.

@@ -20,7 +20,7 @@ struct StemPlayerView: View {
     }
 
     /// Shows the native App Store review prompt. Uses `SKStoreReviewController` so
-    /// it works on the iOS 15 deployment target. The system rate-limits how often
+    /// it works on the iOS 15.1 deployment target. The system rate-limits how often
     /// this actually appears, so we only ask at genuinely happy moments.
     private func requestReview() {
         guard
@@ -37,8 +37,8 @@ struct StemPlayerView: View {
                     StemacleDeviceView(viewModel: viewModel) {
                         showingImporter = true
                     }
-                    .padding(.top, 8)
-                    .padding(.bottom, 22)
+                    .padding(.top, 2)
+                    .padding(.bottom, 14)
 
                     if showWaveformHints || !viewModel.isReady {
                         Text(viewModel.isReady ? READY_HINT : "Drop a track to begin")
@@ -46,27 +46,27 @@ struct StemPlayerView: View {
                             .textCase(.uppercase)
                             .foregroundStyle(StemacleDesign.inkSoft)
                             .multilineTextAlignment(.center)
-                            .padding(.bottom, viewModel.isReady ? 20 : 10)
+                            .padding(.bottom, viewModel.isReady ? 14 : 8)
                     }
 
                     StemLocalProjectHint(viewModel: viewModel) {
                         showingImporter = true
                     }
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 8)
 
                     StemPlaybar(viewModel: viewModel)
-                        .padding(.bottom, 18)
+                        .padding(.bottom, 12)
 
                     StemPanelView(viewModel: viewModel, webRowOrder: webRowOrder)
-                        .padding(.bottom, 140)
+                        .padding(.bottom, 84)
 
                     Text("local separation - HPSS - NativeStemSplitter")
                         .font(.caption2)
                         .foregroundStyle(StemacleDesign.inkGhost)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 16)
                 }
-                .frame(width: max(280, min(UIScreen.main.bounds.width - 28, 760)))
-                .padding(.horizontal, 14)
+                .frame(maxWidth: 880)
+                .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {

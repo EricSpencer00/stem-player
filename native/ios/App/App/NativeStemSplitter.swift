@@ -85,19 +85,15 @@ private struct ModelSessions: @unchecked Sendable {
     let accompaniment: ORTSession
 }
 
-private final class ModelCache {
-    private let lock = NSLock()
+private actor ModelCache {
     private var cachedSessions: ModelSessions?
     private var loadingTask: Task<ModelSessions, Error>?
 
     func sessions(progress: @escaping @Sendable (Double, String) -> Void) async throws -> ModelSessions {
-        lock.lock()
         if let cachedSessions {
-            lock.unlock()
             return cachedSessions
         }
         if let loadingTask {
-            lock.unlock()
             return try await loadingTask.value
         }
 
@@ -105,19 +101,14 @@ private final class ModelCache {
             try await NativeStemSplitter.loadModelSessions(progress: progress)
         }
         loadingTask = task
-        lock.unlock()
 
         do {
             let sessions = try await task.value
-            lock.lock()
             cachedSessions = sessions
             loadingTask = nil
-            lock.unlock()
             return sessions
         } catch {
-            lock.lock()
             loadingTask = nil
-            lock.unlock()
             throw error
         }
     }

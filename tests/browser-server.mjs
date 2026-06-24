@@ -62,7 +62,11 @@ export async function startStaticServer({ root, port = 0 } = {}) {
         res.setHeader('Content-Type', file.mime);
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Content-Length', file.size);
-        createReadStream(file.path).pipe(res);
+        const stream = createReadStream(file.path);
+        stream.on('error', (error) => {
+          res.destroy(error);
+        });
+        stream.pipe(res);
       } catch (error) {
         res.statusCode = 500;
         res.end(`error: ${error.message}`);

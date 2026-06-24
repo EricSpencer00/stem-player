@@ -1028,9 +1028,9 @@ const SPECTRAL_PAD_AFTER_SEC = 4;
 const SPECTRAL_REDRAW_EPSILON = 0.12;
 const READY_HINT = 'Use the mixer rows to mute, solo, change volume, and loop stems';
 const SAMPLE_TRACKS = [
-  {name:'Gentleman — cdk feat. QuianaNadine', url:'./samples/stem-sample-1.mp3'},
-  {name:'Red Light Blues — Alex & UnrealDM', url:'./samples/stem-sample-2.mp3'},
-  {name:'Pyramid — 7OOP3D feat. Mr Yesterday', url:'./samples/stem-sample-3.mp3'},
+  {name:'Gentleman — cdk feat. QuianaNadine', url:'../samples/stem-sample-1.mp3'},
+  {name:'Red Light Blues — Alex & UnrealDM', url:'../samples/stem-sample-2.mp3'},
+  {name:'Pyramid — 7OOP3D feat. Mr Yesterday', url:'../samples/stem-sample-3.mp3'},
 ];
 const PENDING_NATIVE_TRACK_KEY = 'stemacle:pendingTrackId';
 const STEMS = ['drums','vocals','bass','melody'];
@@ -1430,7 +1430,11 @@ function loopButtonsFor(stem){
 
 function setLoopButtons(stem, idx){
   const buttons = loopButtonsFor(stem);
-  buttons.forEach((button)=>button.classList.toggle('on', Number(button.dataset.loop)===idx));
+  buttons.forEach((button)=>{
+    const on = Number(button.dataset.loop) === idx;
+    button.classList.toggle('on', on);
+    button.setAttribute('aria-pressed', String(on));
+  });
   return buttons;
 }
 
@@ -1440,7 +1444,10 @@ function clearStemLoop(stem, buttons=loopButtonsFor(stem)){
   state.loopEnd[stem] = 0;
   const arc = document.getElementById(`varc-${stem}`);
   if(arc) arc.classList.remove('looping');
-  buttons.forEach((button)=>button.classList.toggle('on', false));
+  buttons.forEach((button)=>{
+    button.classList.toggle('on', false);
+    button.setAttribute('aria-pressed', 'false');
+  });
 }
 
 function clearAllLoops(){
@@ -2772,6 +2779,7 @@ const center=document.getElementById('center'), device=document.getElementById('
 // init
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically
 buildSampleButtons();
+document.querySelectorAll('.loop-btn').forEach((button)=>button.setAttribute('aria-pressed', 'false'));
 openPendingNativeTrack();
 STEMS.forEach(stem=>setMute(stem, state.muted[stem]));
 updateHeadphonesUI();
