@@ -2,6 +2,30 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "webapp",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "/Users/eric/GitHub/stem-player"],
+      "port": 8080,
+      "autoPort": false,
+      "url": "http://localhost:8080/app/"
+    },
+    {
+      "name": "landing",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8081", "--directory", "/Users/eric/GitHub/stem-player"],
+      "port": 8081,
+      "autoPort": false,
+      "url": "http://localhost:8081/"
+    },
+    {
+      "name": "native-webui-remote",
+      "runtimeExecutable": "echo",
+      "runtimeArgs": ["Running on Mac mini via SSH tunnel on port 5177"],
+      "port": 5177,
+      "autoPort": false,
+      "url": "http://localhost:5177/"
+    },
+    {
       "name": "appstore-screenshots",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "7893", "--directory", "/Users/eric/GitHub/stem-player"],
