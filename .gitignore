@@ -37,3 +37,6 @@ native/apple/StemacleCore.xcframework/
 native/apple/build/
 native/apple/**/.build/
 *.xcuserstate
+native/apple/Stemacle.xcodeproj/
+native/apple/**/*.xcodeproj/
+native/apple/Stemacle/Resources/Info-*.plist
