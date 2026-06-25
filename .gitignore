@@ -40,3 +40,6 @@ native/apple/**/.build/
 native/apple/Stemacle.xcodeproj/
 native/apple/**/*.xcodeproj/
 native/apple/Stemacle/Resources/Info-*.plist
+native/desktop/target/
+models/build/
+models/.venv-models/

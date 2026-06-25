@@ -1,0 +1,117 @@
+// Stemacle desktop UI (Windows/Linux). Warm cream surfaces, the matte circle as
+// the primary signal, restrained purple action accent — aligned with the web
+// gold master and the Apple apps.
+
+import { Button, Slider } from "std-widgets.slint";
+
+struct StemRow {
+    name: string,
+    volume: float,
+    muted: bool,
+    soloed: bool,
+}
+
+export component MainWindow inherits Window {
+    title: "Stemacle";
+    preferred-width: 460px;
+    preferred-height: 760px;
+    background: #f5f0e6;
+
+    in property <string> status: "Drop or choose a track";
+    in property <bool> ready: false;
+    in-out property <[StemRow]> stems: [
+        { name: "Drums", volume: 0.8, muted: false, soloed: false },
+        { name: "Vocals", volume: 0.8, muted: false, soloed: false },
+        { name: "Bass", volume: 0.8, muted: false, soloed: false },
+        { name: "Melody", volume: 0.8, muted: false, soloed: false },
+    ];
+
+    callback load-clicked();
+    callback export-clicked();
+    callback volume-changed(int, float);
+    callback mute-toggled(int);
+    callback solo-toggled(int);
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 16px;
+
+        // The circle.
+        Rectangle {
+            height: 280px;
+            Rectangle {
+                width: 260px;
+                height: 260px;
+                border-radius: 130px;
+                background: #efe9dd;
+                drop-shadow-blur: 18px;
+                drop-shadow-color: #00000014;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    TouchArea {
+                        clicked => { root.load-clicked(); }
+                        Text {
+                            text: "＋";
+                            font-size: 40px;
+                            color: #6b578f;
+                            horizontal-alignment: center;
+                        }
+                    }
+                    Text {
+                        text: root.status;
+                        color: #6b6470;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Stem rows.
+        for stem[i] in root.stems: Rectangle {
+            background: #faf6ee;
+            border-radius: 10px;
+            border-width: 1px;
+            border-color: #e7e0d3;
+            opacity: root.ready ? 1.0 : 0.5;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 6px;
+                HorizontalLayout {
+                    Text { text: stem.name; color: #2c2733; font-weight: 600; }
+                    Rectangle {}  // spacer
+                    TouchArea {
+                        width: 30px;
+                        clicked => { root.mute-toggled(i); }
+                        Text { text: "M"; color: stem.muted ? #6b578f : #6b6470; }
+                    }
+                    TouchArea {
+                        width: 30px;
+                        clicked => { root.solo-toggled(i); }
+                        Text { text: "H"; color: stem.soloed ? #6b578f : #6b6470; }
+                    }
+                }
+                Slider {
+                    minimum: 0;
+                    maximum: 1;
+                    value: stem.volume;
+                    changed(v) => { root.volume-changed(i, v); }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            Button {
+                text: "Open WAV…";
+                clicked => { root.load-clicked(); }
+            }
+            Button {
+                text: "Export stems";
+                enabled: root.ready;
+                clicked => { root.export-clicked(); }
+            }
+        }
+    }
+}
