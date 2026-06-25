@@ -157,8 +157,11 @@ in the Rust core where possible so all three surfaces benefit.
 ## Suggested sequencing
 
 1. **Slint parity** + **iOS/macOS share-sheet export** — close current gaps; small/medium.
-2. **Stem cache + Instant re-open** — high value, modest effort; also a prerequisite for the mixer.
-3. **Project store + Song Library** — the home screen the product is missing.
-4. **Key detection** (core) — small, unblocks library polish and the mixer.
+2. ~~**Stem cache + Instant re-open**~~ ✅ shipped (iOS/macOS) — `LibraryStore` writes per-project stem WAVs; reopen skips separation.
+3. ~~**Project store + Song Library**~~ ✅ shipped (iOS/macOS) — TabView shell `Library | Splitter | Settings` per the verified `specs/Navigation.tla`.
+4. **Key detection** (core) — small, unblocks library sort/search and the mixer.
 5. **Time-stretch / pitch-shift** then the **Stem Mixer** — the marquee feature, built on 2–4.
 6. Acquisition (preview/MusicKit), Recording, Effects, Sync — as the roadmap allows.
+
+> Updated 2026-06-25: items 2–3 are live on Apple (iOS/macOS). Library/cache for
+> the Slint desktop and the Mixer tab are next.
