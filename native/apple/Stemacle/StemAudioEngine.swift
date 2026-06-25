@@ -1,9 +1,9 @@
 import AVFoundation
 import Foundation
 
-/// Four-stem playback engine built on `AVAudioEngine`. One `AVAudioPlayerNode`
-/// per stem feeds a shared mixer, giving per-stem volume, mute, and headphones
-/// (solo) isolation while staying sample-aligned for the loop contract.
+/// Four-stem playback engine on `AVAudioEngine`. One `AVAudioPlayerNode` per
+/// stem feeds a shared mixer, giving per-stem volume, mute, headphones (solo)
+/// isolation, and **independent per-stem looping** — the web app's loop contract.
 final class StemAudioEngine {
     static let sampleRate: Double = 44100
 
@@ -12,6 +12,9 @@ final class StemAudioEngine {
     private var players: [String: AVAudioPlayerNode] = [:]
     private var buffers: [String: AVAudioPCMBuffer] = [:]
 
+    /// Active loop window per stem in seconds, or nil. Independent per stem.
+    private var loops: [String: (start: Double, end: Double)] = [:]
+
     private(set) var isPlaying = false
     private(set) var durationSeconds: Double = 0
 
@@ -19,18 +22,13 @@ final class StemAudioEngine {
     private var startDate: Date?
     private var startOffset: Double = 0
 
-    /// Current playback position in seconds.
+    let stems = ["drums", "vocals", "bass", "melody"]
+
+    /// Current global transport position in seconds.
     var currentTime: Double {
-        let t: Double
-        if let startDate {
-            t = startOffset + Date().timeIntervalSince(startDate)
-        } else {
-            t = startOffset
-        }
+        let t = startDate.map { startOffset + Date().timeIntervalSince($0) } ?? startOffset
         return max(0, min(t, durationSeconds))
     }
-
-    let stems = ["drums", "vocals", "bass", "melody"]
 
     init() {
         for stem in stems {
@@ -41,8 +39,8 @@ final class StemAudioEngine {
         }
     }
 
-    /// Load mono PCM per stem (already at 44.1 kHz from the core) into buffers.
     func load(stems split: [String: [Float]]) {
+        loops.removeAll()  // new file resets loops (invariant)
         var maxFrames = 0
         for stem in stems {
             guard let samples = split[stem], !samples.isEmpty else { continue }
@@ -55,35 +53,24 @@ final class StemAudioEngine {
             maxFrames = max(maxFrames, samples.count)
         }
         durationSeconds = Double(maxFrames) / Self.sampleRate
+        startOffset = 0
+        startDate = nil
+        isPlaying = false
     }
 
-    func prepare() throws {
-        if !engine.isRunning {
-            try engine.start()
-        }
-    }
+    func prepare() throws { if !engine.isRunning { try engine.start() } }
 
-    /// Start all stems from `offset` seconds, sample-synchronized.
+    // MARK: Transport
+
     func play(from offset: Double = 0) throws {
         try prepare()
-        let startFrame = Int(max(0, offset) * Self.sampleRate)
-        for stem in stems {
-            guard let node = players[stem], let buf = buffers[stem] else { continue }
-            node.stop()
-            guard startFrame < Int(buf.frameLength) else { continue }
-            let segment = startFrame == 0 ? buf : Self.slice(buf, from: startFrame)
-            node.scheduleBuffer(segment, at: nil)
-            node.play()
-        }
+        for stem in stems { scheduleStem(stem, from: max(0, offset)) }
         startOffset = max(0, offset)
         startDate = Date()
         isPlaying = true
     }
 
-    /// Resume from the current position.
-    func resume() throws {
-        try play(from: currentTime)
-    }
+    func resume() throws { try play(from: currentTime) }
 
     func pause() {
         startOffset = currentTime
@@ -99,40 +86,74 @@ final class StemAudioEngine {
         isPlaying = false
     }
 
-    /// Seek to `time` seconds; keeps playing if currently playing.
     func seek(to time: Double) {
         let wasPlaying = isPlaying
         for node in players.values { node.stop() }
         startOffset = max(0, min(time, durationSeconds))
         startDate = nil
-        if wasPlaying {
-            try? play(from: startOffset)
-        }
+        if wasPlaying { try? play(from: startOffset) }
     }
 
-    /// Copy `[from, end)` of a mono buffer into a fresh buffer for offset playback.
-    private static func slice(_ buf: AVAudioPCMBuffer, from: Int) -> AVAudioPCMBuffer {
-        let count = Int(buf.frameLength) - from
+    // MARK: Looping
+
+    /// Set or clear a stem's loop window. When playing, reschedules immediately so
+    /// the change is audible. nil clears the loop (stem plays through).
+    func setLoop(_ stem: String, range: (start: Double, end: Double)?) {
+        if let range { loops[stem] = range } else { loops[stem] = nil }
+        if isPlaying { scheduleStem(stem, from: currentTime) }
+    }
+
+    func loopWindow(_ stem: String) -> (start: Double, end: Double)? { loops[stem] }
+
+    /// Schedule one stem's node based on its loop state.
+    private func scheduleStem(_ stem: String, from offset: Double) {
+        guard let node = players[stem], let buf = buffers[stem] else { return }
+        node.stop()
+        if let loop = loops[stem] {
+            let s = Int(loop.start * Self.sampleRate)
+            let e = min(Int(loop.end * Self.sampleRate), Int(buf.frameLength))
+            guard e > s else { return }
+            node.scheduleBuffer(Self.slice(buf, from: s, to: e), at: nil, options: .loops)
+        } else {
+            let startFrame = Int(offset * Self.sampleRate)
+            guard startFrame < Int(buf.frameLength) else { return }
+            let seg = startFrame == 0 ? buf : Self.slice(buf, from: startFrame, to: Int(buf.frameLength))
+            node.scheduleBuffer(seg, at: nil)
+        }
+        node.play()
+    }
+
+    /// Copy `[from, to)` of a mono buffer into a fresh buffer.
+    private static func slice(_ buf: AVAudioPCMBuffer, from: Int, to: Int) -> AVAudioPCMBuffer {
+        let count = max(0, to - from)
         let out = AVAudioPCMBuffer(pcmFormat: buf.format, frameCapacity: AVAudioFrameCount(count))!
         out.frameLength = AVAudioFrameCount(count)
-        out.floatChannelData![0].update(from: buf.floatChannelData![0] + from, count: count)
+        if count > 0 {
+            out.floatChannelData![0].update(from: buf.floatChannelData![0] + from, count: count)
+        }
         return out
     }
 
-    // MARK: Per-stem mixing
+    // MARK: Mixing
 
-    func setVolume(_ stem: String, _ value: Float) {
-        players[stem]?.volume = max(0, min(1, value))
-    }
-
-    /// Apply mute / solo state across all stems. When any stem is soloed, only
-    /// soloed stems are audible; otherwise muted stems are silenced. Volumes are
-    /// preserved (the gold master's "persistent global mute" invariant).
-    func applyMixing(volumes: [String: Float], muted: Set<String>, soloed: Set<String>) {
+    /// Apply mute / solo / loop-audition state. `auditionSolo` cues only looped
+    /// stems (web Solo mode) without mutating mute; otherwise mute/solo apply.
+    /// Volumes are always preserved (persistent global mute invariant).
+    func applyMixing(volumes: [String: Float], muted: Set<String>, soloed: Set<String>,
+                     globalMuted: Bool, auditionSolo: Bool) {
+        let hasLoop = !loops.isEmpty
         let anySolo = !soloed.isEmpty
         for stem in stems {
             let base = volumes[stem] ?? 0.8
-            let audible = anySolo ? soloed.contains(stem) : !muted.contains(stem)
+            var audible: Bool
+            if auditionSolo && hasLoop {
+                audible = loops[stem] != nil
+            } else if anySolo {
+                audible = soloed.contains(stem)
+            } else {
+                audible = !muted.contains(stem)
+            }
+            if globalMuted { audible = false }
             players[stem]?.volume = audible ? max(0, min(1, base)) : 0
         }
     }

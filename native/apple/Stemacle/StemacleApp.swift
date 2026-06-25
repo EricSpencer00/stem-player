@@ -65,14 +65,27 @@ struct RootView: View {
 
                 // The player's master spectrogram overview ("the one in the player").
                 if model.isReady {
-                    SpectrogramLane(image: masterImage, progress: model.progress) { p in
-                        model.seek(toProgress: p)
+                    VStack(spacing: 4) {
+                        SpectrogramLane(image: masterImage, progress: model.progress,
+                                        grid: model.measureGrid, height: 46) { p in
+                            model.seek(toProgress: p)
+                        }
+                        HStack {
+                            Text(model.elapsedString)
+                            Spacer()
+                            Text("\(Int(model.bpm)) BPM")
+                            Spacer()
+                            Text(model.totalString)
+                        }
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(Stem.inkSoft)
                     }
                     .padding(.horizontal, 18)
-                    .frame(height: 38)
                 }
 
                 TransportView(model: model)
+
+                if model.isReady { LoopControlBar(model: model).padding(.horizontal, 18) }
 
                 // Stem panel with per-stem spectrogram lanes.
                 ScrollView {
@@ -106,6 +119,9 @@ struct RootView: View {
             if ProcessInfo.processInfo.environment["STEMACLE_AUTOLOAD"] != nil,
                let url = Bundle.main.url(forResource: "demo", withExtension: "wav") {
                 await model.loadFile(url)
+                if ProcessInfo.processInfo.environment["STEMACLE_AUTOPLAY"] != nil {
+                    model.togglePlay()
+                }
             }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
@@ -172,12 +188,52 @@ struct DeviceCircleView: View {
     }
 }
 
+/// Global mute, Mix/Solo loop monitoring, and the All-row linked loop.
+struct LoopControlBar: View {
+    @ObservedObject var model: StemPlayerViewModel
+    private let bars: [(String, Float)] = [("¼", 0.25), ("½", 0.5), ("1", 1), ("2", 2)]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                pill("Mute all", on: model.globalMuted) { model.toggleGlobalMute() }
+                pill(model.loopAuditionSolo ? "Solo" : "Mix", on: model.loopAuditionSolo) {
+                    model.setLoopMonitoring(solo: !model.loopAuditionSolo)
+                }
+                Spacer()
+                Text("All").font(.caption.weight(.medium)).foregroundStyle(Stem.inkSoft)
+            }
+            HStack(spacing: 6) {
+                ForEach(bars, id: \.0) { label, value in
+                    let active = model.allLoopBars == value
+                    Button(label) { model.setAllLoop(bars: active ? nil : value) }
+                        .font(.caption.weight(.medium))
+                        .frame(maxWidth: .infinity).padding(.vertical, 6)
+                        .background(active ? Stem.amber.opacity(0.28) : Stem.creamDeep.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func pill(_ text: String, on: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(text, action: action)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(on ? Stem.purple.opacity(0.16) : Stem.creamDeep.opacity(0.5))
+            .foregroundStyle(on ? Stem.purple : Stem.inkSoft)
+            .clipShape(Capsule())
+            .buttonStyle(.plain)
+    }
+}
+
 struct TransportView: View {
     @ObservedObject var model: StemPlayerViewModel
 
     var body: some View {
         HStack(spacing: 28) {
-            transportButton("backward.end.fill") { model.stop() }
+            transportButton("backward.end.fill") { model.seek(toProgress: 0) }
             transportButton(model.isPlaying ? "pause.fill" : "play.fill") { model.togglePlay() }
             transportButton("stop.fill") { model.stop() }
         }
@@ -211,7 +267,7 @@ struct StemRowView: View {
                 iconToggle("headphones", on: model.soloed.contains(stem)) { model.toggleSolo(stem) }
             }
             // Spectrogram lane (the slider below each stem) with tap-to-seek.
-            SpectrogramLane(image: laneImage, progress: model.progress) { p in
+            SpectrogramLane(image: laneImage, progress: model.progress, grid: model.measureGrid) { p in
                 model.seek(toProgress: p)
             }
             Slider(
