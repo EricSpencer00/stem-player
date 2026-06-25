@@ -5,7 +5,46 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
-use stemacle_dsp::{separate, CoherenceSeparator, StemSplit, STEMS};
+use stemacle_dsp::{estimate_tempo, separate, CoherenceSeparator, StemSplit, TempoEstimate, STEMS};
+
+use crate::demucs::{separate_file, DemucsConfig};
+
+/// Stems + analysis produced off the UI thread (all `Send`).
+pub struct LoadedStems {
+    pub stems: [Vec<f32>; 4],
+    pub tempo: TempoEstimate,
+    pub sample_rate: u32,
+    pub high_quality: bool,
+}
+
+/// Separate a WAV file, preferring real htdemucs (high quality) and falling back
+/// to the deterministic DSP path. Pure data in/out so it runs on a worker thread.
+pub fn load_stems(path: &std::path::Path) -> Result<LoadedStems, String> {
+    let pcm = read_wav(path)?;
+    let sr = pcm.sample_rate.max(1);
+    let mono: Vec<f32> = pcm
+        .left
+        .iter()
+        .zip(pcm.right.iter())
+        .map(|(&l, &r)| (l + r) * 0.5)
+        .collect();
+    let tempo = estimate_tempo(&mono, sr as f32);
+
+    let cfg = DemucsConfig::from_env();
+    if cfg.available() {
+        if let Ok(stems) = separate_file(path, &cfg) {
+            return Ok(LoadedStems { stems, tempo, sample_rate: sr, high_quality: true });
+        }
+        // fall through to DSP on any demucs failure
+    }
+    let split = separate(&pcm.left, &pcm.right, sr as usize, &CoherenceSeparator);
+    Ok(LoadedStems {
+        stems: [split.drums, split.vocals, split.bass, split.melody],
+        tempo: split.tempo,
+        sample_rate: sr,
+        high_quality: false,
+    })
+}
 
 /// Minimal PCM container: interleaved-free stereo float at a sample rate.
 pub struct Pcm {
@@ -127,12 +166,26 @@ impl Default for Player {
 }
 
 impl Player {
-    /// Decode + separate a WAV file into four stems via the shared core.
+    /// Decode + separate a WAV file into four stems via the shared core (DSP path,
+    /// synchronous — used by tests; the app uses `load_stems` on a worker thread).
     pub fn load_wav(&mut self, path: &Path) -> Result<(), String> {
         let pcm = read_wav(path)?;
         let split = separate(&pcm.left, &pcm.right, pcm.sample_rate.max(1) as usize, &CoherenceSeparator);
         self.split = Some(split);
         Ok(())
+    }
+
+    /// Install stems produced off-thread by `load_stems` (htdemucs or DSP).
+    pub fn set_loaded(&mut self, loaded: LoadedStems) {
+        let [drums, vocals, bass, melody] = loaded.stems;
+        self.split = Some(StemSplit {
+            drums,
+            vocals,
+            bass,
+            melody,
+            sample_rate: loaded.sample_rate as usize,
+            tempo: loaded.tempo,
+        });
     }
 
     /// Effective gain for a stem given mute/solo (persistent-volume contract).
@@ -215,6 +268,24 @@ mod tests {
             assert!(dir.join(format!("{name}.wav")).exists(), "{name}.wav missing");
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// End-to-end htdemucs path through Rust. Opt-in (slow, needs the venv):
+    ///   STEMACLE_TEST_WAV=/tmp/sample1.wav cargo test -- --ignored e2e
+    #[test]
+    #[ignore]
+    fn demucs_e2e_high_quality() {
+        let wav = std::env::var("STEMACLE_TEST_WAV").expect("set STEMACLE_TEST_WAV");
+        let loaded = load_stems(std::path::Path::new(&wav)).expect("load_stems");
+        assert!(loaded.high_quality, "expected htdemucs path (is the venv present?)");
+        let lens: Vec<usize> = loaded.stems.iter().map(|s| s.len()).collect();
+        assert!(lens.iter().all(|&l| l > 0), "empty stem: {lens:?}");
+        // stems must be distinct (separation actually happened)
+        let rms = |s: &[f32]| (s.iter().map(|x| x * x).sum::<f32>() / s.len() as f32).sqrt();
+        let r: Vec<f32> = loaded.stems.iter().map(|s| rms(s)).collect();
+        assert!(r.iter().any(|&x| x > 1e-4), "all stems silent: {r:?}");
+        assert!(r[0] != r[3], "drums and melody identical energy — not separated");
+        eprintln!("htdemucs e2e ok: bpm={} rms={r:?}", loaded.tempo.bpm);
     }
 
     #[test]

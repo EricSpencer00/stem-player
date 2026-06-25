@@ -3,17 +3,21 @@
 //! The heavy lifting (decode, separation, mixing, export) lives in `player.rs`,
 //! which is unit-tested with `cargo test`. This file only wires the UI events.
 
+mod demucs;
 mod playback;
 mod player;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::mpsc::{channel, Receiver};
 
 use playback::AudioOutput;
-use player::Player;
-use slint::Model;
+use player::{load_stems, LoadedStems, Player};
+use slint::{Model, Timer, TimerMode};
 
 slint::include_modules!();
+
+type LoadResult = Result<LoadedStems, String>;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let window = MainWindow::new()?;
@@ -22,32 +26,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // separates, and exports — playback just stays inert.
     let audio: Rc<Option<AudioOutput>> = Rc::new(AudioOutput::new().ok());
 
-    // Open + separate a WAV.
+    // Worker-thread separation results are polled on the UI thread by a timer,
+    // because the player state / cpal stream are not Send.
+    let (tx, rx) = channel::<LoadResult>();
+    let rx: Rc<RefCell<Receiver<LoadResult>>> = Rc::new(RefCell::new(rx));
+    let poll_timer = Timer::default();
     {
         let weak = window.as_weak();
         let state = state.clone();
         let audio = audio.clone();
+        let rx = rx.clone();
+        poll_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(150), move || {
+            let Ok(result) = rx.borrow().try_recv() else { return };
+            let Some(win) = weak.upgrade() else { return };
+            match result {
+                Ok(loaded) => {
+                    let hq = loaded.high_quality;
+                    let bpm = loaded.tempo.bpm;
+                    {
+                        let mut p = state.borrow_mut();
+                        p.set_loaded(loaded);
+                        if let (Some(out), Some(stems)) = (audio.as_ref(), p.stem_buffers()) {
+                            out.load(stems);
+                            out.set_gains(p.effective_gains());
+                        }
+                    }
+                    win.set_ready(true);
+                    win.set_playing(false);
+                    let label = if hq { "htdemucs" } else { "DSP" };
+                    win.set_status(format!("Ready · {} BPM · {label}", bpm as i32).into());
+                }
+                Err(e) => win.set_status(format!("Load failed: {e}").into()),
+            }
+        });
+    }
+
+    // Open + separate a WAV on a worker thread (htdemucs can take minutes).
+    {
+        let weak = window.as_weak();
+        let tx = tx.clone();
         window.on_load_clicked(move || {
             let Some(win) = weak.upgrade() else { return };
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Audio (WAV)", &["wav"])
                 .pick_file()
             {
-                win.set_status("Separating…".into());
-                match state.borrow_mut().load_wav(&path) {
-                    Ok(()) => {
-                        let p = state.borrow();
-                        let bpm = p.split.as_ref().map(|s| s.tempo.bpm).unwrap_or(120.0);
-                        if let (Some(out), Some(stems)) = (audio.as_ref(), p.stem_buffers()) {
-                            out.load(stems);
-                            out.set_gains(p.effective_gains());
-                        }
-                        win.set_ready(true);
-                        win.set_playing(false);
-                        win.set_status(format!("Ready · {} BPM", bpm as i32).into());
-                    }
-                    Err(e) => win.set_status(format!("Load failed: {e}").into()),
-                }
+                win.set_ready(false);
+                win.set_status("Separating (high quality)… this can take a minute".into());
+                let tx = tx.clone();
+                std::thread::spawn(move || {
+                    let _ = tx.send(load_stems(&path));
+                });
             }
         });
     }

@@ -43,14 +43,19 @@ def export_onnx(model, example, path: Path) -> None:
     import torch
 
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Legacy TorchScript exporter (dynamo=False): mature for complex models and
+    # does not need onnxscript. Opset 17 has a native STFT op, which is exactly
+    # what htdemucs needs (and what blocked the CoreML MIL path). Fixed input
+    # length — htdemucs reshapes by its training_length internally.
     torch.onnx.export(
         model,
         example,
         str(path),
         input_names=["mix"],
         output_names=["stems"],
-        dynamic_axes={"mix": {0: "batch", 2: "time"}, "stems": {0: "batch", 3: "time"}},
         opset_version=17,
+        dynamo=False,
+        do_constant_folding=True,
     )
     print(f"  wrote {path}")
 

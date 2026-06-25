@@ -27,6 +27,24 @@ python models/convert_demucs.py --onnx     # ONNX only
 The script is dependency-checked and side-effect-free until run, so it is safe
 to keep in the repo on environments without torch.
 
+## Desktop: real htdemucs via subprocess (WORKING — the quality path)
+
+`separate.py <in.wav> <out_dir>` runs the **real htdemucs** and writes
+`{drums,bass,melody,vocals}.wav`. The native desktop app decodes audio and shells
+out to it (`native/desktop/src/demucs.rs`), so there's no ffmpeg/torchcodec in the
+hot path — audio I/O is libsndfile. Measured on a 3:46 track (CPU): **~82 s
+(~2.7× realtime)**, stems near-perfectly decorrelated (cross-corr 0.001–0.06),
+distinct per-stem energy — full SOTA quality. The Slint app runs it on a worker
+thread; falls back to the DSP path if the runtime is absent.
+
+```bash
+STEMACLE_DEMUCS_PYTHON=models/.venv-models/bin/python \
+  models/.venv-models/bin/python models/separate.py in.wav out_dir
+```
+
+This is the user-approved "hack on desktop for quality" path; the queue absorbs
+the latency. Mobile (no subprocess) needs a converted model or a server queue.
+
 ## Conversion status (measured, not assumed)
 
 Ran end-to-end in a Python 3.11 venv with `torch 2.12.1 + demucs + coremltools +
