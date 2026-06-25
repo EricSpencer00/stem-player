@@ -141,6 +141,29 @@ pub extern "C" fn stemacle_measure_length(bpm: f32) -> f32 {
     grid(bpm, 0.0, 0.0, 1.0).measure_length()
 }
 
+/// Compute a `cols × rows` log-magnitude spectrogram (values 0..1) into the
+/// caller-provided `out` buffer (length must be `cols*rows`, column-major:
+/// `out[col*rows + row]`). Row 0 is low frequency.
+///
+/// # Safety
+/// `samples` must point to `len` valid `f32`s; `out` to `cols*rows` writable `f32`s.
+#[no_mangle]
+pub unsafe extern "C" fn stemacle_spectrogram(
+    samples: *const f32,
+    len: usize,
+    cols: usize,
+    rows: usize,
+    out: *mut f32,
+) {
+    if samples.is_null() || out.is_null() || cols == 0 || rows == 0 {
+        return;
+    }
+    let s = slice::from_raw_parts(samples, len);
+    let grid = stemacle_dsp::viz::spectrogram(s, cols, rows);
+    let dst = slice::from_raw_parts_mut(out, cols * rows);
+    dst.copy_from_slice(&grid[..dst.len().min(grid.len())]);
+}
+
 /// Fold a transport position into an active loop window (`active != 0`). Pure.
 #[no_mangle]
 pub extern "C" fn stemacle_audible_stem_time(

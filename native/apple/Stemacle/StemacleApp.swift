@@ -8,47 +8,106 @@ struct StemacleApp: App {
             RootView()
         }
         #if os(macOS)
-        .defaultSize(width: 460, height: 760)
+        .defaultSize(width: 460, height: 820)
         #endif
     }
 }
 
-/// The first and primary screen on every device: the Stemacle circle, transport,
-/// and the four-stem panel — visually aligned with the web gold master.
+/// Reports the stem list's scroll offset so the player header can collapse.
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+/// The first and primary screen on every device: the Stemacle player and the
+/// four-stem panel with spectrogram lanes — aligned with the web gold master,
+/// then elevated with a spinning disc + radial spectrum.
 struct RootView: View {
     @StateObject private var model = StemPlayerViewModel()
     @State private var importing = false
     @State private var showingSettings = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var masterImage: Image?
+
+    /// Header collapses as the list scrolls up (mobile especially).
+    private var headerScale: CGFloat {
+        let t = min(max(scrollOffset, 0), 220) / 220
+        return 1 - t * 0.42
+    }
 
     var body: some View {
         ZStack {
             Stem.cream.ignoresSafeArea()
-            VStack(spacing: 20) {
+            VStack(spacing: 12) {
                 HStack {
+                    Text("stemacle").font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Stem.inkSoft)
                     Spacer()
                     Button { showingSettings = true } label: {
                         Image(systemName: "gearshape").foregroundStyle(Stem.inkSoft)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 18)
+                    }.buttonStyle(.plain)
                 }
-                DeviceCircleView(model: model) { importing = true }
-                    .frame(maxWidth: 320)
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
+
+                // Player header (collapsing).
+                Group {
+                    if model.isReady {
+                        PlayerHeaderView(model: model)
+                    } else {
+                        DeviceCircleView(model: model) { importing = true }
+                    }
+                }
+                .frame(maxWidth: 320)
+                .frame(height: 250 * headerScale)
+                .scaleEffect(headerScale, anchor: .top)
+                .animation(.easeOut(duration: 0.15), value: model.isReady)
+
+                // The player's master spectrogram overview ("the one in the player").
+                if model.isReady {
+                    SpectrogramLane(image: masterImage, progress: model.progress) { p in
+                        model.seek(toProgress: p)
+                    }
+                    .padding(.horizontal, 18)
+                    .frame(height: 38)
+                }
 
                 TransportView(model: model)
 
+                // Stem panel with per-stem spectrogram lanes.
                 ScrollView {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: ScrollOffsetKey.self,
+                            value: -proxy.frame(in: .named("stemScroll")).minY
+                        )
+                    }
+                    .frame(height: 0)
+
                     VStack(spacing: 10) {
                         ForEach(Stem.stemOrder, id: \.self) { stem in
                             StemRowView(model: model, stem: stem)
                         }
                     }
                     .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
                 }
+                .coordinateSpace(name: "stemScroll")
+                .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
             }
-            .padding(.bottom, 16)
         }
         .foregroundStyle(Stem.ink)
+        .task(id: model.loadGeneration) {
+            masterImage = makeSpectrogramImage(model.masterSpectrogram)
+        }
+        .task {
+            // Dev/QA hook: auto-load the bundled demo so the loaded player UI can
+            // be inspected without driving the file picker.
+            if ProcessInfo.processInfo.environment["STEMACLE_AUTOLOAD"] != nil,
+               let url = Bundle.main.url(forResource: "demo", withExtension: "wav") {
+                await model.loadFile(url)
+            }
+        }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
             if case let .success(urls) = result, let url = urls.first {
                 Task { await model.loadFile(url) }
@@ -58,42 +117,22 @@ struct RootView: View {
     }
 }
 
-/// Settings: the htdemucs queue-server URL. When set, separation runs on the
-/// server for full quality; when empty, the app separates on-device (DSP).
-struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var serverURL = UserDefaults.standard.string(forKey: "stemacle.serverURL") ?? ""
+/// Ready-state player: spinning disc with the radial EDM spectrum around it.
+struct PlayerHeaderView: View {
+    @ObservedObject var model: StemPlayerViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Settings").font(.title3.weight(.semibold))
-                Spacer()
-                Button("Done") {
-                    UserDefaults.standard.set(serverURL, forKey: "stemacle.serverURL")
-                    dismiss()
-                }
-            }
-            Text("Separation server")
-                .font(.subheadline.weight(.medium))
-            TextField("http://192.168.x.x:8008", text: $serverURL)
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                #endif
-            Text("When set, tracks are split with full htdemucs quality on the server. Leave empty to split on-device.")
-                .font(.footnote)
-                .foregroundStyle(Stem.inkSoft)
-            Spacer()
+        ZStack {
+            RadialSpectrumView(spectrum: model.currentSpectrum, playing: model.isPlaying)
+            SpinningDiscView(playing: model.isPlaying) { model.togglePlay() }
+                .padding(46)
         }
-        .padding(24)
-        .frame(minWidth: 320, minHeight: 220)
+        .aspectRatio(1, contentMode: .fit)
     }
 }
 
 /// The warm matte circle — passive physical display + center load/play control.
+/// Shown before a track is loaded.
 struct DeviceCircleView: View {
     @ObservedObject var model: StemPlayerViewModel
     var onLoad: () -> Void
@@ -101,30 +140,29 @@ struct DeviceCircleView: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [Stem.cream, Stem.creamDeep],
-                        center: .center, startRadius: 8, endRadius: 200
-                    )
-                )
+                .fill(RadialGradient(colors: [Stem.cream, Stem.creamDeep],
+                                     center: .center, startRadius: 8, endRadius: 200))
                 .overlay(Circle().stroke(Stem.creamDeep, lineWidth: 1))
                 .shadow(color: .black.opacity(0.08), radius: 18, y: 8)
-
             VStack(spacing: 8) {
                 if model.isProcessing {
                     ProgressView().controlSize(.large)
                 } else {
-                    Button(action: model.isReady ? model.togglePlay : onLoad) {
-                        Image(systemName: model.isReady ? (model.isPlaying ? "pause.fill" : "play.fill") : "plus.circle")
+                    Button(action: onLoad) {
+                        Image(systemName: "plus.circle")
                             .font(.system(size: 44, weight: .light))
                             .foregroundStyle(Stem.purple)
-                    }
-                    .buttonStyle(.plain)
+                    }.buttonStyle(.plain)
                 }
                 Text(model.status)
-                    .font(.footnote)
-                    .foregroundStyle(Stem.inkSoft)
+                    .font(.footnote).foregroundStyle(Stem.inkSoft)
                     .multilineTextAlignment(.center)
+                if !model.isProcessing, let demo = Bundle.main.url(forResource: "demo", withExtension: "wav") {
+                    Button("try a sample") { Task { await model.loadFile(demo) } }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Stem.purple)
+                        .buttonStyle(.plain)
+                }
             }
             .padding(40)
         }
@@ -153,15 +191,15 @@ struct TransportView: View {
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(Stem.ink)
                 .frame(width: 44, height: 44)
-        }
-        .buttonStyle(.plain)
+        }.buttonStyle(.plain)
     }
 }
 
-/// One stem: name, volume, mute, headphones (solo), and the loop-length buttons.
+/// One stem: name, controls, the spectrogram lane, and loop-length buttons.
 struct StemRowView: View {
     @ObservedObject var model: StemPlayerViewModel
     let stem: String
+    @State private var laneImage: Image?
     private let bars: [(String, Float)] = [("¼", 0.25), ("½", 0.5), ("1", 1), ("2", 2)]
 
     var body: some View {
@@ -172,27 +210,25 @@ struct StemRowView: View {
                 iconToggle("speaker.slash.fill", on: model.muted.contains(stem)) { model.toggleMute(stem) }
                 iconToggle("headphones", on: model.soloed.contains(stem)) { model.toggleSolo(stem) }
             }
+            // Spectrogram lane (the slider below each stem) with tap-to-seek.
+            SpectrogramLane(image: laneImage, progress: model.progress) { p in
+                model.seek(toProgress: p)
+            }
             Slider(
-                value: Binding(
-                    get: { model.volumes[stem] ?? 0.8 },
-                    set: { model.setVolume(stem, $0) }
-                ), in: 0...1
-            )
-            .tint(Stem.purple)
+                value: Binding(get: { model.volumes[stem] ?? 0.8 },
+                               set: { model.setVolume(stem, $0) }), in: 0...1
+            ).tint(Stem.purple)
 
             HStack(spacing: 6) {
                 ForEach(bars, id: \.0) { label, value in
                     let active = model.loopBars[stem] == value
-                    Button(label) {
-                        model.setLoop(stem, bars: active ? nil : value)
-                    }
-                    .font(.caption.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 5)
-                    .background(active ? Stem.amber.opacity(0.25) : Stem.creamDeep.opacity(0.5))
-                    .overlay(active ? Circle().fill(Stem.amber).frame(width: 4, height: 4).offset(y: -12) : nil, alignment: .top)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .buttonStyle(.plain)
+                    Button(label) { model.setLoop(stem, bars: active ? nil : value) }
+                        .font(.caption.weight(.medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(active ? Stem.amber.opacity(0.25) : Stem.creamDeep.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .buttonStyle(.plain)
                 }
             }
         }
@@ -201,6 +237,9 @@ struct StemRowView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Stem.creamDeep, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .opacity(model.isReady ? 1 : 0.5)
+        .task(id: model.loadGeneration) {
+            laneImage = makeSpectrogramImage(model.spectrograms[stem] ?? [])
+        }
     }
 
     private func iconToggle(_ name: String, on: Bool, _ action: @escaping () -> Void) -> some View {
@@ -211,7 +250,39 @@ struct StemRowView: View {
                 .frame(width: 30, height: 30)
                 .background(on ? Stem.purple.opacity(0.12) : .clear)
                 .clipShape(Circle())
+        }.buttonStyle(.plain)
+    }
+}
+
+/// Settings: the htdemucs queue-server URL. When set, separation runs on the
+/// server for full quality; when empty, the app separates on-device (DSP).
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var serverURL = UserDefaults.standard.string(forKey: "stemacle.serverURL") ?? ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Settings").font(.title3.weight(.semibold))
+                Spacer()
+                Button("Done") {
+                    UserDefaults.standard.set(serverURL, forKey: "stemacle.serverURL")
+                    dismiss()
+                }
+            }
+            Text("Separation server").font(.subheadline.weight(.medium))
+            TextField("http://192.168.x.x:8008", text: $serverURL)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                #endif
+            Text("When set, tracks are split with full htdemucs quality on the server. Leave empty to split on-device.")
+                .font(.footnote).foregroundStyle(Stem.inkSoft)
+            Spacer()
         }
-        .buttonStyle(.plain)
+        .padding(24)
+        .frame(minWidth: 320, minHeight: 220)
     }
 }

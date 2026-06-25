@@ -58,6 +58,11 @@ float stemacle_audible_stem_time(float transport_sec, float loop_start,
                                  float loop_end, unsigned int active,
                                  float duration);
 
+/* Compute a cols×rows log-magnitude spectrogram (0..1) into `out` (length
+ * cols*rows, column-major: out[col*rows + row]; row 0 = low frequency). */
+void stemacle_spectrogram(const float *samples, size_t len, size_t cols,
+                          size_t rows, float *out);
+
 #ifdef __cplusplus
 }
 #endif

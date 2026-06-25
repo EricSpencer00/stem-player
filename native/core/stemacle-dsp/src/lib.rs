@@ -16,6 +16,7 @@ pub mod hpss;
 pub mod loops;
 pub mod stft;
 pub mod tempo;
+pub mod viz;
 
 pub use loops::{LoopGrid, LOOP_BARS};
 pub use stft::{Spectrogram, FFT_SIZE, HOP_SIZE, MODEL_BINS, SR, TOT_BINS};

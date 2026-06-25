@@ -83,4 +83,20 @@ public enum Stemacle {
     ) -> Float {
         stemacle_audible_stem_time(transportSec, loopStart, loopEnd, active ? 1 : 0, duration)
     }
+
+    // MARK: Visualization
+
+    /// A `cols × rows` log-magnitude spectrogram (0...1), column-major
+    /// (`grid[col][row]`, row 0 = low frequency) for drawing stem lanes and the
+    /// radial player visualizer.
+    public static func spectrogram(_ samples: [Float], cols: Int, rows: Int) -> [[Float]] {
+        guard cols > 0, rows > 0, !samples.isEmpty else { return [] }
+        var flat = [Float](repeating: 0, count: cols * rows)
+        samples.withUnsafeBufferPointer { src in
+            flat.withUnsafeMutableBufferPointer { dst in
+                stemacle_spectrogram(src.baseAddress, samples.count, cols, rows, dst.baseAddress)
+            }
+        }
+        return (0..<cols).map { c in Array(flat[(c * rows)..<((c + 1) * rows)]) }
+    }
 }

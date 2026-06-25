@@ -14,7 +14,21 @@ final class StemAudioEngine {
 
     private(set) var isPlaying = false
     private(set) var durationSeconds: Double = 0
-    private var startHostTime: AVAudioFramePosition = 0
+
+    // Transport position tracking for the play cursor.
+    private var startDate: Date?
+    private var startOffset: Double = 0
+
+    /// Current playback position in seconds.
+    var currentTime: Double {
+        let t: Double
+        if let startDate {
+            t = startOffset + Date().timeIntervalSince(startDate)
+        } else {
+            t = startOffset
+        }
+        return max(0, min(t, durationSeconds))
+    }
 
     let stems = ["drums", "vocals", "bass", "melody"]
 
@@ -61,17 +75,39 @@ final class StemAudioEngine {
             node.scheduleBuffer(segment, at: nil)
             node.play()
         }
+        startOffset = max(0, offset)
+        startDate = Date()
         isPlaying = true
     }
 
+    /// Resume from the current position.
+    func resume() throws {
+        try play(from: currentTime)
+    }
+
     func pause() {
+        startOffset = currentTime
+        startDate = nil
         for node in players.values { node.pause() }
         isPlaying = false
     }
 
     func stop() {
         for node in players.values { node.stop() }
+        startOffset = 0
+        startDate = nil
         isPlaying = false
+    }
+
+    /// Seek to `time` seconds; keeps playing if currently playing.
+    func seek(to time: Double) {
+        let wasPlaying = isPlaying
+        for node in players.values { node.stop() }
+        startOffset = max(0, min(time, durationSeconds))
+        startDate = nil
+        if wasPlaying {
+            try? play(from: startOffset)
+        }
     }
 
     /// Copy `[from, end)` of a mono buffer into a fresh buffer for offset playback.

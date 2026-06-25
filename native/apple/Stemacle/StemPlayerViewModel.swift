@@ -22,11 +22,68 @@ final class StemPlayerViewModel: ObservableObject {
     /// Selected loop length per stem in bars (nil = no loop). Matches LOOP_BARS.
     @Published var loopBars: [String: Float] = [:]
 
+    /// Per-stem spectrogram grids: `spectrograms[stem][col][row]`, 0...1.
+    @Published var spectrograms: [String: [[Float]]] = [:]
+    /// Master (mix) spectrogram for the radial player visualizer.
+    @Published var masterSpectrogram: [[Float]] = []
+    /// Bumped each load so views can rebuild cached spectrogram images.
+    @Published var loadGeneration = 0
+    /// Live transport position in seconds (drives play cursors + the visualizer).
+    @Published var position: Double = 0
+
     private let engine = StemAudioEngine()
     private var split: StemSplit?
+    private var ticker: Timer?
+
+    /// Spectrogram resolution for the stem lanes.
+    static let specCols = 240
+    static let specRows = 48
 
     init() {
         for stem in stems { volumes[stem] = 0.8 }
+    }
+
+    /// Normalized progress 0...1 for the visualizer/cursor.
+    var progress: Double { duration > 0 ? position / duration : 0 }
+
+    /// The spectrogram column index currently under the play head (0...specCols-1).
+    var playColumn: Int {
+        guard duration > 0 else { return 0 }
+        return min(Self.specCols - 1, Int(progress * Double(Self.specCols)))
+    }
+
+    /// Install separated stems (shared by the server + on-device paths).
+    private func finishLoading(_ dict: [String: [Float]], bpm: Float, quality: String) {
+        self.bpm = bpm
+        engine.load(stems: dict)
+        duration = engine.durationSeconds
+        // Compute per-stem spectrograms for the lanes.
+        var specs: [String: [[Float]]] = [:]
+        var mixLen = 0
+        for (name, samples) in dict {
+            specs[name] = Stemacle.spectrogram(samples, cols: Self.specCols, rows: Self.specRows)
+            mixLen = max(mixLen, samples.count)
+        }
+        spectrograms = specs
+        // Master spectrogram from the summed mix for the radial visualizer.
+        if mixLen > 0 {
+            var mix = [Float](repeating: 0, count: mixLen)
+            for samples in dict.values {
+                for i in 0..<samples.count { mix[i] += samples[i] }
+            }
+            masterSpectrogram = Stemacle.spectrogram(mix, cols: Self.specCols, rows: Self.specRows)
+        }
+        position = 0
+        loadGeneration += 1
+        isReady = true
+        status = "Ready · \(Int(bpm)) BPM · \(quality)"
+    }
+
+    /// Spectrum column (row values 0...1) at the current play head, for the
+    /// radial visualizer. Falls back to an empty spectrum.
+    var currentSpectrum: [Float] {
+        guard !masterSpectrogram.isEmpty else { return [] }
+        return masterSpectrogram[min(playColumn, masterSpectrogram.count - 1)]
     }
 
     /// Decode `url` to 44.1 kHz stereo, separate on the Rust core, load the engine.
@@ -47,11 +104,7 @@ final class StemPlayerViewModel: ObservableObject {
                 let stems = try await server.awaitStems(jobID)
                 // tempo still comes from the on-device core (fast, deterministic).
                 let tempoSplit = Stemacle.separate(left: left, right: right, sampleRate: 44100)
-                bpm = tempoSplit?.bpm ?? 120
-                engine.load(stems: stems)
-                duration = engine.durationSeconds
-                isReady = true
-                status = "Ready · \(Int(bpm)) BPM · htdemucs"
+                finishLoading(stems, bpm: tempoSplit?.bpm ?? 120, quality: "htdemucs")
                 return
             }
 
@@ -65,13 +118,9 @@ final class StemPlayerViewModel: ObservableObject {
                 return
             }
             split = result
-            bpm = result.bpm
             var dict: [String: [Float]] = [:]
             for (name, samples) in result.ordered { dict[name] = samples }
-            engine.load(stems: dict)
-            duration = engine.durationSeconds
-            isReady = true
-            status = "Ready · \(Int(result.bpm)) BPM · on-device"
+            finishLoading(dict, bpm: result.bpm, quality: "on-device")
         } catch {
             status = "Load failed: \(error.localizedDescription)"
         }
@@ -85,10 +134,12 @@ final class StemPlayerViewModel: ObservableObject {
             if isPlaying {
                 engine.pause()
                 isPlaying = false
+                stopTicker()
             } else {
-                try engine.play(from: 0)
+                try engine.resume()
                 applyMixing()
                 isPlaying = true
+                startTicker()
             }
         } catch {
             status = "Playback error: \(error.localizedDescription)"
@@ -98,6 +149,35 @@ final class StemPlayerViewModel: ObservableObject {
     func stop() {
         engine.stop()
         isPlaying = false
+        position = 0
+        stopTicker()
+    }
+
+    /// Seek to a normalized progress (0...1) — used by tapping a spectrogram lane.
+    func seek(toProgress p: Double) {
+        let t = max(0, min(1, p)) * duration
+        engine.seek(to: t)
+        position = t
+    }
+
+    private func startTicker() {
+        ticker?.invalidate()
+        ticker = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.position = self.engine.currentTime
+                if !self.engine.isPlaying && self.isPlaying {
+                    // reached the end
+                    self.isPlaying = false
+                    self.stopTicker()
+                }
+            }
+        }
+    }
+
+    private func stopTicker() {
+        ticker?.invalidate()
+        ticker = nil
     }
 
     // MARK: Per-stem controls
