@@ -1,0 +1,4 @@
+module StemacleCore {
+    header "stemacle.h"
+    export *
+}

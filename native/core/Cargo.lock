@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "stemacle-dsp"
 version = "0.1.0"
+
+[[package]]
+name = "stemacle-ffi"
+version = "0.1.0"
+dependencies = [
+ "stemacle-dsp",
+]

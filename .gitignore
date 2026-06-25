@@ -31,3 +31,9 @@ secrets.json
 # Rust core build output
 native/core/target/
 target/
+
+# Apple build artifacts (regenerate via scripts/build-apple-xcframework.sh)
+native/apple/StemacleCore.xcframework/
+native/apple/build/
+native/apple/**/.build/
+*.xcuserstate

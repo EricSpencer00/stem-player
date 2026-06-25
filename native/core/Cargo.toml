@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "stemacle-dsp",
+    "stemacle-ffi",
 ]
 
 [workspace.package]
