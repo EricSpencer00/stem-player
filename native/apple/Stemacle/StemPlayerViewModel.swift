@@ -48,6 +48,9 @@ final class StemPlayerViewModel: ObservableObject {
     private var split: StemSplit?
     private var ticker: Timer?
 
+    /// Set by the app so fresh splits are saved to the Library / stem cache.
+    var library: LibraryStore?
+
     /// Spectrogram resolution for the stem lanes.
     static let specCols = 240
     static let specRows = 48
@@ -88,8 +91,10 @@ final class StemPlayerViewModel: ObservableObject {
     }
 
     /// Install separated stems (shared by the server + on-device paths).
+    /// Fresh splits are persisted to the Library; cache re-opens pass persist:false.
     private func finishLoading(_ dict: [String: [Float]], bpm: Float,
-                              measureOffset: Float, beatOffset: Float, quality: String) {
+                              measureOffset: Float, beatOffset: Float, quality: String,
+                              persist: Bool = true) {
         self.bpm = bpm
         self.measureOffset = measureOffset
         self.beatOffset = beatOffset
@@ -97,6 +102,11 @@ final class StemPlayerViewModel: ObservableObject {
         loopBars.removeAll(); allLoopBars = nil
         engine.load(stems: dict)
         duration = engine.durationSeconds
+        if persist {
+            library?.add(title: songTitle, stems: dict, sampleRate: Int(StemAudioEngine.sampleRate),
+                         bpm: bpm, measureOffset: measureOffset, beatOffset: beatOffset,
+                         duration: engine.durationSeconds, quality: quality)
+        }
         // Compute per-stem spectrograms for the lanes.
         var specs: [String: [[Float]]] = [:]
         var mixLen = 0
@@ -117,6 +127,19 @@ final class StemPlayerViewModel: ObservableObject {
         loadGeneration += 1
         isReady = true
         status = "Ready · \(Int(bpm)) BPM · \(quality)"
+    }
+
+    /// Instant re-open from the Library's stem cache — no re-separation.
+    func openProject(_ project: Project) {
+        guard let dict = library?.stems(for: project) else {
+            status = "Cached stems missing"
+            return
+        }
+        stop()
+        songTitle = project.title
+        isProcessing = false
+        finishLoading(dict, bpm: project.bpm, measureOffset: project.measureOffset,
+                      beatOffset: project.beatOffset, quality: project.quality, persist: false)
     }
 
     /// Spectrum column (row values 0...1) at the current play head, for the

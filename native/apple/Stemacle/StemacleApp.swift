@@ -5,12 +5,137 @@ import UniformTypeIdentifiers
 struct StemacleApp: App {
     var body: some Scene {
         WindowGroup {
-            RootView()
+            AppRootView()
         }
         #if os(macOS)
-        .defaultSize(width: 460, height: 820)
+        .defaultSize(width: 480, height: 860)
         #endif
     }
+}
+
+enum Tab: Hashable { case library, splitter, settings }
+
+/// Tabbed shell implementing the verified navigation model (specs/Navigation.tla):
+/// Library | Splitter | Settings, with Import reachable from anywhere and fresh
+/// splits saved to the Library's stem cache for instant re-open.
+struct AppRootView: View {
+    @StateObject private var model = StemPlayerViewModel()
+    @StateObject private var library = LibraryStore()
+    @State private var tab: Tab = .splitter
+    @State private var importing = false
+
+    var body: some View {
+        TabView(selection: $tab) {
+            LibraryView(library: library,
+                        onOpen: { project in model.openProject(project); tab = .splitter },
+                        onImport: { importing = true })
+                .tabItem { Label("Library", systemImage: "square.stack") }
+                .tag(Tab.library)
+
+            SplitterView(model: model, onImport: { importing = true })
+                .tabItem { Label("Splitter", systemImage: "waveform") }
+                .tag(Tab.splitter)
+
+            SettingsView()
+                .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(Tab.settings)
+        }
+        .tint(Stem.purple)
+        .onAppear {
+            model.library = library
+            if ProcessInfo.processInfo.environment["STEMACLE_TAB"] == "library" { tab = .library }
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
+            if case let .success(urls) = result, let url = urls.first {
+                tab = .splitter
+                Task { await model.loadFile(url) }
+            }
+        }
+        .task {
+            if ProcessInfo.processInfo.environment["STEMACLE_AUTOLOAD"] != nil,
+               let url = Bundle.main.url(forResource: "demo", withExtension: "wav") {
+                model.library = library
+                await model.loadFile(url)
+                if ProcessInfo.processInfo.environment["STEMACLE_AUTOPLAY"] != nil { model.togglePlay() }
+            }
+        }
+    }
+}
+
+/// The Song Library: every split saved as a card, opens instantly from cache.
+struct LibraryView: View {
+    @ObservedObject var library: LibraryStore
+    var onOpen: (Project) -> Void
+    var onImport: () -> Void
+
+    var body: some View {
+        ZStack {
+            Stem.cream.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Library").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    Spacer()
+                    Button(action: onImport) {
+                        Label("Add", systemImage: "plus").font(.subheadline.weight(.medium))
+                    }.buttonStyle(.plain).foregroundStyle(Stem.purple)
+                }
+                .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 6)
+
+                if library.projects.isEmpty {
+                    Spacer()
+                    VStack(spacing: 10) {
+                        Image(systemName: "square.stack").font(.system(size: 40, weight: .light))
+                            .foregroundStyle(Stem.inkSoft)
+                        Text("No songs yet").font(.headline)
+                        Text("Split a track and it lands here — reopen any time without waiting.")
+                            .font(.footnote).foregroundStyle(Stem.inkSoft)
+                            .multilineTextAlignment(.center).padding(.horizontal, 40)
+                        Button(action: onImport) { Text("Add a song").font(.subheadline.weight(.medium)) }
+                            .buttonStyle(.borderedProminent).tint(Stem.purple).padding(.top, 4)
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(library.projects) { project in
+                                Button { onOpen(project) } label: { ProjectRow(project: project) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                    }
+                }
+            }
+        }
+        .foregroundStyle(Stem.ink)
+    }
+}
+
+struct ProjectRow: View {
+    let project: Project
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(RadialGradient(colors: [Stem.cream, Stem.creamDeep], center: .center, startRadius: 2, endRadius: 36))
+                Image(systemName: "waveform").foregroundStyle(Stem.purple)
+            }
+            .frame(width: 52, height: 52)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Stem.creamDeep, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(project.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                Text("\(Int(project.bpm)) BPM · \(clock(project.duration)) · \(project.quality)")
+                    .font(.caption).foregroundStyle(Stem.inkSoft)
+            }
+            Spacer()
+            Image(systemName: "play.circle").foregroundStyle(Stem.inkSoft)
+        }
+        .padding(10)
+        .background(Stem.cream)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Stem.creamDeep, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    private func clock(_ s: Double) -> String { String(format: "%d:%02d", Int(s) / 60, Int(s) % 60) }
 }
 
 /// Reports the stem list's scroll offset so the player header can collapse.
@@ -19,13 +144,10 @@ private struct ScrollOffsetKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
-/// The first and primary screen on every device: the Stemacle player and the
-/// four-stem panel with spectrogram lanes — aligned with the web gold master,
-/// then elevated with a spinning disc + radial spectrum.
-struct RootView: View {
-    @StateObject private var model = StemPlayerViewModel()
-    @State private var importing = false
-    @State private var showingSettings = false
+/// The Splitter tab: the Stemacle player + four-stem panel with spectrogram lanes.
+struct SplitterView: View {
+    @ObservedObject var model: StemPlayerViewModel
+    var onImport: () -> Void
     @State private var scrollOffset: CGFloat = 0
     @State private var masterImage: Image?
 
@@ -46,11 +168,8 @@ struct RootView: View {
                         .lineLimit(1)
                     Spacer()
                     // Persistent "change song" — load a new track without exiting.
-                    Button { importing = true } label: {
+                    Button(action: onImport) {
                         Image(systemName: "plus.circle").foregroundStyle(Stem.purple)
-                    }.buttonStyle(.plain)
-                    Button { showingSettings = true } label: {
-                        Image(systemName: "gearshape").foregroundStyle(Stem.inkSoft)
                     }.buttonStyle(.plain)
                 }
                 .font(.system(size: 17))
@@ -62,7 +181,7 @@ struct RootView: View {
                     if model.isReady {
                         PlayerHeaderView(model: model)
                     } else {
-                        DeviceCircleView(model: model) { importing = true }
+                        DeviceCircleView(model: model, onLoad: onImport)
                     }
                 }
                 .frame(maxWidth: model.isReady ? 200 : 280)
@@ -120,23 +239,6 @@ struct RootView: View {
         .task(id: model.loadGeneration) {
             masterImage = makeSpectrogramImage(model.masterSpectrogram)
         }
-        .task {
-            // Dev/QA hook: auto-load the bundled demo so the loaded player UI can
-            // be inspected without driving the file picker.
-            if ProcessInfo.processInfo.environment["STEMACLE_AUTOLOAD"] != nil,
-               let url = Bundle.main.url(forResource: "demo", withExtension: "wav") {
-                await model.loadFile(url)
-                if ProcessInfo.processInfo.environment["STEMACLE_AUTOPLAY"] != nil {
-                    model.togglePlay()
-                }
-            }
-        }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
-            if case let .success(urls) = result, let url = urls.first {
-                Task { await model.loadFile(url) }
-            }
-        }
-        .sheet(isPresented: $showingSettings) { SettingsView() }
     }
 }
 
@@ -331,32 +433,37 @@ struct StemRowView: View {
 /// Settings: the htdemucs queue-server URL. When set, separation runs on the
 /// server for full quality; when empty, the app separates on-device (DSP).
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var serverURL = UserDefaults.standard.string(forKey: "stemacle.serverURL") ?? ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Settings").font(.title3.weight(.semibold))
+        ZStack {
+            Stem.cream.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Settings").font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .padding(.top, 10)
+                Text("Separation server").font(.subheadline.weight(.medium))
+                TextField("http://192.168.x.x:8008", text: $serverURL)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    #endif
+                    .onChange(of: serverURL) { v in
+                        UserDefaults.standard.set(v, forKey: "stemacle.serverURL")
+                    }
+                Text("When set, tracks split with full htdemucs quality on the server. Leave empty to split on-device.")
+                    .font(.footnote).foregroundStyle(Stem.inkSoft)
                 Spacer()
-                Button("Done") {
-                    UserDefaults.standard.set(serverURL, forKey: "stemacle.serverURL")
-                    dismiss()
+                HStack(spacing: 10) {
+                    Link("Privacy", destination: URL(string: "https://stemacle.com/privacy/")!)
+                    Link("Terms", destination: URL(string: "https://stemacle.com/terms/")!)
+                    Link("Support", destination: URL(string: "https://stemacle.com/support/")!)
                 }
+                .font(.footnote).foregroundStyle(Stem.purple)
             }
-            Text("Separation server").font(.subheadline.weight(.medium))
-            TextField("http://192.168.x.x:8008", text: $serverURL)
-                .textFieldStyle(.roundedBorder)
-                .autocorrectionDisabled()
-                #if os(iOS)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.URL)
-                #endif
-            Text("When set, tracks are split with full htdemucs quality on the server. Leave empty to split on-device.")
-                .font(.footnote).foregroundStyle(Stem.inkSoft)
-            Spacer()
+            .padding(20)
         }
-        .padding(24)
-        .frame(minWidth: 320, minHeight: 220)
+        .foregroundStyle(Stem.ink)
     }
 }
