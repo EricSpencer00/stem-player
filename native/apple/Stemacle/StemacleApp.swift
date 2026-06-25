@@ -31,26 +31,33 @@ struct RootView: View {
 
     /// Header collapses as the list scrolls up (mobile especially).
     private var headerScale: CGFloat {
-        let t = min(max(scrollOffset, 0), 220) / 220
-        return 1 - t * 0.42
+        let t = min(max(scrollOffset, 0), 160) / 160
+        return 1 - t * 0.6   // shrinks to 40%
     }
 
     var body: some View {
         ZStack {
             Stem.cream.ignoresSafeArea()
             VStack(spacing: 12) {
-                HStack {
-                    Text("stemacle").font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Stem.inkSoft)
+                HStack(spacing: 12) {
+                    Text(model.isReady && !model.songTitle.isEmpty ? model.songTitle : "stemacle")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(model.isReady ? Stem.ink : Stem.inkSoft)
+                        .lineLimit(1)
                     Spacer()
+                    // Persistent "change song" — load a new track without exiting.
+                    Button { importing = true } label: {
+                        Image(systemName: "plus.circle").foregroundStyle(Stem.purple)
+                    }.buttonStyle(.plain)
                     Button { showingSettings = true } label: {
                         Image(systemName: "gearshape").foregroundStyle(Stem.inkSoft)
                     }.buttonStyle(.plain)
                 }
+                .font(.system(size: 17))
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
 
-                // Player header (collapsing).
+                // Player header (compact + collapsing).
                 Group {
                     if model.isReady {
                         PlayerHeaderView(model: model)
@@ -58,8 +65,8 @@ struct RootView: View {
                         DeviceCircleView(model: model) { importing = true }
                     }
                 }
-                .frame(maxWidth: 320)
-                .frame(height: 250 * headerScale)
+                .frame(maxWidth: model.isReady ? 200 : 280)
+                .frame(height: (model.isReady ? 190 : 240) * headerScale)
                 .scaleEffect(headerScale, anchor: .top)
                 .animation(.easeOut(duration: 0.15), value: model.isReady)
 

@@ -10,6 +10,7 @@ final class StemPlayerViewModel: ObservableObject {
     let stems = ["drums", "vocals", "bass", "melody"]
 
     @Published var status: String = "Drop or choose a track"
+    @Published var songTitle: String = ""
     @Published var isProcessing = false
     /// Separation progress 0...1 (server jobs); nil when indeterminate.
     @Published var splitProgress: Double?
@@ -130,6 +131,7 @@ final class StemPlayerViewModel: ObservableObject {
         isProcessing = true
         isReady = false
         splitProgress = nil
+        songTitle = url.deletingPathExtension().lastPathComponent
         status = "Decoding…"
         defer { isProcessing = false; splitProgress = nil }
 
@@ -218,9 +220,13 @@ final class StemPlayerViewModel: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 self.position = self.engine.currentTime
-                if !self.engine.isPlaying && self.isPlaying {
-                    // reached the end
+                // End of track: no active loop and the head reached the end.
+                let hasLoop = !self.loopBars.values.compactMap { $0 }.isEmpty || self.allLoopBars != nil
+                if self.isPlaying && !hasLoop && self.duration > 0,
+                   self.position >= self.duration - 0.02 {
+                    self.engine.stop()
                     self.isPlaying = false
+                    self.position = 0
                     self.stopTicker()
                 }
             }
