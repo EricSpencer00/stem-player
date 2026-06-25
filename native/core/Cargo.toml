@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "stemacle-dsp",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+authors = ["Eric Spencer"]
+
+# Shared Rust core for Stemacle native apps.
+# stemacle-dsp ports the deterministic DSP + loop math from the web gold master
+# (app/index.html) and is gated by golden-vector / reconstruction tests.
+# Neural separation (Demucs via CoreML / ONNX Runtime) is added in a separate
+# crate (stemacle-separator) in Phase 2 and injected behind a trait.
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

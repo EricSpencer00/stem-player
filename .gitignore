@@ -27,3 +27,7 @@ native/macos/.build/
 *.cert
 credentials.json
 secrets.json
+
+# Rust core build output
+native/core/target/
+target/

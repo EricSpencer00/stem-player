@@ -1,0 +1,14 @@
+[package]
+name = "stemacle-dsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Deterministic DSP + loop math for Stemacle, ported from the web gold master."
+
+[lib]
+crate-type = ["lib", "staticlib"]
+
+[dependencies]
+
+[dev-dependencies]
