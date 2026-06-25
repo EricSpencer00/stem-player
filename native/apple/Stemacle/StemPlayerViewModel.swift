@@ -38,6 +38,23 @@ final class StemPlayerViewModel: ObservableObject {
 
         do {
             let (left, right) = try decodeStereo44k(url)
+
+            // Prefer the high-quality htdemucs queue server when configured;
+            // otherwise separate on-device with the shared DSP core.
+            if let server = StemServerClient.configured() {
+                status = "Separating (htdemucs, server)…"
+                let jobID = try await server.submit(left: left, right: right, sampleRate: 44100)
+                let stems = try await server.awaitStems(jobID)
+                // tempo still comes from the on-device core (fast, deterministic).
+                let tempoSplit = Stemacle.separate(left: left, right: right, sampleRate: 44100)
+                bpm = tempoSplit?.bpm ?? 120
+                engine.load(stems: stems)
+                duration = engine.durationSeconds
+                isReady = true
+                status = "Ready · \(Int(bpm)) BPM · htdemucs"
+                return
+            }
+
             status = "Separating…"
             // Hop heavy work off the main actor.
             let result: StemSplit? = await Task.detached(priority: .userInitiated) {
@@ -54,7 +71,7 @@ final class StemPlayerViewModel: ObservableObject {
             engine.load(stems: dict)
             duration = engine.durationSeconds
             isReady = true
-            status = "Ready · \(Int(result.bpm)) BPM"
+            status = "Ready · \(Int(result.bpm)) BPM · on-device"
         } catch {
             status = "Load failed: \(error.localizedDescription)"
         }

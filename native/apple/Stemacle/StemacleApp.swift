@@ -18,14 +18,22 @@ struct StemacleApp: App {
 struct RootView: View {
     @StateObject private var model = StemPlayerViewModel()
     @State private var importing = false
+    @State private var showingSettings = false
 
     var body: some View {
         ZStack {
             Stem.cream.ignoresSafeArea()
             VStack(spacing: 20) {
+                HStack {
+                    Spacer()
+                    Button { showingSettings = true } label: {
+                        Image(systemName: "gearshape").foregroundStyle(Stem.inkSoft)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 18)
+                }
                 DeviceCircleView(model: model) { importing = true }
                     .frame(maxWidth: 320)
-                    .padding(.top, 24)
 
                 TransportView(model: model)
 
@@ -46,6 +54,42 @@ struct RootView: View {
                 Task { await model.loadFile(url) }
             }
         }
+        .sheet(isPresented: $showingSettings) { SettingsView() }
+    }
+}
+
+/// Settings: the htdemucs queue-server URL. When set, separation runs on the
+/// server for full quality; when empty, the app separates on-device (DSP).
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var serverURL = UserDefaults.standard.string(forKey: "stemacle.serverURL") ?? ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Settings").font(.title3.weight(.semibold))
+                Spacer()
+                Button("Done") {
+                    UserDefaults.standard.set(serverURL, forKey: "stemacle.serverURL")
+                    dismiss()
+                }
+            }
+            Text("Separation server")
+                .font(.subheadline.weight(.medium))
+            TextField("http://192.168.x.x:8008", text: $serverURL)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.URL)
+                #endif
+            Text("When set, tracks are split with full htdemucs quality on the server. Leave empty to split on-device.")
+                .font(.footnote)
+                .foregroundStyle(Stem.inkSoft)
+            Spacer()
+        }
+        .padding(24)
+        .frame(minWidth: 320, minHeight: 220)
     }
 }
 

@@ -43,3 +43,7 @@ native/apple/Stemacle/Resources/Info-*.plist
 native/desktop/target/
 models/build/
 models/.venv-models/
+
+# python
+__pycache__/
+*.pyc
