@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Stemacle Terms of Use</title>
+<meta name="description" content="Terms of use for the Stemacle app and website.">
+<link rel="icon" type="image/png" href="/assets/stemacle-tentacle.png">
+<link rel="apple-touch-icon" href="/assets/stemacle-tentacle.png">
+<style>
+:root {
+  --page: oklch(96% 0.016 84);
+  --page-2: oklch(92% 0.020 83);
+  --paper: oklch(98% 0.006 84);
+  --ink: oklch(23% 0.030 314);
+  --ink-soft: oklch(40% 0.022 314);
+  --line: oklch(74% 0.014 74 / 0.46);
+  --plum: oklch(32% 0.110 315);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(96% 72% at 102% -4%, oklch(76% 0.042 316 / 0.16) 0%, oklch(76% 0.042 316 / 0) 42%),
+    linear-gradient(180deg, var(--page) 0%, var(--page-2) 100%);
+  color: var(--ink);
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+.shell { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 42px; }
+.brand {
+  display: inline-flex; align-items: center; gap: 12px; text-decoration: none;
+  text-transform: uppercase; letter-spacing: 0.3em; font-size: 10px; color: var(--ink-soft);
+}
+.brand img { width: 28px; height: 28px; border-radius: 8px; }
+h1 {
+  margin: 24px 0 10px; font-family: Georgia, "Iowan Old Style", serif;
+  font-size: clamp(42px, 8vw, 76px); line-height: 0.92; font-weight: 600; color: var(--plum);
+}
+p, li { line-height: 1.6; color: var(--ink-soft); }
+.panel {
+  margin-top: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 24px;
+  background: oklch(98% 0.008 84 / 0.78); box-shadow: 0 12px 30px oklch(24% 0.012 70 / 0.08);
+}
+.panel h2 { margin: 0 0 10px; font-family: Georgia, "Iowan Old Style", serif; color: var(--ink); font-size: 24px; }
+.panel ul { margin: 12px 0 0; padding-left: 18px; }
+.note {
+  display: inline-flex; align-items: center; min-height: 38px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px; text-decoration: none;
+}
+.meta { margin-top: 8px; font-size: 13px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+  <main class="shell">
+    <a class="brand" href="/">
+      <img src="/assets/stemacle-tentacle.png" alt="">
+      <span>Stemacle</span>
+    </a>
+    <h1>Terms of Use</h1>
+    <p>These terms cover your use of the Stemacle apps and website. By using Stemacle you agree to them. Keep it simple: use your own music, respect other people's rights, and the tool is provided as is.</p>
+    <p class="meta">Last updated: June 25, 2026.</p>
+
+    <section class="panel">
+      <h2>What Stemacle does</h2>
+      <p>Stemacle separates audio you provide into drums, bass, vocals, and melody stems, and lets you play, loop, and export them. Separation runs on your device by default. You may optionally point the app at a separation server you control for higher-quality results; in that case the audio you choose to split is sent to that server to be processed and returned.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Your responsibility for content</h2>
+      <ul>
+        <li>Only import audio you own or have the right to use.</li>
+        <li>You are responsible for how you use the stems you create, including any sharing, remixing, or publishing.</li>
+        <li>Do not use Stemacle to infringe copyrights or other rights.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>License</h2>
+      <p>Stemacle grants you a personal, non-transferable license to use the app on your devices. The app, its design, and the Stemacle name remain the property of the author. Stems you create from your own audio are yours.</p>
+    </section>
+
+    <section class="panel">
+      <h2>No warranty</h2>
+      <p>Stemacle is provided "as is," without warranties of any kind. Separation quality varies by track and model. To the extent permitted by law, the author is not liable for any loss arising from use of the app, including audio results or data loss.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Changes and contact</h2>
+      <p>These terms may change as Stemacle evolves; the current version stays linked from the app. Privacy is covered separately.</p>
+      <p style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="note" href="/privacy/">Privacy Policy</a>
+        <a class="note" href="/support/">Support</a>
+        <a class="note" href="/">Back to Stemacle</a>
+      </p>
+    </section>
+  </main>
+</body>
+</html>

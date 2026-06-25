@@ -100,7 +100,7 @@ test('landing page is a release-only shelf with durable public links', () => {
   assert.match(html, /v0\.2\.0/);
   assert.match(html, /releases\/download\/v0\.2\.0\/Stemacle-0\.2\.0-arm64\.dmg/);
   assert.match(html, /releases\/download\/v0\.2\.0\/Stemacle-0\.2\.0-arm64-mac\.zip/);
-  assert.match(html, /href="\/ios-coming-soon\/"/);
+  assert.match(html, /href="https:\/\/apps\.apple\.com\/app\/id6782539749"/);
   assert.match(main, /Stemacle/);
   assert.doesNotMatch(html, /stemacle-ios-project-0\.1\.0\.zip/);
   assert.doesNotMatch(html, /href=\"\/app\//);
@@ -161,7 +161,7 @@ test('landing page uses release artwork and responsive tile constraints without 
   assert.match(mobileCss, /\.release-shell \{[\s\S]*?padding:\s*12px;[\s\S]*?\}/);
   assert.match(mobileCss, /\.release-grid \{[\s\S]*?gap:\s*12px;[\s\S]*?\}/);
   assert.match(html, />get for ios<\/a>/i);
-  assert.match(html, /href="\/ios-coming-soon\/"/);
+  assert.match(html, /href="https:\/\/apps\.apple\.com\/app\/id6782539749"/);
   assert.doesNotMatch(html, /Current release signal/);
   assert.doesNotMatch(html, /actions validate it/i);
   assert.doesNotMatch(html, /Split songs into stems/i);
@@ -228,9 +228,10 @@ test('site prepare preserves the perfect /app bundle and redirects only legacy s
 
   assert.match(script, /copyIntoSite\('app'\)/);
   assert.match(script, /copyIntoSite\('apps'\)/);
-  assert.match(script, /copyIntoSite\('ios-coming-soon'\)/);
   assert.match(script, /copyIntoSite\('privacy'\)/);
+  assert.match(script, /copyIntoSite\('terms'\)/);
   assert.match(script, /copyIntoSite\('support'\)/);
+  assert.doesNotMatch(script, /ios-coming-soon/);
   assert.match(script, /\/app\b/);
   assert.match(script, /\/app\/\*/);
   assert.doesNotMatch(script, /'\/app\s+https:\/\/stemacle\.com\/app\s+301'/);
