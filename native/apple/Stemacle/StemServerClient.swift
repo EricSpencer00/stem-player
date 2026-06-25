@@ -20,6 +20,7 @@ struct StemServerClient {
         let status: String
         let stems: [String]
         let error: String?
+        let progress: Int?
     }
 
     /// Upload stereo PCM as a WAV and return the new job id.
@@ -47,9 +48,12 @@ struct StemServerClient {
     }
 
     /// Poll until done, then download and decode all four stems to mono Float.
-    func awaitStems(_ jobID: String, pollSeconds: UInt64 = 2) async throws -> [String: [Float]] {
+    /// `onProgress` receives 0...1 while the job runs.
+    func awaitStems(_ jobID: String, pollSeconds: UInt64 = 1,
+                    onProgress: @MainActor (Double) -> Void = { _ in }) async throws -> [String: [Float]] {
         while true {
             let s = try await status(jobID)
+            await onProgress(Double(s.progress ?? 0) / 100.0)
             if s.status == "done" { break }
             if s.status == "error" {
                 throw NSError(domain: "Stemacle", code: 10,

@@ -162,7 +162,18 @@ struct DeviceCircleView: View {
                 .shadow(color: .black.opacity(0.08), radius: 18, y: 8)
             VStack(spacing: 8) {
                 if model.isProcessing {
-                    ProgressView().controlSize(.large)
+                    if let p = model.splitProgress {
+                        ZStack {
+                            Circle().stroke(Stem.creamDeep, lineWidth: 4).frame(width: 64, height: 64)
+                            Circle().trim(from: 0, to: CGFloat(p))
+                                .stroke(Stem.amber, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                                .rotationEffect(.degrees(-90)).frame(width: 64, height: 64)
+                            Text("\(Int(p * 100))%").font(.caption.monospacedDigit())
+                                .foregroundStyle(Stem.inkSoft)
+                        }
+                    } else {
+                        ProgressView().controlSize(.large)
+                    }
                 } else {
                     Button(action: onLoad) {
                         Image(systemName: "plus.circle")

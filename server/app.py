@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import time
 import uuid
+import wave
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "models"))
@@ -46,8 +48,22 @@ def healthz() -> dict:
     return {"ok": True, "model": MODEL_NAME}
 
 
+def _audio_seconds(path: Path) -> float:
+    try:
+        with wave.open(str(path), "rb") as w:
+            return w.getnframes() / float(w.getframerate() or 44100)
+    except Exception:
+        return 0.0
+
+
+# htdemucs runs ~2.7x realtime on CPU; used to estimate progress.
+REALTIME_FACTOR = 2.7
+
+
 def _run_job(job_id: str, in_path: Path) -> None:
     job = JOBS[job_id]
+    job["t0"] = time.monotonic()
+    job["est"] = max(2.0, _audio_seconds(in_path) / REALTIME_FACTOR)
     try:
         out_dir = WORK / job_id
         separate_to_dir(in_path, out_dir, MODEL_NAME)
@@ -59,6 +75,15 @@ def _run_job(job_id: str, in_path: Path) -> None:
         job["error"] = str(e)
     finally:
         in_path.unlink(missing_ok=True)
+
+
+def _progress(job: dict) -> int:
+    if job["status"] == "done":
+        return 100
+    if job["status"] == "error" or "t0" not in job:
+        return 0
+    elapsed = time.monotonic() - job["t0"]
+    return int(min(99, elapsed / job.get("est", 1.0) * 100))
 
 
 @app.post("/separate")
@@ -76,7 +101,12 @@ def job_status(job_id: str) -> dict:
     job = JOBS.get(job_id)
     if not job:
         raise HTTPException(404, "unknown job")
-    return {"status": job["status"], "stems": job["stems"], "error": job["error"]}
+    return {
+        "status": job["status"],
+        "stems": job["stems"],
+        "error": job["error"],
+        "progress": _progress(job),
+    }
 
 
 @app.get("/jobs/{job_id}/{stem}")

@@ -11,6 +11,8 @@ final class StemPlayerViewModel: ObservableObject {
 
     @Published var status: String = "Drop or choose a track"
     @Published var isProcessing = false
+    /// Separation progress 0...1 (server jobs); nil when indeterminate.
+    @Published var splitProgress: Double?
     @Published var isReady = false
     @Published var isPlaying = false
     @Published var bpm: Float = 120
@@ -127,27 +129,36 @@ final class StemPlayerViewModel: ObservableObject {
     func loadFile(_ url: URL) async {
         isProcessing = true
         isReady = false
+        splitProgress = nil
         status = "Decoding…"
-        defer { isProcessing = false }
+        defer { isProcessing = false; splitProgress = nil }
 
         do {
             let (left, right) = try decodeStereo44k(url)
 
             // Prefer the high-quality htdemucs queue server when configured;
-            // otherwise separate on-device with the shared DSP core.
+            // fall back to the on-device DSP core if it's unreachable or fails.
             if let server = StemServerClient.configured() {
-                status = "Separating (htdemucs, server)…"
-                let jobID = try await server.submit(left: left, right: right, sampleRate: 44100)
-                let stems = try await server.awaitStems(jobID)
-                // tempo still comes from the on-device core (fast, deterministic).
-                let t = Stemacle.separate(left: left, right: right, sampleRate: 44100)
-                finishLoading(stems, bpm: t?.bpm ?? 120,
-                              measureOffset: t?.measureOffset ?? 0, beatOffset: t?.beatOffset ?? 0,
-                              quality: "htdemucs")
-                return
+                do {
+                    status = "Splitting in the background (htdemucs)…"
+                    splitProgress = 0
+                    let jobID = try await server.submit(left: left, right: right, sampleRate: 44100)
+                    let stems = try await server.awaitStems(jobID) { p in
+                        self.splitProgress = p
+                        self.status = "Splitting… \(Int(p * 100))%"
+                    }
+                    let t = Stemacle.separate(left: left, right: right, sampleRate: 44100)
+                    finishLoading(stems, bpm: t?.bpm ?? 120,
+                                  measureOffset: t?.measureOffset ?? 0, beatOffset: t?.beatOffset ?? 0,
+                                  quality: "htdemucs")
+                    return
+                } catch {
+                    splitProgress = nil
+                    status = "Server unavailable, splitting on-device…"
+                }
             }
 
-            status = "Separating…"
+            status = isProcessing ? status : "Separating…"
             // Hop heavy work off the main actor.
             let result: StemSplit? = await Task.detached(priority: .userInitiated) {
                 Stemacle.separate(left: left, right: right, sampleRate: 44100)
