@@ -12,3 +12,4 @@ crate-type = ["lib", "staticlib"]
 [dependencies]
 
 [dev-dependencies]
+serde_json = "1"

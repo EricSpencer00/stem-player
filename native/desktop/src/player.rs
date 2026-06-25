@@ -142,6 +142,22 @@ impl Player {
         if audible { self.volumes[stem].clamp(0.0, 1.0) } else { 0.0 }
     }
 
+    /// Effective gains for all four stems, in canonical order.
+    pub fn effective_gains(&self) -> [f32; 4] {
+        [
+            self.effective_gain(0),
+            self.effective_gain(1),
+            self.effective_gain(2),
+            self.effective_gain(3),
+        ]
+    }
+
+    /// The four stems as owned buffers in canonical order (drums, vocals, bass, melody).
+    pub fn stem_buffers(&self) -> Option<[Vec<f32>; 4]> {
+        let s = self.split.as_ref()?;
+        Some([s.drums.clone(), s.vocals.clone(), s.bass.clone(), s.melody.clone()])
+    }
+
     /// Export the four stems next to `dir` as `<stem>.wav`.
     pub fn export_stems(&self, dir: &Path) -> Result<(), String> {
         let split = self.split.as_ref().ok_or("nothing loaded")?;

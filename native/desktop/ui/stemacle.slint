@@ -19,6 +19,7 @@ export component MainWindow inherits Window {
 
     in property <string> status: "Drop or choose a track";
     in property <bool> ready: false;
+    in property <bool> playing: false;
     in-out property <[StemRow]> stems: [
         { name: "Drums", volume: 0.8, muted: false, soloed: false },
         { name: "Vocals", volume: 0.8, muted: false, soloed: false },
@@ -28,6 +29,8 @@ export component MainWindow inherits Window {
 
     callback load-clicked();
     callback export-clicked();
+    callback play-clicked();
+    callback stop-clicked();
     callback volume-changed(int, float);
     callback mute-toggled(int);
     callback solo-toggled(int);
@@ -65,6 +68,22 @@ export component MainWindow inherits Window {
                         horizontal-alignment: center;
                     }
                 }
+            }
+        }
+
+        // Transport.
+        HorizontalLayout {
+            alignment: center;
+            spacing: 16px;
+            Button {
+                text: root.playing ? "⏸ Pause" : "▶ Play";
+                enabled: root.ready;
+                clicked => { root.play-clicked(); }
+            }
+            Button {
+                text: "⏹ Stop";
+                enabled: root.ready;
+                clicked => { root.stop-clicked(); }
             }
         }
 

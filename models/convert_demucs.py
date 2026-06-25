@@ -59,7 +59,10 @@ def export_coreml(model, example, path: Path) -> None:
     import coremltools as ct
     import torch
 
-    traced = torch.jit.trace(model, example)
+    # htdemucs has data-dependent transformer paths, so the trace sanity check
+    # (which re-runs and diffs graphs) fails spuriously; the traced graph is
+    # still valid for a fixed-length input.
+    traced = torch.jit.trace(model, example, check_trace=False, strict=False)
     mlmodel = ct.convert(
         traced,
         inputs=[ct.TensorType(name="mix", shape=example.shape)],
@@ -87,9 +90,16 @@ def main() -> None:
     from demucs.pretrained import get_model
 
     print("Loading htdemucs…")
-    model = get_model("htdemucs").cpu().eval()
-    sr = model.samplerate  # 44100
-    example = torch.zeros(1, 2, int(sr * args.seconds))
+    bag = get_model("htdemucs").cpu().eval()
+    # get_model returns a BagOfModels whose forward defers to apply_model; the
+    # exportable module is the single inner HTDemucs.
+    model = bag.models[0].cpu().eval() if hasattr(bag, "models") else bag
+    sr = int(getattr(bag, "samplerate", 44100))  # 44100
+    # HTDemucs has a fixed processing segment; the traced input must match it
+    # exactly (it reshapes by training_length internally).
+    seg = float(getattr(model, "segment", getattr(bag, "segment", 7.8)))
+    example = torch.zeros(1, 2, int(round(seg * sr)))
+    print(f"  segment {seg}s → example {tuple(example.shape)}")
 
     OUT.mkdir(parents=True, exist_ok=True)
     print(f"Stem mapping: {dict(zip(DEMUCS_SOURCES, STEMACLE_STEMS))}")

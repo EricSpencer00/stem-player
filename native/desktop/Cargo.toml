@@ -13,6 +13,7 @@ path = "src/main.rs"
 stemacle-dsp = { path = "../core/stemacle-dsp" }
 slint = "=1.8.0"
 rfd = "0.15"
+cpal = "0.15"
 
 [build-dependencies]
 slint-build = "=1.8.0"

@@ -27,6 +27,27 @@ python models/convert_demucs.py --onnx     # ONNX only
 The script is dependency-checked and side-effect-free until run, so it is safe
 to keep in the repo on environments without torch.
 
+## Conversion status (measured, not assumed)
+
+Ran end-to-end in a Python 3.11 venv with `torch 2.12.1 + demucs + coremltools +
+onnxscript`:
+
+- ✅ `htdemucs` weights download and the inner `HTDemucs` module loads.
+- ✅ `torch.jit.trace(..., check_trace=False)` traces at the correct 7.8 s
+  segment length (the script handles the `BagOfModels` unwrap + segment length).
+- ❌ **CoreML export** fails inside MIL op conversion
+  (`TypeError: only 0-dimensional arrays can be converted to Python scalars`) —
+  a coremltools/htdemucs incompatibility; coremltools is only tested up to
+  torch 2.7, and htdemucs's hybrid STFT/transformer ops don't all lower cleanly.
+- ❌ **ONNX export** likewise needs a conversion-friendly wrapper.
+
+**Path forward** (known, scoped): pin `torch==2.7` (coremltools-tested) and/or
+wrap `HTDemucs.forward` to replace `torch.stft`/`istft` with conversion-safe ops
+and split the spectral/temporal merge. Until then the apps run the **tested DSP
+fallback** — so this is a quality upgrade that is staged, not a blocker. The
+script gets the pipeline to the exact failure point so the remaining work is
+well-defined.
+
 ## Integration status
 
 - The shared Rust core (`native/core/stemacle-dsp`) exposes a `Separator` trait.
