@@ -50,6 +50,10 @@ function loadSupportHtml() {
   return readFileSync(new URL('../support/index.html', import.meta.url), 'utf8');
 }
 
+function loadTermsHtml() {
+  return readFileSync(new URL('../terms/index.html', import.meta.url), 'utf8');
+}
+
 function loadReleaseWorkflow() {
   return readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
 }
@@ -171,15 +175,26 @@ test('landing page uses release artwork and responsive tile constraints without 
 
 test('privacy and support pages are real public destinations', () => {
   const privacy = loadPrivacyHtml();
+  const terms = loadTermsHtml();
   const support = loadSupportHtml();
 
   assert.match(privacy, /<title>Stemacle Privacy Policy<\/title>/);
+  assert.match(privacy, /Last updated: June 26, 2026/);
   assert.match(privacy, /What stays local/);
   assert.match(privacy, /What we do not collect/);
+  assert.match(privacy, /Stemacle does not upload your songs/);
+  assert.match(privacy, /No accounts/);
+  assert.doesNotMatch(privacy, /optional separation server|server address|htdemucs|Demucs|model/i);
+  assert.match(terms, /<title>Stemacle Terms of Use<\/title>/);
+  assert.match(terms, /Last updated: June 26, 2026/);
+  assert.match(terms, /Use music you have the right to use/);
+  assert.doesNotMatch(terms, /separation server|server you control|model/i);
   assert.match(privacy, /Back to Stemacle/);
   assert.match(support, /<title>Stemacle Support<\/title>/);
-  assert.match(support, /Open GitHub issue/);
-  assert.match(support, /Leave a Review/);
+  assert.match(support, /Email Support/);
+  assert.match(support, /Rate Stemacle/);
+  assert.match(support, /href="mailto:support@stemacle.com/);
+  assert.doesNotMatch(support, /GitHub issue|repository|server/i);
   assert.match(support, /id="review"/);
 });
 
@@ -837,6 +852,32 @@ test('touch controls keep fixed hit areas when labels change', () => {
   assert.match(html, /\.timeline-wrap\s*\{(?=[^}]*height:\s*28px;)/s);
 });
 
+test('browser DSP fallback gates centered low bass out of the vocal mask', () => {
+  const html = loadHtml();
+
+  assert.match(html, /function vocalMaskWeightForBin\(bin\)/);
+  assert.match(html, /vocalMaskWeightForBin\(b\)/);
+  assert.match(html, /const freq = bin \* SR \/ FFT_SIZE/);
+  assert.match(html, /if\(freq < 120\) return 0/);
+});
+
+test('browser DSP fallback ducks vocal masking on transient frames', () => {
+  const html = loadHtml();
+
+  assert.match(html, /function transientWeights\(magL,\s*magR,\s*F\)/);
+  assert.match(html, /const transient = transientWeights\(magL,\s*magR,\s*F\)/);
+  assert.match(html, /const attackDuck = 1 - 0\.9 \* transient\[f\]/);
+  assert.match(html, /vocalMaskWeightForBin\(b\) \* attackDuck/);
+});
+
+test('browser bass melody split uses a soft low-mid crossover', () => {
+  const html = loadHtml();
+
+  assert.match(html, /function softLowPass\(re,\s*im,\s*F,\s*B,\s*lowHz,\s*highHz\)/);
+  assert.match(html, /0\.5 \+ 0\.5 \* Math\.cos\(Math\.PI \* t\)/);
+  assert.match(html, /softLowPass\(hRe,\s*hIm,\s*F,\s*TOT_BINS,\s*220,\s*380\)/);
+});
+
 test('tempo estimator recovers beat tempo and beat-grid offset', () => {
   const { app } = loadApp();
   const { signal, sampleRate } = makePulseTrain({ bpm: 96, offset: 0.18 });
@@ -900,6 +941,18 @@ test('loop end snaps to the next selected subdivision on the measured bar grid',
   assertAlmostEqual(app.snapLoopEnd(3.0, 0.6), 3.25);
   assertAlmostEqual(app.snapLoopEnd(2.651, 0.6), 2.65);
   assertAlmostEqual(app.snapLoopEnd(4.7), 5.05);
+});
+
+test('loop snapping survives corrupted tempo metadata with finite fallback points', () => {
+  const { app } = loadApp();
+  app.state.duration = 30;
+  app.state.bpm = Number.NaN;
+  app.state.measureOffset = Number.NaN;
+  app.state.beatOffset = Number.NaN;
+
+  assertAlmostEqual(app.measureLength(), 2);
+  assertAlmostEqual(app.snapLoopStart(3, Number.NaN), 2);
+  assertAlmostEqual(app.snapLoopEnd(3, Number.NaN), 4);
 });
 
 test('decode setup does not wait forever when Safari keeps AudioContext suspended', async () => {

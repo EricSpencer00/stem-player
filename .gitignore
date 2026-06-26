@@ -47,3 +47,9 @@ models/.venv-models/
 # python
 __pycache__/
 *.pyc
+
+# Per-user Xcode/SwiftPM IDE state
+native/apple/**/.swiftpm/
+
+# Agent-mode scratch outputs
+outputs/

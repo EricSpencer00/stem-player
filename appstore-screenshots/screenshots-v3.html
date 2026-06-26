@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stemacle App Store Screenshots</title>
+<style>
+:root {
+  --cream: #f4efe6;
+  --cream-deep: #e7ddcf;
+  --ink: #302936;
+  --ink-soft: #685f6d;
+  --plum: #6b578f;
+  --amber: #d49b48;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 32px;
+  background: #d9d1c5;
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(4, 428px);
+  gap: 24px;
+  align-items: start;
+}
+.shot {
+  position: relative;
+  width: 428px;
+  height: 926px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 8%, #faf7ef 0 18%, transparent 44%),
+    linear-gradient(180deg, var(--cream), var(--cream-deep));
+  border-radius: 32px;
+  box-shadow: 0 28px 70px rgb(48 41 54 / 0.18);
+}
+.copy {
+  position: absolute;
+  left: 34px;
+  right: 34px;
+}
+.copy h2 {
+  margin: 0;
+  color: var(--plum);
+  font-size: 44px;
+  line-height: 0.98;
+  letter-spacing: 0;
+  font-weight: 720;
+}
+.copy p {
+  margin: 16px 0 0;
+  color: var(--ink-soft);
+  font-size: 18px;
+  line-height: 1.42;
+}
+.phone-card,
+.panel,
+.track,
+.result-card,
+.files,
+.flow {
+  position: absolute;
+  left: 34px;
+  right: 34px;
+  border: 1px solid rgb(104 95 109 / 0.18);
+  background: rgb(250 247 239 / 0.72);
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7), 0 18px 45px rgb(48 41 54 / 0.12);
+}
+.s1-copy { top: 56px; }
+.s1-track { top: 314px; height: 184px; }
+.s1-result { top: 548px; height: 294px; }
+.wave {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 64px;
+  height: 52px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 15px, rgb(107 87 143 / 0.18) 15px 18px),
+    linear-gradient(180deg, transparent 0 44%, rgb(48 41 54 / 0.18) 44% 56%, transparent 56%);
+  border-radius: 14px;
+}
+.stem-list {
+  display: grid;
+  gap: 12px;
+  padding: 26px;
+}
+.stem-pill {
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(107 87 143 / 0.14), rgb(212 155 72 / 0.18));
+}
+.s2-copy { top: 56px; }
+.s2-files { top: 286px; height: 170px; padding: 22px; }
+.s2-flow {
+  top: 506px;
+  height: 322px;
+  display: grid;
+  place-items: center;
+}
+.file-row {
+  height: 34px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgb(48 41 54 / 0.08);
+}
+.import-note {
+  position: absolute;
+  left: 28px;
+  top: 135px;
+  width: 118px;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.25;
+  text-align: right;
+}
+.drop-disc {
+  position: absolute;
+  left: 168px;
+  top: 96px;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--plum);
+  font-size: 52px;
+  background: radial-gradient(circle at 36% 30%, #f8f3ea, #e1d6c8);
+  box-shadow: inset 0 2px 7px rgb(255 255 255 / 0.72), 0 16px 34px rgb(48 41 54 / 0.15);
+}
+.s3-copy { top: 56px; }
+.s3-panel {
+  top: 334px;
+  height: 454px;
+  padding: 24px;
+}
+.library-row {
+  height: 76px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  background: rgb(48 41 54 / 0.07);
+  position: relative;
+}
+.library-row::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 15px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--plum);
+  opacity: 0.42;
+}
+.s4-copy { top: 56px; }
+.s4-panel {
+  top: 288px;
+  height: 546px;
+  padding: 20px;
+}
+.toolbar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+.toolbar-btn {
+  min-width: 156px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.control-strip {
+  display: grid;
+  grid-template-columns: 68px minmax(92px, 1fr) 54px;
+  gap: 12px;
+  align-items: center;
+  height: 66px;
+  border-top: 1px solid rgb(104 95 109 / 0.16);
+}
+.stem-name {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.slider {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--plum) 0 72%, rgb(104 95 109 / 0.18) 72%);
+}
+.mute-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(107 87 143 / 0.16);
+  justify-self: end;
+}
+</style>
+</head>
+<body>
+<main class="sheet" aria-label="Stemacle App Store screenshot set">
+  <section class="shot" id="s1">
+    <div class="copy s1-copy">
+      <h2>Split songs into stems.</h2>
+      <p>Drums, vocals, bass, and melody stay local, playable, and ready to loop.</p>
+    </div>
+    <div class="track s1-track">
+      <div class="wave"></div>
+    </div>
+    <div class="result-card s1-result">
+      <div class="stem-list">
+        <div class="stem-pill"></div>
+        <div class="stem-pill"></div>
+        <div class="stem-pill"></div>
+        <div class="stem-pill"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="shot" id="s2">
+    <div class="copy s2-copy">
+      <h2>Drop in any track.</h2>
+      <p>Import from Files, split in the background, and reopen cached songs instantly.</p>
+    </div>
+    <div class="files s2-files">
+      <div class="file-row"></div>
+      <div class="file-row"></div>
+      <div class="file-row"></div>
+    </div>
+    <div class="flow s2-flow">
+      <div class="import-note">Choose audio or try the bundled sample.</div>
+      <div class="drop-disc">+</div>
+    </div>
+  </section>
+
+  <section class="shot" id="s3">
+    <div class="copy s3-copy">
+      <h2>Your split library.</h2>
+      <p>Every finished project lands in a local library, so the second open is instant.</p>
+    </div>
+    <div class="panel s3-panel">
+      <div class="library-row"></div>
+      <div class="library-row"></div>
+      <div class="library-row"></div>
+      <div class="library-row"></div>
+    </div>
+  </section>
+
+  <section class="shot" id="s4">
+    <div class="copy s4-copy">
+      <h2>Loop and mute fast.</h2>
+      <p>Each stem gets tactile volume, mute, solo, and snapped loop controls.</p>
+    </div>
+    <div class="panel s4-panel">
+      <div class="toolbar"><div class="toolbar-btn">Mute all</div></div>
+      <div class="control-strip"><div class="stem-name">Drums</div><div class="slider"></div><div class="mute-dot"></div></div>
+      <div class="control-strip"><div class="stem-name">Vocals</div><div class="slider"></div><div class="mute-dot"></div></div>
+      <div class="control-strip"><div class="stem-name">Bass</div><div class="slider"></div><div class="mute-dot"></div></div>
+      <div class="control-strip"><div class="stem-name">Melody</div><div class="slider"></div><div class="mute-dot"></div></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -114,6 +114,15 @@ function screenshotPath(name) {
   return resolve(dir, name);
 }
 
+function intersects(a, b, gap = 0) {
+  return !(
+    a.right + gap <= b.left ||
+    b.right + gap <= a.left ||
+    a.bottom + gap <= b.top ||
+    b.bottom + gap <= a.top
+  );
+}
+
 // ===========================================================================
 // 1. Boot + structural parity
 // ===========================================================================
@@ -202,6 +211,74 @@ browserTest('canonical web app exposes the center circle, play button, and level
     }));
     for (const [key, present] of Object.entries(ids)) {
       assert.equal(present, true, `expected #${key} in the canonical web app`);
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+browserTest('canonical web app keeps key idle controls visible and non-overlapping across viewports', async () => {
+  const page = await browser.newPage();
+  const viewports = [
+    { width: 390, height: 844, name: 'phone' },
+    { width: 1280, height: 800, name: 'desktop' },
+  ];
+
+  try {
+    for (const viewport of viewports) {
+      await page.setViewport({ ...viewport, deviceScaleFactor: 1 });
+      await loadApp(page);
+      const boxes = await page.evaluate(() => {
+        const selectors = {
+          device: '#device',
+          center: '#center',
+          samples: '#sampleRows',
+          hint: '#hint',
+          transport: '#playbar',
+          stemsPanel: '#stems-panel',
+        };
+        return Object.fromEntries(Object.entries(selectors).map(([name, selector]) => {
+          const el = document.querySelector(selector);
+          if (!el) return [name, null];
+          const style = getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          return [name, {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+            display: style.display,
+            visibility: style.visibility,
+            opacity: Number(style.opacity),
+            text: el.textContent.trim(),
+          }];
+        }));
+      });
+
+      for (const [name, box] of Object.entries(boxes)) {
+        assert.ok(box, `${viewport.name}: expected ${name}`);
+        assert.notEqual(box.visibility, 'hidden', `${viewport.name}: ${name} should not be visibility:hidden`);
+      }
+
+      for (const name of ['device', 'center', 'samples', 'hint']) {
+        assert.ok(
+          boxes[name].width > 0 && boxes[name].height > 0,
+          `${viewport.name}: ${name} should occupy space`,
+        );
+      }
+
+      assert.equal(boxes.transport.display, 'none', `${viewport.name}: transport stays hidden while idle`);
+      assert.equal(boxes.stemsPanel.display, 'none', `${viewport.name}: stems panel stays hidden while idle`);
+      assert.ok(boxes.samples.text.length > 0, `${viewport.name}: sample text should be visible`);
+      assert.ok(!intersects(boxes.device, boxes.samples, 4), `${viewport.name}: device and sample rows should not overlap`);
+      assert.ok(boxes.hint.text.length > 0, `${viewport.name}: hint text should be visible`);
+      assert.ok(!intersects(boxes.samples, boxes.hint, 4), `${viewport.name}: sample rows and hint should not overlap`);
+      assert.ok(
+        boxes.device.bottom < viewport.height && boxes.samples.bottom <= viewport.height,
+        `${viewport.name}: idle call-to-action should fit inside the first viewport`,
+      );
     }
   } finally {
     await page.close();
@@ -384,28 +461,26 @@ browserTest('loop button toggles the aria-pressed / active class for the right s
 });
 
 // ===========================================================================
-// 4. Native / desktop shell parity
+// 4. Native app download handoff
 // ===========================================================================
 
-browserTest('native desktop shell loads and exposes the iOS nav and the bundled apps', async () => {
+browserTest('Stem Shuffle native handoff points at the release shelf, not a removed native web shell', async () => {
   const page = await newPage();
   try {
-    const url = `${serverHandle.url}/native/index.html`;
+    const url = `${serverHandle.url}/apps/stem-shuffle/index.html`;
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await page.waitForSelector('body[data-surface], .shell', { timeout: 5000 });
+    await page.waitForSelector('.actions a', { timeout: 5000 });
 
-    // The desktop shell always has the four view routes wired.
-    for (const view of ['home', 'projects', 'library', 'settings']) {
-      const present = await page.$(`[data-ios-view="${view}"]`);
-      assert.ok(present, `expected data-ios-view="${view}" in native/index.html`);
-    }
+    const links = await page.$$eval('.actions a', (anchors) =>
+      anchors.map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href') }))
+    );
+    assert.deepEqual(links, [
+      { text: 'Open Stem Splitter', href: '/app/' },
+      { text: 'Get native apps', href: '/' },
+    ]);
 
-    // The desktop shell has the iOS platform pill and the desktop
-    // library controls, per the parity contract.
-    const platforms = await page.$$eval('.platforms span', (els) => els.map((e) => e.textContent.trim()));
-    assert.ok(platforms.includes('iOS'), 'native shell should advertise the iOS surface');
-
-    await page.screenshot({ path: screenshotPath('native-idle.png'), fullPage: false });
+    await page.goto(`${serverHandle.url}/`, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.waitForSelector('[data-release="mac-dmg"], [data-release="ios"]', { timeout: 5000 });
   } finally {
     await page.close();
   }

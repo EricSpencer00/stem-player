@@ -25,10 +25,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "models"))
 from stemacle_sep import STEM_ORDER, load_model, separate_to_dir  # noqa: E402
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 MODEL_NAME = "htdemucs"
+ALLOWED_MODELS = {"htdemucs", "htdemucs_ft", "mdx_extra"}
 app = FastAPI(title="Stemacle Separation Queue")
 
 # In-memory job store: id -> {status, dir, stems, error}.
@@ -60,13 +61,13 @@ def _audio_seconds(path: Path) -> float:
 REALTIME_FACTOR = 2.7
 
 
-def _run_job(job_id: str, in_path: Path) -> None:
+def _run_job(job_id: str, in_path: Path, model: str) -> None:
     job = JOBS[job_id]
     job["t0"] = time.monotonic()
     job["est"] = max(2.0, _audio_seconds(in_path) / REALTIME_FACTOR)
     try:
         out_dir = WORK / job_id
-        separate_to_dir(in_path, out_dir, MODEL_NAME)
+        separate_to_dir(in_path, out_dir, model)
         job["dir"] = str(out_dir)
         job["stems"] = STEM_ORDER
         job["status"] = "done"
@@ -87,13 +88,15 @@ def _progress(job: dict) -> int:
 
 
 @app.post("/separate")
-async def separate(file: UploadFile, background: BackgroundTasks) -> JSONResponse:
+async def separate(file: UploadFile, background: BackgroundTasks,
+                   model: str = Form(MODEL_NAME)) -> JSONResponse:
+    chosen = model if model in ALLOWED_MODELS else MODEL_NAME
     job_id = uuid.uuid4().hex
     in_path = WORK / f"{job_id}-in{Path(file.filename or '').suffix or '.wav'}"
     in_path.write_bytes(await file.read())
     JOBS[job_id] = {"status": "processing", "stems": [], "dir": None, "error": None}
-    background.add_task(_run_job, job_id, in_path)
-    return JSONResponse({"job_id": job_id, "status": "processing"})
+    background.add_task(_run_job, job_id, in_path, chosen)
+    return JSONResponse({"job_id": job_id, "status": "processing", "model": chosen})
 
 
 @app.get("/jobs/{job_id}")

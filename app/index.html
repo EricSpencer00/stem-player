@@ -1295,7 +1295,8 @@ function estimateTempo(signal, sampleRate){
 }
 
 function measureLength(){
-  return (60 / clamp(state.bpm, BPM_MIN, BPM_MAX)) * BEATS_PER_MEASURE;
+  const bpm = Number.isFinite(state.bpm) ? clamp(state.bpm, BPM_MIN, BPM_MAX) : BPM_FALLBACK;
+  return (60 / bpm) * BEATS_PER_MEASURE;
 }
 
 function beatLength(){
@@ -1641,6 +1642,27 @@ function lowPass(re,im,F,B,hz){
   for(let f=0;f<F;f++){for(let b=cut;b<B;b++){lRe[f][b]=0;lIm[f][b]=0;}for(let b=0;b<cut;b++){hRe[f][b]=0;hIm[f][b]=0;}}
   return {lRe,lIm,hRe,hIm};
 }
+function softLowPass(re,im,F,B,lowHz,highHz){
+  const lRe=re.map(()=>new Float32Array(B)),lIm=im.map(()=>new Float32Array(B));
+  const hRe=re.map(()=>new Float32Array(B)),hIm=im.map(()=>new Float32Array(B));
+  const binHz=SR/FFT_SIZE;
+  for(let f=0;f<F;f++){
+    for(let b=0;b<B;b++){
+      const freq=b*binHz;
+      let lowWeight;
+      if(freq<=lowHz) lowWeight=1;
+      else if(freq>=highHz) lowWeight=0;
+      else {
+        const t=(freq-lowHz)/(highHz-lowHz);
+        lowWeight=0.5 + 0.5 * Math.cos(Math.PI * t);
+      }
+      const highWeight=1-lowWeight;
+      lRe[f][b]=re[f][b]*lowWeight; lIm[f][b]=im[f][b]*lowWeight;
+      hRe[f][b]=re[f][b]*highWeight; hIm[f][b]=im[f][b]*highWeight;
+    }
+  }
+  return {lRe,lIm,hRe,hIm};
+}
 
 // ── ONNX ──
 let vSess=null, aSess=null;
@@ -1808,6 +1830,31 @@ function finishProcessingJob(job){
   updateSampleRowsVisibility();
 }
 
+function vocalMaskWeightForBin(bin){
+  const freq = bin * SR / FFT_SIZE;
+  if(freq < 120) return 0;
+  if(freq < 240) return (freq - 120) / 120;
+  if(freq <= 3400) return 1;
+  if(freq < 6000) return 1 - ((freq - 3400) / 2600);
+  return 0;
+}
+function transientWeights(magL, magR, F){
+  const weights = new Float32Array(F);
+  const prev = new Float32Array(MODEL_BINS);
+  for(let f=0; f<F; f++){
+    let flux = 0, energy = 0;
+    for(let b=4; b<MODEL_BINS; b++){
+      const cur = (magL[f][b] + magR[f][b]) * 0.5;
+      energy += cur;
+      flux += Math.max(0, cur - prev[b]);
+      prev[b] = cur;
+    }
+    const novelty = flux / (energy + 1e-8);
+    weights[f] = Math.max(0, Math.min(1, (novelty - 0.18) / 0.42));
+  }
+  return weights;
+}
+
 // ── pipeline ──
 async function separateAudio(arrayBuf,onProg){
   const step=async(p,m)=>{if(onProg)await onProg(p,m);};
@@ -1840,6 +1887,7 @@ async function separateAudio(arrayBuf,onProg){
   const magR=await buildMagnitude(stR,p=>step(38+4*p,'Measuring right channel…'));
 
   const vMask=new Float32Array(F*MODEL_BINS);  // vocal soft mask per (frame,bin)
+  const transient = transientWeights(magL, magR, F);
 
   if(vSess&&aSess){
     const nSeg=Math.ceil(F/SEG_FRAMES);
@@ -1858,7 +1906,7 @@ async function separateAudio(arrayBuf,onProg){
         const bL=(0*SEG_FRAMES+fr)*MODEL_BINS, bR=(1*SEG_FRAMES+fr)*MODEL_BINS;
         for(let b=0;b<MODEL_BINS;b++){
           const vp=ve[bL+b]**2+ve[bR+b]**2, ap=ae[bL+b]**2+ae[bR+b]**2;
-          vMask[f*MODEL_BINS+b]=vp/(vp+ap+1e-10);
+          vMask[f*MODEL_BINS+b]=(vp/(vp+ap+1e-10)) * vocalMaskWeightForBin(b);
         }
       }
       await step(44+24*(seg+1)/nSeg,`Separating vocals ${seg+1}/${nSeg}…`);
@@ -1866,9 +1914,10 @@ async function separateAudio(arrayBuf,onProg){
   } else {
     const stride=Math.max(1,Math.floor(F/24));
     for(let f=0;f<F;f++){
+      const attackDuck = 1 - 0.9 * transient[f];
       for(let b=0;b<MODEL_BINS;b++){
       const l=magL[f][b],r=magR[f][b];
-      vMask[f*MODEL_BINS+b]=Math.min(l,r)/(0.5*(l+r)+1e-8);
+      vMask[f*MODEL_BINS+b]=(Math.min(l,r)/(0.5*(l+r)+1e-8)) * vocalMaskWeightForBin(b) * attackDuck;
       }
       if(f%stride===0||f===F-1)await step(44+24*(f+1)/F,'Separating vocals with browser DSP…');
     }
@@ -1890,7 +1939,7 @@ async function separateAudio(arrayBuf,onProg){
 
   const {hRe,hIm,pRe,pIm}=await hpss(aRe,aIm,F,TOT_BINS,(p,m)=>step(74+8*p,m));
   await step(83,'Extracting bass…');
-  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=lowPass(hRe,hIm,F,TOT_BINS,300);
+  const {lRe:bsRe,lIm:bsIm,hRe:mlRe,hIm:mlIm}=softLowPass(hRe,hIm,F,TOT_BINS,220,380);
 
   await step(86,'Synthesizing stems…');
   const dur=raw.duration;

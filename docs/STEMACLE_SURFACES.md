@@ -18,9 +18,11 @@
 
 Stemacle has one identity across web, desktop, and iOS: the warm matte circle,
 four-stem controls, loop contract, local-first privacy model, and purple tentacle
-artwork stay recognizable everywhere. The web app is the gold master. Desktop and
-iOS are separate native parity-plus surfaces. They share the same product DNA, but
-they do not share navigation language or ownership.
+artwork stay recognizable everywhere. Web app, native desktop macOS app, and
+native iOS app are three distinct product surfaces. The web app is not the macOS
+app. The web app is the gold master. Desktop and iOS are separate native
+parity-plus surfaces. They share the same product DNA, but they do not share
+navigation language or ownership.
 
 ## Web App
 
@@ -39,12 +41,13 @@ Best for:
 - preserving the full web player contract
 - validating UI and loop behavior before native surfaces borrow it
 
-## Desktop App
+## Native Desktop macOS App
 
-Desktop is the SwiftUI Mac app in `native/macos`. The desktop product direction is
-not an Electron wrapper around a website. SwiftUI owns the native workbench and
-must make the app feel like the same perfect Stemacle splitter, elevated with
-desktop power.
+The native desktop macOS app is the SwiftUI `StemacleMac` target in
+`native/apple`. The desktop product direction is not the web app, not an
+Electron wrapper around a website, and not the Windows/Linux Slint app. SwiftUI
+owns the native macOS workbench and must make the app feel like the same perfect
+Stemacle splitter, elevated with desktop power.
 
 The desktop app must match the web app first:
 
@@ -56,8 +59,7 @@ The desktop app must match the web app first:
 
 Then desktop should go above and beyond:
 
-- SwiftUI app shell in `native/macos`
-- WKWebView loading of the prepared local `/app/` and `/apps/stem-shuffle/` bundles
+- SwiftUI app shell in `native/apple` through the `StemacleMac` scheme
 - native `NSOpenPanel` file and folder intake
 - local library list with reveal-in-Finder actions
 - project history and saved loop/shuffle ideas
@@ -73,13 +75,13 @@ Any compatibility package that still uses a web workbench should follow this Swi
 desktop direction where possible and must not redefine the product direction away
 from SwiftUI parity-plus.
 
-## iOS App
+## Native iOS App
 
-The iOS app is the SwiftUI mobile app in `native/ios`. Like desktop, it must match
-the perfect web app first, then add mobile-native strengths. It boots a SwiftUI
-shell from `AppDelegate`, uses iOS navigation patterns (`TabView`,
-`NavigationStack`, menus, sheets, document picker, lists, toggles), and compiles
-the splitter into Swift through `NativeStemSplitter`. Capacitor remains useful as
+The native iOS app is the SwiftUI `StemacleiOS` target in `native/apple`. Like
+desktop, it must match the perfect web app first, then add mobile-native
+strengths. It uses iOS navigation patterns (`TabView`, `NavigationStack`, menus,
+sheets, document picker, lists, toggles) and compiles the splitter into Swift
+through `StemacleKit` and `StemacleCore.xcframework`. Capacitor remains useful as
 a packaging/resource legacy, but it is no longer the iOS runtime direction.
 
 iOS must keep the same tactile splitter and visual parity with the web player:
@@ -130,9 +132,9 @@ Every release should verify all surfaces:
 - web bundle: `npm run site:prepare`
 - canonical web app availability at `https://stemacle.com/app/`
 - legacy redirect from `https://ericspencer.us/stem-player` to `https://stemacle.com/app/`
-- desktop SwiftUI bundle: `npm run macos:package` on macOS with release signing credentials for distribution
+- desktop SwiftUI bundle: `xcodebuild -project native/apple/Stemacle.xcodeproj -scheme StemacleMac -configuration Debug -destination 'platform=macOS' build`
 - iOS resources: `npm run native:prepare`
-- iOS native compile: `xcodebuild -project native/ios/App/App.xcodeproj -scheme Stemacle -configuration Debug -destination 'platform=iOS Simulator,name=<available simulator>' build`
+- iOS native compile: `xcodebuild -project native/apple/Stemacle.xcodeproj -scheme StemacleiOS -configuration Debug -destination 'platform=iOS Simulator,name=<available simulator>' build`
 - regression suite: `npm test`
 
 Stemacle.com points at the Cloudflare Pages output in `dist/site`. The current web app remains perfect at `/app/`. Desktop and iOS now compile native SwiftUI surfaces that must match the web app before adding their own platform features.
