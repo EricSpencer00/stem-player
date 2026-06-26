@@ -12,4 +12,5 @@ enum Stem {
     static let amber = Color(red: 0.85, green: 0.62, blue: 0.28)
 
     static let stemOrder = ["drums", "vocals", "bass", "melody"]
+    static let minimumHitTarget: CGFloat = 44
 }

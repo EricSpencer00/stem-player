@@ -1,11 +1,13 @@
 import AVFoundation
 import Foundation
+import StemacleKit
 
 /// Four-stem playback engine on `AVAudioEngine`. One `AVAudioPlayerNode` per
 /// stem feeds a shared mixer, giving per-stem volume, mute, headphones (solo)
 /// isolation, and **independent per-stem looping** — the web app's loop contract.
 final class StemAudioEngine {
     static let sampleRate: Double = 44100
+    static let outputCeiling: Float = 0.95
 
     private let engine = AVAudioEngine()
     private let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
@@ -39,11 +41,12 @@ final class StemAudioEngine {
         }
     }
 
-    func load(stems split: [String: [Float]]) {
+    func load(stems split: [String: [Float]], durationSeconds expectedDuration: Double? = nil) {
         loops.removeAll()  // new file resets loops (invariant)
+        let safeSplit = Self.sanitizedStems(split)
         var maxFrames = 0
         for stem in stems {
-            guard let samples = split[stem], !samples.isEmpty else { continue }
+            guard let samples = safeSplit[stem], !samples.isEmpty else { continue }
             let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
             buf.frameLength = AVAudioFrameCount(samples.count)
             samples.withUnsafeBufferPointer { src in
@@ -52,7 +55,8 @@ final class StemAudioEngine {
             buffers[stem] = buf
             maxFrames = max(maxFrames, samples.count)
         }
-        durationSeconds = Double(maxFrames) / Self.sampleRate
+        let computedDuration = Double(maxFrames) / Self.sampleRate
+        durationSeconds = max(computedDuration, expectedDuration ?? 0)
         startOffset = 0
         startDate = nil
         isPlaying = false
@@ -113,6 +117,17 @@ final class StemAudioEngine {
             let s = Int(loop.start * Self.sampleRate)
             let e = min(Int(loop.end * Self.sampleRate), Int(buf.frameLength))
             guard e > s else { return }
+            let audible = Stemacle.audibleStemTime(
+                transportSec: Float(offset),
+                loopStart: Float(loop.start),
+                loopEnd: Float(loop.end),
+                active: true,
+                duration: Float(durationSeconds)
+            )
+            let start = min(max(Int(Double(audible) * Self.sampleRate), s), e - 1)
+            if start > s {
+                node.scheduleBuffer(Self.slice(buf, from: start, to: e), at: nil)
+            }
             node.scheduleBuffer(Self.slice(buf, from: s, to: e), at: nil, options: .loops)
         } else {
             let startFrame = Int(offset * Self.sampleRate)
@@ -132,6 +147,39 @@ final class StemAudioEngine {
             out.floatChannelData![0].update(from: buf.floatChannelData![0] + from, count: count)
         }
         return out
+    }
+
+    /// Clean non-finite samples and scale all stems together so a full mix cannot
+    /// exceed the output ceiling even when every stem volume is at 1.0.
+    private static func sanitizedStems(_ split: [String: [Float]]) -> [String: [Float]] {
+        let order = ["drums", "vocals", "bass", "melody"]
+        var cleaned: [String: [Float]] = [:]
+        var maxFrames = 0
+        for stem in order {
+            let samples = split[stem] ?? []
+            let safe = samples.map { sample -> Float in
+                guard sample.isFinite else { return 0 }
+                return sample
+            }
+            cleaned[stem] = safe
+            maxFrames = max(maxFrames, safe.count)
+        }
+
+        var mixPeak: Float = 0
+        for i in 0..<maxFrames {
+            var sum: Float = 0
+            for stem in order {
+                let samples = cleaned[stem] ?? []
+                if i < samples.count { sum += samples[i] }
+            }
+            mixPeak = max(mixPeak, abs(sum))
+        }
+        guard mixPeak > outputCeiling else { return cleaned }
+        let gain = outputCeiling / mixPeak
+        for stem in order {
+            cleaned[stem] = (cleaned[stem] ?? []).map { $0 * gain }
+        }
+        return cleaned
     }
 
     // MARK: Mixing

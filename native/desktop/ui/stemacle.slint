@@ -16,6 +16,8 @@ export component MainWindow inherits Window {
     preferred-width: 460px;
     preferred-height: 760px;
     background: #f5f0e6;
+    property <length> header-circle-size: 220px;
+    property <length> minimum-hit-target: 44px;
 
     in property <string> status: "Drop or choose a track";
     in property <bool> ready: false;
@@ -37,15 +39,15 @@ export component MainWindow inherits Window {
 
     VerticalLayout {
         padding: 18px;
-        spacing: 16px;
+        spacing: 12px;
 
         // The circle.
         Rectangle {
-            height: 280px;
+            height: 232px;
             Rectangle {
-                width: 260px;
-                height: 260px;
-                border-radius: 130px;
+                width: root.header-circle-size;
+                height: root.header-circle-size;
+                border-radius: root.header-circle-size / 2;
                 background: #efe9dd;
                 drop-shadow-blur: 18px;
                 drop-shadow-color: #00000014;
@@ -53,6 +55,8 @@ export component MainWindow inherits Window {
                     alignment: center;
                     spacing: 8px;
                     TouchArea {
+                        width: root.minimum-hit-target;
+                        height: root.minimum-hit-target;
                         clicked => { root.load-clicked(); }
                         Text {
                             text: "＋";
@@ -66,6 +70,8 @@ export component MainWindow inherits Window {
                         color: #6b6470;
                         font-size: 13px;
                         horizontal-alignment: center;
+                        height: 34px;
+                        overflow: elide;
                     }
                 }
             }
@@ -101,12 +107,14 @@ export component MainWindow inherits Window {
                     Text { text: stem.name; color: #2c2733; font-weight: 600; }
                     Rectangle {}  // spacer
                     TouchArea {
-                        width: 30px;
+                        width: root.minimum-hit-target;
+                        height: root.minimum-hit-target;
                         clicked => { root.mute-toggled(i); }
                         Text { text: "M"; color: stem.muted ? #6b578f : #6b6470; }
                     }
                     TouchArea {
-                        width: 30px;
+                        width: root.minimum-hit-target;
+                        height: root.minimum-hit-target;
                         clicked => { root.solo-toggled(i); }
                         Text { text: "H"; color: stem.soloed ? #6b578f : #6b6470; }
                     }

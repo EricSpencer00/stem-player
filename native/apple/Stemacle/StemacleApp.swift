@@ -1,5 +1,11 @@
 import SwiftUI
+import StoreKit
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @main
 struct StemacleApp: App {
@@ -13,14 +19,15 @@ struct StemacleApp: App {
     }
 }
 
-enum Tab: Hashable { case library, splitter, settings }
+enum Tab: Hashable { case library, splitter, shuffle, settings }
 
 /// Tabbed shell implementing the verified navigation model (specs/Navigation.tla):
-/// Library | Splitter | Settings, with Import reachable from anywhere and fresh
+/// Library | Splitter | Shuffle | Settings, with Import reachable from anywhere and fresh
 /// splits saved to the Library's stem cache for instant re-open.
 struct AppRootView: View {
     @StateObject private var model = StemPlayerViewModel()
     @StateObject private var library = LibraryStore()
+    @StateObject private var mixer = MixerViewModel()
     @State private var tab: Tab = .splitter
     @State private var importing = false
 
@@ -36,6 +43,10 @@ struct AppRootView: View {
                 .tabItem { Label("Splitter", systemImage: "waveform") }
                 .tag(Tab.splitter)
 
+            MixerView(library: library, mixer: mixer)
+                .tabItem { Label("Shuffle", systemImage: "shuffle") }
+                .tag(Tab.shuffle)
+
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(Tab.settings)
@@ -44,6 +55,7 @@ struct AppRootView: View {
         .onAppear {
             model.library = library
             if ProcessInfo.processInfo.environment["STEMACLE_TAB"] == "library" { tab = .library }
+            if ProcessInfo.processInfo.environment["STEMACLE_TAB"] == "shuffle" { tab = .shuffle }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
             if case let .success(urls) = result, let url = urls.first {
@@ -77,7 +89,11 @@ struct LibraryView: View {
                     Spacer()
                     Button(action: onImport) {
                         Label("Add", systemImage: "plus").font(.subheadline.weight(.medium))
+                            .frame(minWidth: Stem.minimumHitTarget, minHeight: Stem.minimumHitTarget,
+                                   alignment: .trailing)
+                            .contentShape(Rectangle())
                     }.buttonStyle(.plain).foregroundStyle(Stem.purple)
+                        .accessibilityIdentifier("library.add")
                 }
                 .padding(.horizontal, 18).padding(.top, 10).padding(.bottom, 6)
 
@@ -100,6 +116,7 @@ struct LibraryView: View {
                             ForEach(library.projects) { project in
                                 Button { onOpen(project) } label: { ProjectRow(project: project) }
                                     .buttonStyle(.plain)
+                                    .accessibilityIdentifier("project.row")
                             }
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -144,12 +161,20 @@ private struct ScrollOffsetKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
+enum PlayerHeaderMetrics {
+    static let readyDiameter: CGFloat = 156
+    static let idleDiameter: CGFloat = 220
+    static let masterLaneHeight: CGFloat = 34
+    static let transportSpacing: CGFloat = 22
+}
+
 /// The Splitter tab: the Stemacle player + four-stem panel with spectrogram lanes.
 struct SplitterView: View {
     @ObservedObject var model: StemPlayerViewModel
     var onImport: () -> Void
     @State private var scrollOffset: CGFloat = 0
     @State private var masterImage: Image?
+    @State private var dropTargeted = false
 
     /// Header collapses as the list scrolls up (mobile especially).
     private var headerScale: CGFloat {
@@ -160,21 +185,31 @@ struct SplitterView: View {
     var body: some View {
         ZStack {
             Stem.cream.ignoresSafeArea()
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 HStack(spacing: 12) {
                     Text(model.isReady && !model.songTitle.isEmpty ? model.songTitle : "stemacle")
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(model.isReady ? Stem.ink : Stem.inkSoft)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .layoutPriority(1)
+                        .accessibilityIdentifier("splitter.title")
                     Spacer()
                     // Persistent "change song" — load a new track without exiting.
                     Button(action: onImport) {
                         Image(systemName: "plus.circle").foregroundStyle(Stem.purple)
-                    }.buttonStyle(.plain)
+                            .frame(width: Stem.minimumHitTarget, height: Stem.minimumHitTarget)
+                            // Whole 44pt frame is tappable, not just the glyph.
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("o", modifiers: .command)
+                    .accessibilityIdentifier("splitter.add")
                 }
                 .font(.system(size: 17))
                 .padding(.horizontal, 18)
-                .padding(.top, 8)
+                .padding(.top, 6)
+                .padding(.bottom, -4)
 
                 // Player header (compact + collapsing).
                 Group {
@@ -184,16 +219,17 @@ struct SplitterView: View {
                         DeviceCircleView(model: model, onLoad: onImport)
                     }
                 }
-                .frame(maxWidth: model.isReady ? 200 : 280)
-                .frame(height: (model.isReady ? 190 : 240) * headerScale)
+                .frame(maxWidth: model.isReady ? PlayerHeaderMetrics.readyDiameter : PlayerHeaderMetrics.idleDiameter)
+                .frame(height: (model.isReady ? PlayerHeaderMetrics.readyDiameter : PlayerHeaderMetrics.idleDiameter) * headerScale)
                 .scaleEffect(headerScale, anchor: .top)
                 .animation(.easeOut(duration: 0.15), value: model.isReady)
+                .accessibilityIdentifier("splitter.header")
 
                 // The player's master spectrogram overview ("the one in the player").
                 if model.isReady {
                     VStack(spacing: 4) {
                         SpectrogramLane(image: masterImage, progress: model.progress,
-                                        grid: model.measureGrid, height: 46) { p in
+                                        grid: model.measureGrid, height: PlayerHeaderMetrics.masterLaneHeight) { p in
                             model.seek(toProgress: p)
                         }
                         HStack {
@@ -207,11 +243,17 @@ struct SplitterView: View {
                         .foregroundStyle(Stem.inkSoft)
                     }
                     .padding(.horizontal, 18)
+                    .accessibilityIdentifier("splitter.overview")
                 }
 
                 TransportView(model: model)
 
-                if model.isReady { LoopControlBar(model: model).padding(.horizontal, 18) }
+                if model.isReady {
+                    LoopControlBar(model: model)
+                        .disabled(!model.isReady || model.isProcessing)
+                        .padding(.horizontal, 18)
+                        .accessibilityIdentifier("loop.bar")
+                }
 
                 // Stem panel with per-stem spectrogram lanes.
                 ScrollView {
@@ -226,6 +268,7 @@ struct SplitterView: View {
                     VStack(spacing: 10) {
                         ForEach(Stem.stemOrder, id: \.self) { stem in
                             StemRowView(model: model, stem: stem)
+                                .disabled(!model.isReady || model.isProcessing)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -235,10 +278,38 @@ struct SplitterView: View {
                 .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
             }
         }
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Stem.purple.opacity(0.35), lineWidth: 2)
+                    .padding(10)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onDrop(of: [.fileURL, .audio], isTargeted: $dropTargeted) { providers in
+            handleDrop(providers)
+        }
         .foregroundStyle(Stem.ink)
         .task(id: model.loadGeneration) {
             masterImage = makeSpectrogramImage(model.masterSpectrogram)
         }
+    }
+
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                let url: URL?
+                if let data = item as? Data {
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                } else {
+                    url = item as? URL
+                }
+                guard let url else { return }
+                Task { @MainActor in await model.loadFile(url) }
+            }
+            return true
+        }
+        return false
     }
 }
 
@@ -293,6 +364,8 @@ struct DeviceCircleView: View {
                 Text(model.status)
                     .font(.footnote).foregroundStyle(Stem.inkSoft)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
                 if !model.isProcessing, let demo = Bundle.main.url(forResource: "demo", withExtension: "wav") {
                     Button("try a sample") { Task { await model.loadFile(demo) } }
                         .font(.caption.weight(.medium))
@@ -352,7 +425,7 @@ struct TransportView: View {
     @ObservedObject var model: StemPlayerViewModel
 
     var body: some View {
-        HStack(spacing: 28) {
+        HStack(spacing: PlayerHeaderMetrics.transportSpacing) {
             transportButton("backward.end.fill") { model.seek(toProgress: 0) }
             transportButton(model.isPlaying ? "pause.fill" : "play.fill") { model.togglePlay() }
             transportButton("stop.fill") { model.stop() }
@@ -366,8 +439,12 @@ struct TransportView: View {
             Image(systemName: name)
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(Stem.ink)
-                .frame(width: 44, height: 44)
-        }.buttonStyle(.plain)
+                .frame(width: Stem.minimumHitTarget, height: Stem.minimumHitTarget)
+                // Whole 44pt frame is tappable, not just the centered glyph.
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("transport.\(name)")
     }
 }
 
@@ -413,6 +490,7 @@ struct StemRowView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Stem.creamDeep, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .opacity(model.isReady ? 1 : 0.5)
+        .accessibilityIdentifier("stem.row.\(stem)")
         .task(id: model.loadGeneration) {
             laneImage = makeSpectrogramImage(model.spectrograms[stem] ?? [])
         }
@@ -423,47 +501,145 @@ struct StemRowView: View {
             Image(systemName: name)
                 .font(.system(size: 14))
                 .foregroundStyle(on ? Stem.purple : Stem.inkSoft)
-                .frame(width: 30, height: 30)
+                .frame(width: Stem.minimumHitTarget, height: Stem.minimumHitTarget)
                 .background(on ? Stem.purple.opacity(0.12) : .clear)
                 .clipShape(Circle())
+                // Off-state background is .clear, so without this only the 14pt
+                // glyph would be tappable — make the whole circle live.
+                .contentShape(Circle())
         }.buttonStyle(.plain)
     }
 }
 
-/// Settings: the htdemucs queue-server URL. When set, separation runs on the
-/// server for full quality; when empty, the app separates on-device (DSP).
 struct SettingsView: View {
-    @State private var serverURL = UserDefaults.standard.string(forKey: "stemacle.serverURL") ?? ""
+    @Environment(\.openURL) private var openURL
+    @Environment(\.requestReview) private var requestReview
 
     var body: some View {
         ZStack {
             Stem.cream.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Settings").font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .padding(.top, 10)
-                Text("Separation server").font(.subheadline.weight(.medium))
-                TextField("http://192.168.x.x:8008", text: $serverURL)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
-                    #endif
-                    .onChange(of: serverURL) { v in
-                        UserDefaults.standard.set(v, forKey: "stemacle.serverURL")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Settings").font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .padding(.top, 10)
+
+                    Text("Your music stays on this device. Stemacle does not use accounts, analytics, or uploads.")
+                        .font(.footnote)
+                        .foregroundStyle(Stem.inkSoft)
+                        .lineSpacing(2)
+
+                    VStack(spacing: 0) {
+                        SettingsRow(title: "App Settings", systemImage: "gearshape",
+                                    subtitle: "Notifications, files, and system permissions") {
+                            openAppSettings()
+                        }
+                        Divider().padding(.leading, 54)
+                        SettingsLinkRow(title: "Privacy Policy", systemImage: "hand.raised",
+                                        subtitle: "Plain-language privacy details",
+                                        url: URL(string: "https://stemacle.com/privacy/")!)
+                        Divider().padding(.leading, 54)
+                        SettingsLinkRow(title: "Terms of Use", systemImage: "doc.text",
+                                        subtitle: "Your responsibilities and app terms",
+                                        url: URL(string: "https://stemacle.com/terms/")!)
+                        Divider().padding(.leading, 54)
+                        SettingsLinkRow(title: "Support", systemImage: "questionmark.circle",
+                                        subtitle: "Help, contact, and review links",
+                                        url: URL(string: "https://stemacle.com/support/")!)
+                        Divider().padding(.leading, 54)
+                        SettingsRow(title: "Rate Stemacle", systemImage: "star",
+                                    subtitle: "Tell the App Store how it feels") {
+                            requestReview()
+                        }
                     }
-                Text("When set, tracks split with full htdemucs quality on the server. Leave empty to split on-device.")
-                    .font(.footnote).foregroundStyle(Stem.inkSoft)
-                Spacer()
-                HStack(spacing: 10) {
-                    Link("Privacy", destination: URL(string: "https://stemacle.com/privacy/")!)
-                    Link("Terms", destination: URL(string: "https://stemacle.com/terms/")!)
-                    Link("Support", destination: URL(string: "https://stemacle.com/support/")!)
+                    .background(Stem.cream.opacity(0.68))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Stem.creamDeep, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .accessibilityIdentifier("settings.publicRows")
+
+                    Text("Stemacle separates audio locally. Quality can vary by song, but your tracks stay yours.")
+                        .font(.caption)
+                        .foregroundStyle(Stem.inkSoft)
+                        .lineSpacing(2)
+                        .padding(.top, 2)
                 }
-                .font(.footnote).foregroundStyle(Stem.purple)
+                .padding(20)
             }
-            .padding(20)
         }
         .foregroundStyle(Stem.ink)
+    }
+
+    private func openAppSettings() {
+        #if os(iOS)
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            openURL(url)
+        }
+        #elseif os(macOS)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        #endif
+    }
+}
+
+struct SettingsRow: View {
+    let title: String
+    let systemImage: String
+    let subtitle: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Stem.purple)
+                    .frame(width: 32, height: Stem.minimumHitTarget)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.subheadline.weight(.medium))
+                    Text(subtitle).font(.caption).foregroundStyle(Stem.inkSoft)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Stem.inkSoft)
+            }
+            .frame(minHeight: Stem.minimumHitTarget)
+            .padding(.horizontal, 12)
+            // Whole row is tappable — without this the transparent Spacer gap
+            // between the title and the chevron is dead to touch.
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings.\(title.replacingOccurrences(of: " ", with: ".").lowercased())")
+    }
+}
+
+struct SettingsLinkRow: View {
+    let title: String
+    let systemImage: String
+    let subtitle: String
+    let url: URL
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Stem.purple)
+                    .frame(width: 32, height: Stem.minimumHitTarget)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.subheadline.weight(.medium))
+                    Text(subtitle).font(.caption).foregroundStyle(Stem.inkSoft)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Stem.inkSoft)
+            }
+            .frame(minHeight: Stem.minimumHitTarget)
+            .padding(.horizontal, 12)
+            // Whole row opens the link — the Spacer gap would otherwise be dead.
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings.\(title.replacingOccurrences(of: " ", with: ".").lowercased())")
     }
 }

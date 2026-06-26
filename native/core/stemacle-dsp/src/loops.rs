@@ -5,7 +5,7 @@
 //! These are pure functions of the transport position and the detected tempo
 //! grid, so they are covered exhaustively with hand-computed expectations.
 
-use crate::tempo::{clamp, BEATS_PER_MEASURE, BPM_MAX, BPM_MIN};
+use crate::tempo::{clamp, BEATS_PER_MEASURE, BPM_FALLBACK, BPM_MAX, BPM_MIN};
 
 /// The bar fractions exposed as loop buttons: 1/4, 1/2, 1, 2 measures.
 pub const LOOP_BARS: [f32; 4] = [0.25, 0.5, 1.0, 2.0];
@@ -21,7 +21,12 @@ pub struct LoopGrid {
 
 impl LoopGrid {
     pub fn measure_length(&self) -> f32 {
-        (60.0 / clamp(self.bpm, BPM_MIN, BPM_MAX)) * BEATS_PER_MEASURE as f32
+        let bpm = if self.bpm.is_finite() {
+            clamp(self.bpm, BPM_MIN, BPM_MAX)
+        } else {
+            BPM_FALLBACK
+        };
+        (60.0 / bpm) * BEATS_PER_MEASURE as f32
     }
 
     pub fn beat_length(&self) -> f32 {
@@ -46,15 +51,14 @@ impl LoopGrid {
             measure
         };
         let grid = measure.min(active_length);
-        let offset = clamp(
-            if self.measure_offset.is_finite() {
-                self.measure_offset
-            } else {
-                self.beat_offset
-            },
-            0.0,
-            (measure - 1e-6).max(0.0),
-        );
+        let raw_offset = if self.measure_offset.is_finite() {
+            self.measure_offset
+        } else if self.beat_offset.is_finite() {
+            self.beat_offset
+        } else {
+            0.0
+        };
+        let offset = clamp(raw_offset, 0.0, (measure - 1e-6).max(0.0));
         let boundary = offset + ((current_sec - offset) / grid).floor() * grid;
         let next_boundary = boundary + grid;
         let epsilon = 0.03f32.min(grid * 0.25);
@@ -185,6 +189,60 @@ mod tests {
         let one_measure = g.loop_length_for(1.0);
         // boundaries at 0.3, 2.3, 4.3 ... at 1.0s → next boundary 2.3s.
         assert!((g.snap_loop_end(1.0, one_measure) - 2.3).abs() < 1e-5);
+    }
+
+    #[test]
+    fn corrupt_tempo_metadata_falls_back_to_finite_loop_grid() {
+        let g = LoopGrid {
+            bpm: f32::NAN,
+            measure_offset: f32::NAN,
+            beat_offset: f32::NAN,
+            duration: 30.0,
+        };
+        let measure = g.measure_length();
+        assert!(measure.is_finite());
+        assert!((measure - 2.0).abs() < 1e-6);
+
+        let (start, end) = g.loop_range_for(3.0, f32::NAN);
+        assert!(start.is_finite());
+        assert!(end.is_finite());
+        assert!((start - 2.0).abs() < 1e-6);
+        assert!((end - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn adversarial_loop_grids_stay_finite_and_monotonic() {
+        let bpms = [f32::NAN, f32::INFINITY, 0.0, 59.0, 60.0, 91.0, 240.0, 999.0];
+        let offsets = [f32::NAN, f32::NEG_INFINITY, -1.0, 0.0, 0.25, 99.0];
+        let durations = [0.0, 0.1, 3.0, 30.0, f32::NAN];
+        let currents = [f32::NAN, f32::NEG_INFINITY, -2.0, 0.0, 0.03, 2.999, 400.0];
+        let lengths = [f32::NAN, f32::INFINITY, -1.0, 0.0, 0.25, 0.5, 2.0, 999.0];
+
+        for bpm in bpms {
+            for measure_offset in offsets {
+                for duration in durations {
+                    let grid = LoopGrid { bpm, measure_offset, beat_offset: measure_offset, duration };
+                    assert!(grid.measure_length().is_finite());
+                    for current in currents {
+                        for length in lengths {
+                            let snap = grid.snap_loop_end(current, length);
+                            assert!(snap.is_finite(), "snap bpm={bpm} offset={measure_offset} duration={duration} current={current} length={length}");
+
+                            let (start, end) = grid.loop_range_for(current, length);
+                            assert!(start.is_finite(), "start bpm={bpm} offset={measure_offset} duration={duration} current={current} length={length}");
+                            assert!(end.is_finite(), "end bpm={bpm} offset={measure_offset} duration={duration} current={current} length={length}");
+                            assert!(start >= 0.0, "start before zero: {start}");
+                            assert!(end >= start, "end before start: {start}..{end}");
+
+                            if grid.loop_fits(current, length) {
+                                assert!(duration.is_finite() && duration >= 0.0);
+                                assert!(end <= duration + 1e-6, "fit loop exceeds duration: {end} > {duration}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]

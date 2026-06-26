@@ -1,4 +1,5 @@
 import Foundation
+import StemacleKit
 
 /// A split song persisted to disk: metadata + a cache of its four stem WAVs.
 /// Backs both the Song Library and "instant re-open" (no re-separation).
@@ -10,7 +11,7 @@ struct Project: Identifiable, Codable, Hashable {
     var measureOffset: Float
     var beatOffset: Float
     var duration: Double
-    var quality: String      // "htdemucs" | "on-device"
+    var quality: String      // "on-device" or the selected server model
     var sampleRate: Int
 }
 

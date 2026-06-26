@@ -3,6 +3,36 @@ import Combine
 import Foundation
 import StemacleKit
 
+struct DecodedAudio {
+    let left: [Float]
+    let right: [Float]
+    let duration: Double
+}
+
+private final class DecodeInputState {
+    var finished = false
+}
+
+private final class DeviceSeparationQueue {
+    private let queue = OperationQueue()
+
+    init() {
+        queue.name = "com.stemacle.device-separation"
+        queue.maxConcurrentOperationCount = 1
+        queue.qualityOfService = .userInitiated
+    }
+
+    func separate(left: [Float], right: [Float], sampleRate: UInt32) async throws -> StemSplit? {
+        try Task.checkCancellation()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<StemSplit?, Error>) in
+            queue.addOperation {
+                let result = Stemacle.separate(left: left, right: right, sampleRate: sampleRate)
+                continuation.resume(returning: result)
+            }
+        }
+    }
+}
+
 /// Drives the Stemacle player UI: decodes a file, runs separation on the shared
 /// Rust core, and exposes transport + per-stem state to SwiftUI.
 @MainActor
@@ -12,7 +42,7 @@ final class StemPlayerViewModel: ObservableObject {
     @Published var status: String = "Drop or choose a track"
     @Published var songTitle: String = ""
     @Published var isProcessing = false
-    /// Separation progress 0...1 (server jobs); nil when indeterminate.
+    /// Separation progress 0...1; nil when indeterminate.
     @Published var splitProgress: Double?
     @Published var isReady = false
     @Published var isPlaying = false
@@ -55,6 +85,10 @@ final class StemPlayerViewModel: ObservableObject {
     static let specCols = 240
     static let specRows = 48
 
+    private static let separationQueue = DeviceSeparationQueue()
+
+    private var controlsEnabled: Bool { isReady && !isProcessing }
+
     init() {
         for stem in stems { volumes[stem] = 0.8 }
     }
@@ -90,22 +124,22 @@ final class StemPlayerViewModel: ObservableObject {
         return String(format: "%d:%02d", t / 60, t % 60)
     }
 
-    /// Install separated stems (shared by the server + on-device paths).
+    /// Install separated stems from the on-device path.
     /// Fresh splits are persisted to the Library; cache re-opens pass persist:false.
     private func finishLoading(_ dict: [String: [Float]], bpm: Float,
-                              measureOffset: Float, beatOffset: Float, quality: String,
+                              measureOffset: Float, beatOffset: Float, duration: Double, quality: String,
                               persist: Bool = true) {
         self.bpm = bpm
         self.measureOffset = measureOffset
         self.beatOffset = beatOffset
         // reset loop state on new file (invariant)
         loopBars.removeAll(); allLoopBars = nil
-        engine.load(stems: dict)
-        duration = engine.durationSeconds
+        engine.load(stems: dict, durationSeconds: duration)
+        self.duration = engine.durationSeconds
         if persist {
             library?.add(title: songTitle, stems: dict, sampleRate: Int(StemAudioEngine.sampleRate),
                          bpm: bpm, measureOffset: measureOffset, beatOffset: beatOffset,
-                         duration: engine.durationSeconds, quality: quality)
+                         duration: self.duration, quality: quality)
         }
         // Compute per-stem spectrograms for the lanes.
         var specs: [String: [[Float]]] = [:]
@@ -139,7 +173,8 @@ final class StemPlayerViewModel: ObservableObject {
         songTitle = project.title
         isProcessing = false
         finishLoading(dict, bpm: project.bpm, measureOffset: project.measureOffset,
-                      beatOffset: project.beatOffset, quality: project.quality, persist: false)
+                      beatOffset: project.beatOffset, duration: project.duration,
+                      quality: project.quality, persist: false)
     }
 
     /// Spectrum column (row values 0...1) at the current play head, for the
@@ -149,7 +184,21 @@ final class StemPlayerViewModel: ObservableObject {
         return masterSpectrogram[min(playColumn, masterSpectrogram.count - 1)]
     }
 
-    /// Decode `url` to 44.1 kHz stereo, separate on the Rust core, load the engine.
+    /// Decode `url` to 44.1 kHz stereo, separate using the best available *local*
+    /// engine, and load the audio engine. Separation is always on-device — audio
+    /// is never uploaded (the App Store privacy posture: "your music stays on this
+    /// device"). Priority:
+    ///   1. htdemucs subprocess – macOS only, when a local Demucs venv is present
+    ///      (a local process, no network), for quality that beats the web app.
+    ///   2. on-device DSP – CoherenceSeparator (Rust), always-available fallback
+    ///      and the only engine on iOS.
+    ///
+    /// A network separation server (`StemServerClient` / `server/app.py`) exists
+    /// for a possible future opt-in (e.g. a Cloudflare-hosted queue) but is
+    /// deliberately NOT wired in here, so no build ever uploads audio by default.
+    ///
+    /// The on-device DSP runs in parallel for BPM/tempo so the loop grid stays
+    /// accurate even when the macOS subprocess supplies the high-quality stems.
     func loadFile(_ url: URL) async {
         isProcessing = true
         isReady = false
@@ -159,35 +208,41 @@ final class StemPlayerViewModel: ObservableObject {
         defer { isProcessing = false; splitProgress = nil }
 
         do {
-            let (left, right) = try decodeStereo44k(url)
+            let decoded = try decodeStereo44k(url)
+            let left = decoded.left
+            let right = decoded.right
 
-            // Prefer the high-quality htdemucs queue server when configured;
-            // fall back to the on-device DSP core if it's unreachable or fails.
-            if let server = StemServerClient.configured() {
+            // --- Tier 1: htdemucs subprocess (macOS only, local, no network) ---
+            #if os(macOS)
+            let subprocCfg = SubprocessDemucsConfig.fromEnv()
+            if subprocCfg.available() {
+                status = "Separating with htdemucs (local)…"
                 do {
-                    status = "Splitting in the background (htdemucs)…"
-                    splitProgress = 0
-                    let jobID = try await server.submit(left: left, right: right, sampleRate: 44100)
-                    let stems = try await server.awaitStems(jobID) { p in
-                        self.splitProgress = p
-                        self.status = "Splitting… \(Int(p * 100))%"
-                    }
-                    let t = Stemacle.separate(left: left, right: right, sampleRate: 44100)
-                    finishLoading(stems, bpm: t?.bpm ?? 120,
-                                  measureOffset: t?.measureOffset ?? 0, beatOffset: t?.beatOffset ?? 0,
-                                  quality: "htdemucs")
+                    // Run BPM analysis and subprocess in parallel on background threads.
+                    async let analysisTask = Self.separationQueue.separate(
+                        left: left, right: right, sampleRate: 44100)
+                    let subprocStems = try await Task.detached(priority: .userInitiated) {
+                        try subprocCfg.separate(left: left, right: right, sampleRate: 44100)
+                    }.value
+                    let analysis = try? await analysisTask
+                    finishLoading(subprocStems,
+                                  bpm: analysis?.bpm ?? 120,
+                                  measureOffset: analysis?.measureOffset ?? 0,
+                                  beatOffset: analysis?.beatOffset ?? 0,
+                                  duration: decoded.duration,
+                                  quality: subprocCfg.qualityLabel)
+                    split = analysis
                     return
                 } catch {
-                    splitProgress = nil
-                    status = "Server unavailable, splitting on-device…"
+                    status = "Local Demucs failed, falling back to on-device…"
                 }
             }
+            #endif
 
-            status = isProcessing ? status : "Separating…"
-            // Hop heavy work off the main actor.
-            let result: StemSplit? = await Task.detached(priority: .userInitiated) {
-                Stemacle.separate(left: left, right: right, sampleRate: 44100)
-            }.value
+            // --- Tier 2: on-device DSP (CoherenceSeparator, always available) ---
+            status = "Separating (on-device)…"
+            let result = try await Self.separationQueue.separate(
+                left: left, right: right, sampleRate: 44100)
             guard let result else {
                 status = "Could not separate this file"
                 return
@@ -197,6 +252,7 @@ final class StemPlayerViewModel: ObservableObject {
             for (name, samples) in result.ordered { dict[name] = samples }
             finishLoading(dict, bpm: result.bpm,
                           measureOffset: result.measureOffset, beatOffset: result.beatOffset,
+                          duration: decoded.duration,
                           quality: "on-device")
         } catch {
             status = "Load failed: \(error.localizedDescription)"
@@ -264,23 +320,39 @@ final class StemPlayerViewModel: ObservableObject {
     // MARK: Per-stem controls
 
     func setVolume(_ stem: String, _ value: Float) {
+        guard controlsEnabled else { return }
         volumes[stem] = value
         applyMixing()
     }
 
     func toggleMute(_ stem: String) {
+        guard controlsEnabled else { return }
         if muted.contains(stem) { muted.remove(stem) } else { muted.insert(stem) }
         applyMixing()
     }
 
     func toggleSolo(_ stem: String) {
-        if soloed.contains(stem) { soloed.remove(stem) } else { soloed.insert(stem) }
+        guard controlsEnabled else { return }
+        if soloed.contains(stem) {
+            soloed.removeAll()
+        } else {
+            soloed.removeAll()
+            soloed.insert(stem)
+        }
         applyMixing()
     }
 
-    func toggleGlobalMute() { globalMuted.toggle(); applyMixing() }
+    func toggleGlobalMute() {
+        guard controlsEnabled else { return }
+        globalMuted.toggle()
+        applyMixing()
+    }
 
-    func setLoopMonitoring(solo: Bool) { loopAuditionSolo = solo; applyMixing() }
+    func setLoopMonitoring(solo: Bool) {
+        guard controlsEnabled else { return }
+        loopAuditionSolo = solo
+        applyMixing()
+    }
 
     // MARK: Looping (functional)
 
@@ -298,6 +370,7 @@ final class StemPlayerViewModel: ObservableObject {
 
     /// Toggle a per-stem loop of `bars` length (nil arg clears).
     func setLoop(_ stem: String, bars: Float?) {
+        guard controlsEnabled else { return }
         guard let bars else {
             loopBars[stem] = nil
             engine.setLoop(stem, range: nil)
@@ -315,6 +388,7 @@ final class StemPlayerViewModel: ObservableObject {
 
     /// Apply one linked loop across every stem (the All row), or clear all.
     func setAllLoop(bars: Float?) {
+        guard controlsEnabled else { return }
         guard let bars else {
             allLoopBars = nil
             for stem in stems { loopBars[stem] = nil; engine.setLoop(stem, range: nil) }
@@ -338,7 +412,7 @@ final class StemPlayerViewModel: ObservableObject {
     // MARK: Decoding
 
     /// Decode any AVFoundation-readable file to two 44.1 kHz mono Float arrays.
-    private func decodeStereo44k(_ url: URL) throws -> (left: [Float], right: [Float]) {
+    private func decodeStereo44k(_ url: URL) throws -> DecodedAudio {
         let needsAccess = url.startAccessingSecurityScopedResource()
         defer { if needsAccess { url.stopAccessingSecurityScopedResource() } }
 
@@ -355,15 +429,15 @@ final class StemPlayerViewModel: ObservableObject {
         }
 
         let ratio = target.sampleRate / file.processingFormat.sampleRate
-        let capacity = AVAudioFrameCount(Double(file.length) * ratio) + 4096
-        guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else {
-            throw NSError(domain: "Stemacle", code: 2,
-                          userInfo: [NSLocalizedDescriptionKey: "Out of memory decoding"])
-        }
+        let estimatedFrames = max(0, Int(Double(file.length) * ratio))
+        var left: [Float] = []
+        var right: [Float] = []
+        left.reserveCapacity(estimatedFrames)
+        right.reserveCapacity(estimatedFrames)
 
-        var finished = false
+        let inputState = DecodeInputState()
         let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
-            if finished {
+            if inputState.finished {
                 outStatus.pointee = .endOfStream
                 return nil
             }
@@ -380,7 +454,7 @@ final class StemPlayerViewModel: ObservableObject {
                 return nil
             }
             if buf.frameLength == 0 {
-                finished = true
+                inputState.finished = true
                 outStatus.pointee = .endOfStream
                 return nil
             }
@@ -388,16 +462,37 @@ final class StemPlayerViewModel: ObservableObject {
             return buf
         }
 
-        var error: NSError?
-        converter.convert(to: out, error: &error, withInputFrom: inputBlock)
-        if let error { throw error }
+        conversionLoop: while true {
+            guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: 16384) else {
+                throw NSError(domain: "Stemacle", code: 2,
+                              userInfo: [NSLocalizedDescriptionKey: "Out of memory decoding"])
+            }
 
-        let n = Int(out.frameLength)
-        let chans = out.floatChannelData!
-        let left = Array(UnsafeBufferPointer(start: chans[0], count: n))
-        let right = target.channelCount > 1
-            ? Array(UnsafeBufferPointer(start: chans[1], count: n))
-            : left
-        return (left, right)
+            var error: NSError?
+            let status = converter.convert(to: out, error: &error, withInputFrom: inputBlock)
+            if let error { throw error }
+
+            let n = Int(out.frameLength)
+            if n > 0, let chans = out.floatChannelData {
+                left.append(contentsOf: UnsafeBufferPointer(start: chans[0], count: n))
+                let rightChannel = target.channelCount > 1 ? chans[1] : chans[0]
+                right.append(contentsOf: UnsafeBufferPointer(start: rightChannel, count: n))
+            }
+
+            switch status {
+            case .haveData, .inputRanDry:
+                continue
+            case .endOfStream:
+                break conversionLoop
+            case .error:
+                throw NSError(domain: "Stemacle", code: 3,
+                              userInfo: [NSLocalizedDescriptionKey: "Could not decode this file"])
+            @unknown default:
+                break conversionLoop
+            }
+        }
+
+        let duration = Double(max(left.count, right.count)) / StemAudioEngine.sampleRate
+        return DecodedAudio(left: left, right: right.isEmpty ? left : right, duration: duration)
     }
 }

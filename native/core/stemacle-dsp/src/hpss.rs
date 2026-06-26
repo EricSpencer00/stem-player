@@ -76,7 +76,10 @@ pub fn hpss(input: &Spectrogram) -> HpssResult {
             percussive.im[f][b] = input.im[f][b] * pp / d;
         }
     }
-    HpssResult { harmonic, percussive }
+    HpssResult {
+        harmonic,
+        percussive,
+    }
 }
 
 /// Low-pass split at `hz`. Port of `lowPass`: returns (low, high) spectrograms
@@ -94,6 +97,35 @@ pub fn low_pass(input: &Spectrogram, hz: f32) -> (Spectrogram, Spectrogram) {
         for b in 0..cut.min(TOT_BINS) {
             high.re[f][b] = 0.0;
             high.im[f][b] = 0.0;
+        }
+    }
+    (low, high)
+}
+
+/// Soft bass/melody crossover. Below `low_hz` all energy goes to bass; above
+/// `high_hz` all energy goes to melody; between them a cosine crossfade avoids
+/// hard-cutting low-mid instruments.
+pub fn soft_low_pass(input: &Spectrogram, low_hz: f32, high_hz: f32) -> (Spectrogram, Spectrogram) {
+    let frames = input.frames;
+    let bin_hz = SR as f32 / FFT_SIZE as f32;
+    let mut low = Spectrogram::zeros(frames);
+    let mut high = Spectrogram::zeros(frames);
+    for f in 0..frames {
+        for b in 0..TOT_BINS {
+            let freq = b as f32 * bin_hz;
+            let low_weight = if freq <= low_hz {
+                1.0
+            } else if freq >= high_hz {
+                0.0
+            } else {
+                let t = (freq - low_hz) / (high_hz - low_hz);
+                0.5 + 0.5 * (std::f32::consts::PI * t).cos()
+            };
+            let high_weight = 1.0 - low_weight;
+            low.re[f][b] = input.re[f][b] * low_weight;
+            low.im[f][b] = input.im[f][b] * low_weight;
+            high.re[f][b] = input.re[f][b] * high_weight;
+            high.im[f][b] = input.im[f][b] * high_weight;
         }
     }
     (low, high)
@@ -142,5 +174,19 @@ mod tests {
                 assert!((sum_re - spec.re[f][b]).abs() < 1e-4, "re mismatch {f},{b}");
             }
         }
+    }
+
+    #[test]
+    fn soft_low_pass_crossfades_and_partitions_energy() {
+        let mut spec = Spectrogram::zeros(1);
+        let bin_hz = SR as f32 / FFT_SIZE as f32;
+        let bin = (330.0 / bin_hz).round() as usize;
+        spec.re[0][bin] = 1.0;
+
+        let (low, high) = soft_low_pass(&spec, 220.0, 380.0);
+
+        assert!(low.re[0][bin] > 0.1, "low weight {}", low.re[0][bin]);
+        assert!(high.re[0][bin] > 0.1, "high weight {}", high.re[0][bin]);
+        assert!((low.re[0][bin] + high.re[0][bin] - 1.0).abs() < 1e-6);
     }
 }
