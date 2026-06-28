@@ -29,16 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify required site files exist
+      - name: Verify required site + native surfaces exist
         run: |
+          # Web gold master + landing.
           test -f index.html
           test -f app/index.html
           test -f apps/stem-shuffle/index.html
-          test -f native/index.html
-          test -f native/electron/main.cjs
-          test -f native/ios/App/App.xcodeproj/project.pbxproj
-          test -f native/ios/App/App/Info.plist
-          test -f capacitor.config.json
           test -f wrangler.toml
           test -f PRODUCT.md
           test -f LOOP_SAMPLING.md
@@ -46,6 +42,10 @@ jobs:
           test -f samples/stem-sample-2.mp3
           test -f samples/stem-sample-3.mp3
           test -f tests/stem-player.test.mjs
+          # Current native surfaces (the rewrite, not the old electron/capacitor shells).
+          test -f native/apple/project.yml
+          test -f native/core/Cargo.toml
+          test -f native/desktop/Cargo.toml
 
       - name: Check inline splitter script syntax
         run: |
@@ -68,6 +68,3 @@ jobs:
 
       - name: Prepare Cloudflare Pages artifact
         run: npm run site:prepare
-
-      - name: Prepare native app artifact
-        run: npm run native:prepare

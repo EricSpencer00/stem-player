@@ -43,43 +43,112 @@ func makeSpectrogramImage(_ grid: [[Float]]) -> Image? {
     return Image(decorative: cg, scale: 1, orientation: .up).resizable().interpolation(.medium)
 }
 
-// MARK: - Per-stem spectrogram lane
+// MARK: - Per-stem spectrogram / waveform lane (scrolling window)
 
-/// A spectrogram strip with a played-region tint, measure grid markers, a moving
-/// play cursor, and tap/drag-to-seek (the web gold master's per-stem lane).
+/// A lane that shows a sliding 30-second time window: the play cursor stays at
+/// 25% from the left so the lane scrolls like the web gold master.
+///
+/// `image` is the full-track spectrogram (macOS). `envelope` is the peak
+/// waveform (iOS, avoids STFT OOM). Pass whichever is non-empty.
 struct SpectrogramLane: View {
     let image: Image?
-    var progress: Double
-    var grid: [Double]            // normalized measure-boundary positions
+    let envelope: [Float]          // iOS waveform fallback; empty on macOS
+    var progress: Double           // global 0..1 play position
+    var duration: Double           // total track seconds
+    var grid: [Double]             // measure boundaries 0..1 (global)
     var height: CGFloat = 34
     var onSeek: (Double) -> Void
 
+    private let windowSec: Double = 30    // visible window width in seconds
+    private let headFrac: Double  = 0.25  // playhead at 25% of window
+
+    private var windowStart: Double {
+        guard duration > 0 else { return 0 }
+        let preferred = progress * duration - headFrac * windowSec
+        let maxStart  = max(0, duration - windowSec)
+        return max(0, min(preferred, maxStart))
+    }
+
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
+            let W      = geo.size.width
+            let H      = geo.size.height
+            let wStart = windowStart
+            let wEnd   = wStart + windowSec
+            let cursorX = duration > 0
+                ? ((progress * duration - wStart) / windowSec).clamped(to: 0...1)
+                : headFrac
+
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 6).fill(Stem.creamDeep.opacity(0.4))
-                image?.resizable().frame(width: w, height: geo.size.height)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                // measure grid markers
-                ForEach(Array(grid.enumerated()), id: \.offset) { _, g in
-                    Rectangle().fill(Stem.ink.opacity(0.06)).frame(width: 1)
-                        .offset(x: w * CGFloat(g))
+
+                if let img = image {
+                    // Full-track spectrogram: the image is W*(duration/windowSec)
+                    // pixels wide; shift it left so windowStart aligns with x=0.
+                    let scale    = duration > 0 ? duration / windowSec : 1
+                    let totalW   = W * CGFloat(scale)
+                    let offsetX  = -W * CGFloat(wStart / windowSec)
+                    img.resizable()
+                        .frame(width: totalW, height: H)
+                        .offset(x: offsetX)
+                        .clipped()
+
+                } else if !envelope.isEmpty {
+                    // iOS waveform fallback: render bars for the visible window.
+                    Canvas { ctx, size in
+                        let cols   = envelope.count
+                        let c0     = Int((wStart / max(duration, 1)) * Double(cols))
+                        let c1     = min(cols, Int((wEnd / max(duration, 1)) * Double(cols)) + 1)
+                        let vis    = max(1, c1 - c0)
+                        let barW   = size.width / CGFloat(vis)
+                        for i in 0..<vis {
+                            let ci = (c0 + i).clamped(to: 0...(cols - 1))
+                            let v  = CGFloat(envelope[ci])
+                            let bH = size.height * v
+                            let y  = (size.height - bH) / 2
+                            let r  = CGRect(x: CGFloat(i) * barW, y: y,
+                                            width: max(1, barW - 0.5), height: bH)
+                            ctx.fill(Path(r),
+                                     with: .color(Stem.purple.opacity(0.4 + 0.35 * v)))
+                        }
+                    }
                 }
-                // played region tint
+
+                // Measure grid: only markers visible in the current window
+                ForEach(Array(grid.enumerated()), id: \.offset) { _, g in
+                    let gSec = g * duration
+                    if gSec >= wStart && gSec <= wEnd {
+                        let xFrac = (gSec - wStart) / windowSec
+                        Rectangle().fill(Stem.ink.opacity(0.06)).frame(width: 1)
+                            .offset(x: W * CGFloat(xFrac))
+                    }
+                }
+
+                // Played-region tint
                 Rectangle().fill(Stem.amber.opacity(0.10))
-                    .frame(width: max(0, w * CGFloat(progress)))
-                // play cursor
+                    .frame(width: max(0, W * CGFloat(cursorX)))
+
+                // Play cursor — stays near headFrac, clamped at track edges
                 Rectangle().fill(Stem.amber).frame(width: 2)
                     .shadow(color: Stem.amber.opacity(0.6), radius: 3)
-                    .offset(x: w * CGFloat(progress) - 1)
+                    .offset(x: W * CGFloat(cursorX) - 1)
             }
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0)
-                .onEnded { v in onSeek(min(1, max(0, v.location.x / w))) })
+                .onEnded { v in
+                    let frac    = max(0, min(1, v.location.x / W))
+                    let seekSec = wStart + frac * windowSec
+                    onSeek(max(0, min(1, duration > 0 ? seekSec / duration : 0)))
+                })
         }
         .frame(height: height)
+    }
+}
+
+private extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self {
+        min(max(self, range.lowerBound), range.upperBound)
     }
 }
 

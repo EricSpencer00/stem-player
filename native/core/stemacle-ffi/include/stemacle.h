@@ -63,6 +63,12 @@ float stemacle_audible_stem_time(float transport_sec, float loop_start,
 void stemacle_spectrogram(const float *samples, size_t len, size_t cols,
                           size_t rows, float *out);
 
+/* Compute a cols-bucket peak waveform envelope (0..1) into `out`.
+ * O(n) time and O(cols) space — use on iOS instead of stemacle_spectrogram
+ * to avoid the large STFT allocation on long tracks. */
+void stemacle_waveform_envelope(const float *samples, size_t len, size_t cols,
+                                float *out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -11,6 +11,15 @@ on:
         required: true
         type: string
 
+# NOTE: desktop release packaging is intentionally not wired up. The old disk-image
+# path built a now-removed SwiftPM macOS target via an Electron packager; both were
+# deleted in the native rewrite. The current surfaces build differently:
+#   - macOS/iOS: native/apple via xcodebuild (iOS release: scripts/ios-release.sh)
+#   - Windows/Linux: native/desktop (Slint) via cargo
+# A real signed/notarized desktop release job should be (re)built on those when
+# packaging is ready. Until then this workflow only runs the verification gate so
+# tagging a release still proves the tree is green.
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -35,83 +44,3 @@ jobs:
 
       - name: Prepare site bundle
         run: npm run site:prepare
-
-      - name: Prepare native bundle
-        run: npm run native:prepare
-
-  build:
-    needs: verify
-    runs-on: macos-latest
-
-    env:
-      STEMACLE_MAC_ARCH: arm64
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prepare native bundle
-        run: npm run native:prepare
-
-      - name: Build macOS desktop artifacts
-        run: npm run macos:package
-
-      - name: Generate checksums
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
-          cd release
-          shasum -a 256 \
-            "Stemacle-${version}-arm64.dmg" \
-            "Stemacle-${version}-arm64-mac.zip" \
-            > "Stemacle-${version}-SHA256SUMS.txt"
-
-      - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: stemacle-macos
-          if-no-files-found: error
-          path: |
-            release/Stemacle-[0-9]*-arm64.dmg
-            release/Stemacle-[0-9]*-arm64-mac.zip
-            release/Stemacle-[0-9]*-SHA256SUMS.txt
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Show release asset manifest
-        shell: bash
-        run: |
-          find release-assets -maxdepth 2 -type f | sort
-
-      - name: Publish GitHub Release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-          target_commitish: ${{ github.sha }}
-          files: |
-            release-assets/Stemacle-[0-9]*-arm64.dmg
-            release-assets/Stemacle-[0-9]*-arm64-mac.zip
-            release-assets/Stemacle-[0-9]*-SHA256SUMS.txt

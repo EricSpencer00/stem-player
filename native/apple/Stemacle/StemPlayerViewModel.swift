@@ -67,6 +67,8 @@ final class StemPlayerViewModel: ObservableObject {
 
     /// Per-stem spectrogram grids: `spectrograms[stem][col][row]`, 0...1.
     @Published var spectrograms: [String: [[Float]]] = [:]
+    /// Per-stem waveform envelopes for iOS (O(n), avoids STFT OOM on long tracks).
+    @Published var stemEnvelopes: [String: [Float]] = [:]
     /// Master (mix) spectrogram for the radial player visualizer.
     @Published var masterSpectrogram: [[Float]] = []
     /// Bumped each load so views can rebuild cached spectrogram images.
@@ -141,15 +143,34 @@ final class StemPlayerViewModel: ObservableObject {
                          bpm: bpm, measureOffset: measureOffset, beatOffset: beatOffset,
                          duration: self.duration, quality: quality)
         }
-        // Compute per-stem spectrograms for the lanes.
-        var specs: [String: [[Float]]] = [:]
+        // Compute per-stem visualization.
+        // iOS uses a peak waveform envelope (O(n), O(cols) space) to avoid the
+        // ~200 MB STFT allocation that each spectrogram call requires on long tracks.
+        // macOS has sufficient RAM for the full log-magnitude spectrogram.
         var mixLen = 0
+        for samples in dict.values { mixLen = max(mixLen, samples.count) }
+        #if os(iOS)
+        var envs: [String: [Float]] = [:]
+        for (name, samples) in dict {
+            envs[name] = Stemacle.waveformEnvelope(samples, cols: Self.specCols)
+        }
+        stemEnvelopes = envs
+        spectrograms = [:]
+        // Low-res master spectrogram (64×16) for the radial visualizer — tiny allocation.
+        if mixLen > 0 {
+            var mix = [Float](repeating: 0, count: mixLen)
+            for samples in dict.values {
+                for i in 0..<samples.count { mix[i] += samples[i] }
+            }
+            masterSpectrogram = Stemacle.spectrogram(mix, cols: 64, rows: 16)
+        }
+        #else
+        var specs: [String: [[Float]]] = [:]
         for (name, samples) in dict {
             specs[name] = Stemacle.spectrogram(samples, cols: Self.specCols, rows: Self.specRows)
-            mixLen = max(mixLen, samples.count)
         }
         spectrograms = specs
-        // Master spectrogram from the summed mix for the radial visualizer.
+        stemEnvelopes = [:]
         if mixLen > 0 {
             var mix = [Float](repeating: 0, count: mixLen)
             for samples in dict.values {
@@ -157,6 +178,7 @@ final class StemPlayerViewModel: ObservableObject {
             }
             masterSpectrogram = Stemacle.spectrogram(mix, cols: Self.specCols, rows: Self.specRows)
         }
+        #endif
         position = 0
         loadGeneration += 1
         isReady = true
@@ -181,7 +203,9 @@ final class StemPlayerViewModel: ObservableObject {
     /// radial visualizer. Falls back to an empty spectrum.
     var currentSpectrum: [Float] {
         guard !masterSpectrogram.isEmpty else { return [] }
-        return masterSpectrogram[min(playColumn, masterSpectrogram.count - 1)]
+        // masterSpectrogram is 64 cols on iOS, specCols cols on macOS
+        let col = min(Int(progress * Double(masterSpectrogram.count)), masterSpectrogram.count - 1)
+        return masterSpectrogram[col]
     }
 
     /// Decode `url` to 44.1 kHz stereo, separate using the best available *local*
@@ -240,20 +264,46 @@ final class StemPlayerViewModel: ObservableObject {
             #endif
 
             // --- Tier 2: on-device DSP (CoherenceSeparator, always available) ---
+            // iOS memory budget: the Rust STFT allocates ~200 MB per stereo
+            // spectrogram; a 3-minute track peaks at ~1 GB and crashes.
+            // Cap the separation input to 90 seconds; silence-pad stems back
+            // to the full duration so playback length is always correct.
+            #if os(iOS)
+            let maxSepSamples = Int(StemAudioEngine.sampleRate * 90)
+            let wasTrimmed = left.count > maxSepSamples
+            let sepLeft  = wasTrimmed ? Array(left.prefix(maxSepSamples))  : left
+            let sepRight = wasTrimmed ? Array(right.prefix(maxSepSamples)) : right
+            if wasTrimmed { status = "Separating first 90s (on-device)…" } else {
+                status = "Separating (on-device)…"
+            }
+            #else
+            let sepLeft = left; let sepRight = right; let wasTrimmed = false
             status = "Separating (on-device)…"
+            #endif
+
             let result = try await Self.separationQueue.separate(
-                left: left, right: right, sampleRate: 44100)
+                left: sepLeft, right: sepRight, sampleRate: 44100)
             guard let result else {
                 status = "Could not separate this file"
                 return
             }
             split = result
             var dict: [String: [Float]] = [:]
-            for (name, samples) in result.ordered { dict[name] = samples }
+            let fullLen = left.count
+            for (name, samples) in result.ordered {
+                if wasTrimmed && samples.count < fullLen {
+                    var padded = samples
+                    padded.append(contentsOf: [Float](repeating: 0, count: fullLen - samples.count))
+                    dict[name] = padded
+                } else {
+                    dict[name] = samples
+                }
+            }
+            let quality = wasTrimmed ? "on-device (90s)" : "on-device"
             finishLoading(dict, bpm: result.bpm,
                           measureOffset: result.measureOffset, beatOffset: result.beatOffset,
                           duration: decoded.duration,
-                          quality: "on-device")
+                          quality: quality)
         } catch {
             status = "Load failed: \(error.localizedDescription)"
         }

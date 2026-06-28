@@ -164,6 +164,28 @@ pub unsafe extern "C" fn stemacle_spectrogram(
     dst.copy_from_slice(&grid[..dst.len().min(grid.len())]);
 }
 
+/// Compute a `cols`-bucket peak waveform envelope (0..1) into `out`.
+/// O(n) time and O(cols) extra space — use on iOS instead of `stemacle_spectrogram`
+/// to avoid the ~200 MB STFT allocation per stem on long tracks.
+///
+/// # Safety
+/// `samples` must point to `len` valid `f32`s; `out` to `cols` writable `f32`s.
+#[no_mangle]
+pub unsafe extern "C" fn stemacle_waveform_envelope(
+    samples: *const f32,
+    len: usize,
+    cols: usize,
+    out: *mut f32,
+) {
+    if samples.is_null() || out.is_null() || cols == 0 {
+        return;
+    }
+    let s = slice::from_raw_parts(samples, len);
+    let env = stemacle_dsp::viz::waveform_envelope(s, cols);
+    let dst = slice::from_raw_parts_mut(out, cols);
+    dst.copy_from_slice(&env[..dst.len().min(env.len())]);
+}
+
 /// Fold a transport position into an active loop window (`active != 0`). Pure.
 #[no_mangle]
 pub extern "C" fn stemacle_audible_stem_time(

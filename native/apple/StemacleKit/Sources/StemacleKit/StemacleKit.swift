@@ -99,4 +99,17 @@ public enum Stemacle {
         }
         return (0..<cols).map { c in Array(flat[(c * rows)..<((c + 1) * rows)]) }
     }
+
+    /// A `cols`-bucket peak waveform envelope (0…1). O(n) time and O(cols) space —
+    /// use on iOS instead of `spectrogram` to avoid the large STFT allocation on long tracks.
+    public static func waveformEnvelope(_ samples: [Float], cols: Int) -> [Float] {
+        guard cols > 0, !samples.isEmpty else { return [Float](repeating: 0, count: max(0, cols)) }
+        var out = [Float](repeating: 0, count: cols)
+        samples.withUnsafeBufferPointer { src in
+            out.withUnsafeMutableBufferPointer { dst in
+                stemacle_waveform_envelope(src.baseAddress, samples.count, cols, dst.baseAddress)
+            }
+        }
+        return out
+    }
 }
