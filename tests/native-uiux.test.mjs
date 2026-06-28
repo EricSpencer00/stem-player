@@ -68,6 +68,32 @@ test('Library Add button has a 44pt hit target, not just the label glyphs', () =
     'Library Add button must make its whole target tappable, not just the text');
 });
 
+test('empty Library gives first-time users a full-size import button with a UI-test hook', () => {
+  const i = app.indexOf('"Add a song"');
+  assert.notEqual(i, -1, 'empty-library Add a song button exists');
+  const block = app.slice(app.lastIndexOf('Button(action: onImport)', i), app.indexOf('Spacer()', i));
+  assert.match(block, /Text\("Add a song"\)/, 'precondition: primary empty-state import CTA');
+  assert.match(block, /Stem\.minimumHitTarget/,
+    'empty-library import button must reserve a >= 44pt target');
+  assert.match(block, /\.contentShape\(Rectangle\(\)\)/,
+    'empty-library import button must make its whole target tappable');
+  assert.match(block, /\.accessibilityIdentifier\("library\.empty\.add"\)/,
+    'empty-library import needs a stable UI automation hook');
+});
+
+test('Library project rows have unique automation hooks and whole-card tap areas', () => {
+  const list = slice(app, 'ForEach(library.projects)', 'ScrollView {');
+  assert.match(list, /Button \{ onOpen\(project\) \} label: \{ ProjectRow\(project: project\) \}/,
+    'precondition: tapping a project reopens it');
+  assert.match(list, /\.accessibilityIdentifier\("project\.row\.\\\(project\.id\.uuidString\)"\)/,
+    'project rows need per-project identifiers so UI tests can open a specific cached song');
+
+  const row = slice(app, 'struct ProjectRow', 'private func clock');
+  assert.match(row, /Spacer\(\)/, 'precondition: ProjectRow has a transparent gap before the play icon');
+  assert.match(row, /\.contentShape\(Rectangle\(\)\)/,
+    'the whole visual card, including the Spacer gap, should reopen the project');
+});
+
 // --- Icon-only buttons: dead corners around a centered glyph -----------------
 
 test('transport buttons make their full 44pt frame tappable, not just the glyph', () => {
@@ -95,6 +121,53 @@ test('splitter change-song (+) button is fully tappable, not just the plus glyph
   assert.match(block, /\.frame\(width: Stem\.minimumHitTarget, height: Stem\.minimumHitTarget\)/);
   assert.match(block, /\.contentShape\(Rectangle\(\)\)/,
     'change-song button needs .contentShape so the whole 44pt frame is tappable');
+});
+
+test('idle splitter exposes first-run load and sample actions as full-size tappable controls', () => {
+  const device = slice(app, 'struct DeviceCircleView', 'struct LoopControlBar');
+
+  const load = device.slice(device.indexOf('Button(action: onLoad)'), device.indexOf('Text(model.status)'));
+  assert.match(load, /Image\(systemName: "plus\.circle"\)/, 'precondition: center load control exists');
+  assert.match(load, /\.frame\(width: Stem\.minimumHitTarget, height: Stem\.minimumHitTarget\)/,
+    'center load control needs a real 44pt hit box, not only a large glyph');
+  assert.match(load, /\.contentShape\(Rectangle\(\)\)/,
+    'center load control should make the full hit box tappable');
+  assert.match(load, /\.accessibilityIdentifier\("splitter\.load"\)/,
+    'center load control needs a stable UI automation hook');
+
+  const sample = device.slice(device.indexOf('Button("try a sample")'), device.indexOf('.padding(40)'));
+  assert.match(sample, /Button\("try a sample"\)/, 'precondition: sample action exists');
+  assert.match(sample, /Stem\.minimumHitTarget/,
+    'sample action needs a 44pt-height tap target');
+  assert.match(sample, /\.contentShape\(Rectangle\(\)\)/,
+    'sample action should make its full tap target live');
+  assert.match(sample, /\.accessibilityIdentifier\("splitter\.sample"\)/,
+    'sample action needs a stable UI automation hook');
+});
+
+test('splitter progress and status are observable while a song is processing', () => {
+  const device = slice(app, 'struct DeviceCircleView', 'struct LoopControlBar');
+  assert.match(device, /if model\.isProcessing/);
+  assert.match(device, /ProgressView\(\)/);
+  assert.match(device, /model\.splitProgress/);
+  assert.match(device, /\.accessibilityIdentifier\("splitter\.progress"\)/,
+    'processing progress needs a stable UI automation hook');
+  assert.match(device, /Text\(model\.status\)[\s\S]*\.accessibilityIdentifier\("splitter\.status"\)/,
+    'processing and error status text needs a stable UI automation hook');
+});
+
+test('loop controls use 44pt tap targets and stable identifiers for post-load walkthroughs', () => {
+  const loop = slice(app, 'struct LoopControlBar', 'struct TransportView');
+  assert.match(loop, /Button\(label\) \{ model\.setAllLoop/,
+    'precondition: All loop length buttons exist');
+  assert.match(loop, /Button\(text, action: action\)/,
+    'precondition: Mute all / Mix-Solo pills exist');
+  assert.match(loop, /\.frame\(minHeight: Stem\.minimumHitTarget\)/,
+    'loop controls should not rely on small caption-height tap boxes');
+  assert.match(loop, /\.contentShape\(Rectangle\(\)\)/,
+    'loop controls need their full pill/button area tappable');
+  assert.match(loop, /\.accessibilityIdentifier\("loop\./,
+    'loop controls need stable UI automation identifiers');
 });
 
 // --- Overlap contracts ------------------------------------------------------

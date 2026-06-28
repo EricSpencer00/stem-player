@@ -14,20 +14,8 @@ function loadLandingHtml() {
   return readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 }
 
-function loadIosComingSoonHtml() {
-  return readFileSync(new URL('../ios-coming-soon/index.html', import.meta.url), 'utf8');
-}
-
-function loadNativeShellHtml() {
-  return readFileSync(new URL('../native/index.html', import.meta.url), 'utf8');
-}
-
 function loadPackageJson() {
   return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-}
-
-function loadCapacitorConfig() {
-  return JSON.parse(readFileSync(new URL('../capacitor.config.json', import.meta.url), 'utf8'));
 }
 
 function loadWranglerConfig() {
@@ -62,28 +50,8 @@ function loadPagesWorkflow() {
   return readFileSync(new URL('../.github/workflows/pages.yml', import.meta.url), 'utf8');
 }
 
-function loadGitignore() {
-  return readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
-}
-
-function loadPackageMacosScript() {
-  return readFileSync(new URL('../scripts/package-macos.mjs', import.meta.url), 'utf8');
-}
-
 function readRepo(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-}
-
-function loadMacEntitlements(path) {
-  return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-}
-
-function loadMacSwiftApp() {
-  return readFileSync(new URL('../native/macos/Sources/StemacleMac/StemacleMacApp.swift', import.meta.url), 'utf8');
-}
-
-function loadIosProject() {
-  return readFileSync(new URL('../native/ios/App/App.xcodeproj/project.pbxproj', import.meta.url), 'utf8');
 }
 
 test('landing page is a release-only shelf with durable public links', () => {
@@ -233,9 +201,13 @@ test('cloudflare pages build publishes the complete Stemacle site', () => {
   assert.match(pagesWorkflow, /name:\s*Validate/);
   assert.match(pagesWorkflow, /npm test/);
   assert.match(pagesWorkflow, /npm run site:prepare/);
-  assert.match(pagesWorkflow, /npm run native:prepare/);
   assert.doesNotMatch(pagesWorkflow, /configure-pages|upload-pages-artifact|deploy-pages/);
   assert.doesNotMatch(pagesWorkflow, /pages:\s*write|id-token:\s*write|github-pages/);
+  // CI must not reference surfaces deleted in the native rewrite (kept the repo
+  // RED for months). It validates the current native surfaces instead.
+  assert.doesNotMatch(pagesWorkflow, /native\/electron|native\/index\.html|native\/ios|capacitor\.config\.json|native:prepare/);
+  assert.match(pagesWorkflow, /native\/apple\/project\.yml/);
+  assert.match(pagesWorkflow, /native\/core\/Cargo\.toml/);
 });
 
 test('site prepare preserves the perfect /app bundle and redirects only legacy stem-player paths', () => {
@@ -269,42 +241,45 @@ test('404 fallback redirects legacy paths without looping stemacle app routes', 
   assert.doesNotMatch(html, /path === '\/app' \|\| path\.startsWith\('\/app\/'\)\) \{/);
 });
 
-test('release workflow publishes comprehensive macOS desktop assets to GitHub Releases', () => {
+test('release + package contracts are honest: no dead electron/capacitor/native-macos surfaces', () => {
   const pkg = loadPackageJson();
   const workflow = loadReleaseWorkflow();
   const pagesWorkflow = loadPagesWorkflow();
-  const packageScript = loadPackageMacosScript();
-  const gitignore = loadGitignore();
+  const iosReleaseScript = readRepo('scripts/ios-release.sh');
 
   assert.equal(pkg.version, '0.2.1');
-  assert.doesNotMatch(workflow, /node-version:\s*20/);
   assert.match(workflow, /node-version:\s*24/);
-  assert.doesNotMatch(pagesWorkflow, /node-version:\s*20/);
   assert.match(pagesWorkflow, /node-version:\s*24/);
-  assert.equal(pkg.build.productName, 'Stemacle Web Workbench');
-  assert.match(packageScript, /packageJson\.version/);
-  assert.match(packageScript, /const appIconName = 'StemacleIcon\.icns'/);
-  assert.match(packageScript, /CFBundleIconFile[\s\S]*\$\{appIconName\}/);
-  assert.match(packageScript, /native', 'electron', 'icon\.icns'/);
-  assert.match(packageScript, /findDeveloperIdApplicationIdentity/);
-  assert.match(packageScript, /Developer ID Application:/);
-  assert.match(packageScript, /const appEntitlements = distribution === 'appstore'/);
-  assert.match(packageScript, /if \(appEntitlements\)/);
-  assert.match(packageScript, /codesign[\s\S]*dmgPath/);
-  assert.match(packageScript, /CFBundleShortVersionString[\s\S]*\$\{version\}/);
-  assert.match(packageScript, /versionedBaseName = `Stemacle-\$\{version\}-\$\{outputArch\}`/);
-  assert.match(packageScript, /\$\{versionedBaseName\}\.dmg/);
-  assert.match(packageScript, /\$\{versionedBaseName\}-mac\.zip/);
-  assert.match(workflow, /runs-on:\s*macos-latest/);
-  assert.match(workflow, /npm run macos:package/);
-  assert.match(workflow, /Stemacle-\$\{version\}-arm64\.dmg/);
-  assert.match(workflow, /Stemacle-\$\{version\}-arm64-mac\.zip/);
-  assert.match(workflow, /Stemacle-\$\{version\}-SHA256SUMS\.txt/);
-  assert.match(workflow, /target_commitish:\s*\$\{\{\s*github\.sha\s*\}\}/);
-  assert.match(workflow, /release-assets\/Stemacle-\[0-9\]\*-arm64\.dmg/);
-  assert.match(workflow, /release-assets\/Stemacle-\[0-9\]\*-arm64-mac\.zip/);
-  assert.doesNotMatch(workflow, /Stemacle-windows|Stemacle-linux|WIN_CSC_LINK/);
-  assert.match(gitignore, /native\/macos\/\.build\//);
+
+  // The native rewrite removed native/electron, native/ios (Capacitor), and
+  // native/macos (SwiftPM). package.json + the release workflow must not still
+  // claim those build paths, or CI breaks and new agents are misled.
+  assert.equal(pkg.main, undefined, 'no electron main entry');
+  assert.equal(pkg.build, undefined, 'no electron-builder build block');
+  assert.equal(pkg.dependencies, undefined, 'no @capacitor dependency');
+  for (const script of Object.values(pkg.scripts)) {
+    assert.doesNotMatch(script, /electron|cap (add|sync|open)|native\/macos|native:prepare|package-macos/,
+      `script must not reference a deleted surface: ${script}`);
+  }
+  assert.equal(pkg.keywords.includes('electron'), false);
+  assert.equal(pkg.keywords.includes('capacitor'), false);
+
+  // The release workflow still gates tags with the real test suite, but no longer
+  // builds the dead macOS DMG (native/macos + electron-builder are gone).
+  assert.match(workflow, /npm test/, 'release still runs the test gate');
+  assert.doesNotMatch(workflow, /macos:package|native\/macos|electron-builder|\.dmg/);
+
+  // The live native release path that remains is the iOS xcodebuild script.
+  assert.match(pkg.scripts['ios:archive'], /scripts\/ios-release\.sh/);
+  assert.match(iosReleaseScript, /PROJECT_PATH="\$ROOT_DIR\/native\/apple\/Stemacle\.xcodeproj"/);
+  assert.match(iosReleaseScript, /SCHEME="StemacleiOS"/);
+  assert.match(iosReleaseScript, /npm run apple:project/);
+  assert.match(iosReleaseScript, /npm run apple:xcframework/);
+  assert.match(iosReleaseScript, /APPLE_DEVELOPMENT_TEAM="\$\{APPLE_DEVELOPMENT_TEAM:-\$\{DEVELOPMENT_TEAM:-QAWD9U9CF6\}\}"/);
+  assert.match(iosReleaseScript, /validate_signing_identity/);
+  assert.match(iosReleaseScript, /security find-identity -v -p codesigning/);
+  assert.match(iosReleaseScript, /DEVELOPMENT_TEAM="\$APPLE_DEVELOPMENT_TEAM"/);
+  assert.doesNotMatch(iosReleaseScript, /native\/ios|ios:sync|cap sync|Capacitor/);
 });
 
 class FakeClassList {
@@ -876,6 +851,27 @@ test('browser bass melody split uses a soft low-mid crossover', () => {
   assert.match(html, /function softLowPass\(re,\s*im,\s*F,\s*B,\s*lowHz,\s*highHz\)/);
   assert.match(html, /0\.5 \+ 0\.5 \* Math\.cos\(Math\.PI \* t\)/);
   assert.match(html, /softLowPass\(hRe,\s*hIm,\s*F,\s*TOT_BINS,\s*220,\s*380\)/);
+});
+
+test('web, Rust core, and golden generator pin the same DSP fallback constants', () => {
+  const html = loadHtml();
+  const tempo = readRepo('native/core/stemacle-dsp/src/tempo.rs');
+  const loops = readRepo('native/core/stemacle-dsp/src/loops.rs');
+  const hpss = readRepo('native/core/stemacle-dsp/src/hpss.rs');
+  const core = readRepo('native/core/stemacle-dsp/src/lib.rs');
+  const golden = readRepo('tests/golden/gen-golden.mjs');
+
+  assert.match(html, /const BPM_FALLBACK = 120;/);
+  assert.match(tempo, /pub const BPM_FALLBACK: f32 = 120\.0;/);
+  assert.match(golden, /BPM_FALLBACK = 120;/);
+
+  assert.match(html, /const bpm = Number\.isFinite\(state\.bpm\) \? clamp\(state\.bpm, BPM_MIN, BPM_MAX\) : BPM_FALLBACK;/);
+  assert.match(loops, /let bpm = if self\.bpm\.is_finite\(\) \{[\s\S]*clamp\(self\.bpm, BPM_MIN, BPM_MAX\)[\s\S]*\} else \{[\s\S]*BPM_FALLBACK[\s\S]*\};/);
+
+  assert.match(html, /0\.5 \+ 0\.5 \* Math\.cos\(Math\.PI \* t\)/);
+  assert.match(hpss, /0\.5 \+ 0\.5 \* \(std::f32::consts::PI \* t\)\.cos\(\)/);
+  assert.match(html, /softLowPass\(hRe,\s*hIm,\s*F,\s*TOT_BINS,\s*220,\s*380\)/);
+  assert.match(core, /hpss::soft_low_pass\(&split\.harmonic,\s*220\.0,\s*380\.0\)/);
 });
 
 test('tempo estimator recovers beat tempo and beat-grid offset', () => {

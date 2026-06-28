@@ -106,8 +106,16 @@ struct LibraryView: View {
                         Text("Split a track and it lands here — reopen any time without waiting.")
                             .font(.footnote).foregroundStyle(Stem.inkSoft)
                             .multilineTextAlignment(.center).padding(.horizontal, 40)
-                        Button(action: onImport) { Text("Add a song").font(.subheadline.weight(.medium)) }
-                            .buttonStyle(.borderedProminent).tint(Stem.purple).padding(.top, 4)
+                        Button(action: onImport) {
+                            Text("Add a song")
+                                .font(.subheadline.weight(.medium))
+                                .frame(minWidth: Stem.minimumHitTarget, minHeight: Stem.minimumHitTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Stem.purple)
+                        .padding(.top, 4)
+                        .accessibilityIdentifier("library.empty.add")
                     }
                     Spacer()
                 } else {
@@ -116,7 +124,7 @@ struct LibraryView: View {
                             ForEach(library.projects) { project in
                                 Button { onOpen(project) } label: { ProjectRow(project: project) }
                                     .buttonStyle(.plain)
-                                    .accessibilityIdentifier("project.row")
+                                    .accessibilityIdentifier("project.row.\(project.id.uuidString)")
                             }
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -151,6 +159,7 @@ struct ProjectRow: View {
         .background(Stem.cream)
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Stem.creamDeep, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
     }
     private func clock(_ s: Double) -> String { String(format: "%d:%02d", Int(s) / 60, Int(s) % 60) }
 }
@@ -351,26 +360,36 @@ struct DeviceCircleView: View {
                             Text("\(Int(p * 100))%").font(.caption.monospacedDigit())
                                 .foregroundStyle(Stem.inkSoft)
                         }
+                        .accessibilityIdentifier("splitter.progress")
                     } else {
                         ProgressView().controlSize(.large)
+                            .accessibilityIdentifier("splitter.progress")
                     }
                 } else {
                     Button(action: onLoad) {
                         Image(systemName: "plus.circle")
                             .font(.system(size: 44, weight: .light))
                             .foregroundStyle(Stem.purple)
-                    }.buttonStyle(.plain)
+                            .frame(width: Stem.minimumHitTarget, height: Stem.minimumHitTarget)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("splitter.load")
                 }
                 Text(model.status)
                     .font(.footnote).foregroundStyle(Stem.inkSoft)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .minimumScaleFactor(0.75)
+                    .accessibilityIdentifier("splitter.status")
                 if !model.isProcessing, let demo = Bundle.main.url(forResource: "demo", withExtension: "wav") {
                     Button("try a sample") { Task { await model.loadFile(demo) } }
                         .font(.caption.weight(.medium))
                         .foregroundStyle(Stem.purple)
+                        .frame(minHeight: Stem.minimumHitTarget)
+                        .contentShape(Rectangle())
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("splitter.sample")
                 }
             }
             .padding(40)
@@ -401,10 +420,12 @@ struct LoopControlBar: View {
                     let active = model.allLoopBars == value
                     Button(label) { model.setAllLoop(bars: active ? nil : value) }
                         .font(.caption.weight(.medium))
-                        .frame(maxWidth: .infinity).padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, minHeight: Stem.minimumHitTarget)
                         .background(active ? Stem.amber.opacity(0.28) : Stem.creamDeep.opacity(0.5))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .contentShape(Rectangle())
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("loop.all.\(label)")
                 }
             }
         }
@@ -414,10 +435,13 @@ struct LoopControlBar: View {
         Button(text, action: action)
             .font(.caption.weight(.medium))
             .padding(.horizontal, 12).padding(.vertical, 6)
+            .frame(minHeight: Stem.minimumHitTarget)
             .background(on ? Stem.purple.opacity(0.16) : Stem.creamDeep.opacity(0.5))
             .foregroundStyle(on ? Stem.purple : Stem.inkSoft)
             .clipShape(Capsule())
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
+            .accessibilityIdentifier("loop.\(text.replacingOccurrences(of: " ", with: ".").lowercased())")
     }
 }
 

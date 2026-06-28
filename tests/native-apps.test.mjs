@@ -63,6 +63,22 @@ test('Apple apps are native SwiftUI over StemacleKit, not a webview shell', () =
   assert.ok(existsSync(r('native', 'apple', 'Stemacle', 'Resources', 'Assets.xcassets', 'AccentColor.colorset', 'Contents.json')));
 });
 
+test('Apple project keeps signing and App Store bundle resources installable', () => {
+  const project = read('native', 'apple', 'project.yml');
+  const generated = read('native', 'apple', 'Stemacle.xcodeproj', 'project.pbxproj');
+
+  assert.match(project, /DEVELOPMENT_TEAM:\s*QAWD9U9CF6/);
+  assert.match(generated, /DEVELOPMENT_TEAM = QAWD9U9CF6;/);
+  assert.doesNotMatch(project, /DEVELOPMENT_TEAM:\s*""/);
+  assert.doesNotMatch(generated, /DEVELOPMENT_TEAM = "";/);
+
+  assert.match(project, /Resources\/Info-iOS\.plist/);
+  assert.match(project, /Resources\/Info-macOS\.plist/);
+  assert.match(project, /UIRequiresFullScreen:\s*true/);
+  assert.doesNotMatch(generated, /Info-iOS\.plist in Resources/);
+  assert.doesNotMatch(generated, /Info-macOS\.plist in Resources/);
+});
+
 test('Apple app mounts the implemented Stem Shuffle tab', () => {
   const app = read('native', 'apple', 'Stemacle', 'StemacleApp.swift');
   assert.match(app, /enum Tab: Hashable \{ case library, splitter, shuffle, settings \}/);

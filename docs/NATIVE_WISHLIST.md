@@ -61,8 +61,8 @@ Non-negotiable from the web app:
 ### Goalpost 1: Parity Release (MVP)
 **Goal:** Free or $4.99 one-time. Make people realize native is worth installing.
 
-- [ ] SwiftUI app shell in `native/macos`
-- [ ] Load prepared local `/app/` bundle via WKWebView
+- [ ] SwiftUI app shell in `native/apple` through the `StemacleMac` target
+- [ ] Use the shared Rust DSP core through `StemacleKit`, not a WKWebView wrapper
 - [ ] Warm matte circle, four-stem controls, loop contract match web exactly
 - [ ] Play/pause/seek/tempo/loop behavior identical to web
 - [ ] Native file dialogs (NSOpenPanel for one-off splits)

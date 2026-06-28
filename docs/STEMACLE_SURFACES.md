@@ -68,8 +68,8 @@ Then desktop should go above and beyond:
 - durable per-track cache paths and local-first storage clarity
 - native menus, keyboard shortcuts, drag/drop, command palette, and desktop notifications
 - app sandbox entitlements for App Store packaging
-- GitHub Release `.app` zip packaging through `npm run macos:package`
-- App Store package path through `npm run macos:appstore`
+- GitHub/App Store desktop packaging is not currently wired up; rebuild it around
+  the `native/apple` Xcode project when the desktop release path is ready.
 
 Any compatibility package that still uses a web workbench should follow this SwiftUI
 desktop direction where possible and must not redefine the product direction away
@@ -81,8 +81,8 @@ The native iOS app is the SwiftUI `StemacleiOS` target in `native/apple`. Like
 desktop, it must match the perfect web app first, then add mobile-native
 strengths. It uses iOS navigation patterns (`TabView`, `NavigationStack`, menus,
 sheets, document picker, lists, toggles) and compiles the splitter into Swift
-through `StemacleKit` and `StemacleCore.xcframework`. Capacitor remains useful as
-a packaging/resource legacy, but it is no longer the iOS runtime direction.
+through `StemacleKit` and `StemacleCore.xcframework`. Capacitor is no longer the
+iOS runtime or packaging direction.
 
 iOS must keep the same tactile splitter and visual parity with the web player:
 
@@ -133,8 +133,8 @@ Every release should verify all surfaces:
 - canonical web app availability at `https://stemacle.com/app/`
 - legacy redirect from `https://ericspencer.us/stem-player` to `https://stemacle.com/app/`
 - desktop SwiftUI bundle: `xcodebuild -project native/apple/Stemacle.xcodeproj -scheme StemacleMac -configuration Debug -destination 'platform=macOS' build`
-- iOS resources: `npm run native:prepare`
 - iOS native compile: `xcodebuild -project native/apple/Stemacle.xcodeproj -scheme StemacleiOS -configuration Debug -destination 'platform=iOS Simulator,name=<available simulator>' build`
+- iOS archive/publish path: `npm run ios:archive`, `npm run ios:testflight`, `npm run ios:publish`, or `npm run ios:validate`
 - regression suite: `npm test`
 
 Stemacle.com points at the Cloudflare Pages output in `dist/site`. The current web app remains perfect at `/app/`. Desktop and iOS now compile native SwiftUI surfaces that must match the web app before adding their own platform features.
