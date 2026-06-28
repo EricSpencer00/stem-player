@@ -185,86 +185,66 @@ struct SplitterView: View {
     var body: some View {
         ZStack {
             Stem.cream.ignoresSafeArea()
-            VStack(spacing: 8) {
-                HStack(spacing: 12) {
-                    Text(model.isReady && !model.songTitle.isEmpty ? model.songTitle : "stemacle")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(model.isReady ? Stem.ink : Stem.inkSoft)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .layoutPriority(1)
-                        .accessibilityIdentifier("splitter.title")
-                    Spacer()
-                    // Persistent "change song" — load a new track without exiting.
-                    Button(action: onImport) {
-                        Image(systemName: "plus.circle").foregroundStyle(Stem.purple)
-                            .frame(width: Stem.minimumHitTarget, height: Stem.minimumHitTarget)
-                            // Whole 44pt frame is tappable, not just the glyph.
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("o", modifiers: .command)
-                    .accessibilityIdentifier("splitter.add")
-                }
-                .font(.system(size: 17))
-                .padding(.horizontal, 18)
-                .padding(.top, 6)
-                .padding(.bottom, -4)
 
-                // Player header (compact + collapsing).
-                Group {
-                    if model.isReady {
-                        PlayerHeaderView(model: model)
-                    } else {
-                        DeviceCircleView(model: model, onLoad: onImport)
-                    }
-                }
-                .frame(maxWidth: model.isReady ? PlayerHeaderMetrics.readyDiameter : PlayerHeaderMetrics.idleDiameter)
-                .frame(height: (model.isReady ? PlayerHeaderMetrics.readyDiameter : PlayerHeaderMetrics.idleDiameter) * headerScale)
-                .scaleEffect(headerScale, anchor: .top)
-                .animation(.easeOut(duration: 0.15), value: model.isReady)
-                .accessibilityIdentifier("splitter.header")
-
-                // The player's master spectrogram overview ("the one in the player").
-                if model.isReady {
-                    VStack(spacing: 4) {
-                        SpectrogramLane(image: masterImage, progress: model.progress,
-                                        grid: model.measureGrid, height: PlayerHeaderMetrics.masterLaneHeight) { p in
-                            model.seek(toProgress: p)
-                        }
-                        HStack {
-                            Text(model.elapsedString)
-                            Spacer()
-                            Text("\(Int(model.bpm)) BPM")
-                            Spacer()
-                            Text(model.totalString)
-                        }
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(Stem.inkSoft)
-                    }
-                    .padding(.horizontal, 18)
-                    .accessibilityIdentifier("splitter.overview")
-                }
-
-                TransportView(model: model)
-
-                if model.isReady {
-                    LoopControlBar(model: model)
-                        .disabled(!model.isReady || model.isProcessing)
-                        .padding(.horizontal, 18)
-                        .accessibilityIdentifier("loop.bar")
-                }
-
-                // Stem panel with per-stem spectrogram lanes.
-                ScrollView {
+            // Single ScrollView so the whole screen moves together.
+            ScrollView {
+                VStack(spacing: 8) {
+                    // Invisible offset detector at the top of the scroll content.
                     GeometryReader { proxy in
                         Color.clear.preference(
                             key: ScrollOffsetKey.self,
-                            value: -proxy.frame(in: .named("stemScroll")).minY
+                            value: -proxy.frame(in: .named("splitterScroll")).minY
                         )
                     }
                     .frame(height: 0)
 
+                    // Player header (compact + collapsing via scroll offset).
+                    Group {
+                        if model.isReady {
+                            PlayerHeaderView(model: model)
+                        } else {
+                            DeviceCircleView(model: model, onLoad: onImport)
+                        }
+                    }
+                    .frame(maxWidth: model.isReady ? PlayerHeaderMetrics.readyDiameter : PlayerHeaderMetrics.idleDiameter)
+                    .frame(height: (model.isReady ? PlayerHeaderMetrics.readyDiameter : PlayerHeaderMetrics.idleDiameter) * headerScale)
+                    .scaleEffect(headerScale, anchor: .top)
+                    .animation(.easeOut(duration: 0.15), value: model.isReady)
+                    .accessibilityIdentifier("splitter.header")
+
+                    // Master spectrogram overview.
+                    if model.isReady {
+                        VStack(spacing: 4) {
+                            SpectrogramLane(image: masterImage, envelope: [],
+                                            progress: model.progress, duration: model.duration,
+                                            grid: model.measureGrid,
+                                            height: PlayerHeaderMetrics.masterLaneHeight) { p in
+                                model.seek(toProgress: p)
+                            }
+                            HStack {
+                                Text(model.elapsedString)
+                                Spacer()
+                                Text("\(Int(model.bpm)) BPM")
+                                Spacer()
+                                Text(model.totalString)
+                            }
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(Stem.inkSoft)
+                        }
+                        .padding(.horizontal, 18)
+                        .accessibilityIdentifier("splitter.overview")
+                    }
+
+                    TransportView(model: model)
+
+                    if model.isReady {
+                        LoopControlBar(model: model)
+                            .disabled(!model.isReady || model.isProcessing)
+                            .padding(.horizontal, 18)
+                            .accessibilityIdentifier("loop.bar")
+                    }
+
+                    // Stem panels — no longer in a nested ScrollView.
                     VStack(spacing: 10) {
                         ForEach(Stem.stemOrder, id: \.self) { stem in
                             StemRowView(model: model, stem: stem)
@@ -274,9 +254,35 @@ struct SplitterView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 24)
                 }
-                .coordinateSpace(name: "stemScroll")
-                .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
             }
+            .coordinateSpace(name: "splitterScroll")
+            .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
+        }
+        // Title bar stays pinned above the scroll content.
+        .safeAreaInset(edge: .top) {
+            HStack(spacing: 12) {
+                Text(model.isReady && !model.songTitle.isEmpty ? model.songTitle : "stemacle")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(model.isReady ? Stem.ink : Stem.inkSoft)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .layoutPriority(1)
+                    .accessibilityIdentifier("splitter.title")
+                Spacer()
+                Button(action: onImport) {
+                    Image(systemName: "plus.circle").foregroundStyle(Stem.purple)
+                        .frame(width: Stem.minimumHitTarget, height: Stem.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut("o", modifiers: .command)
+                .accessibilityIdentifier("splitter.add")
+            }
+            .font(.system(size: 17))
+            .padding(.horizontal, 18)
+            .padding(.top, 6)
+            .padding(.bottom, 8)
+            .background(Stem.cream.opacity(0.94).ignoresSafeArea(edges: .top))
         }
         .overlay {
             if dropTargeted {
@@ -463,8 +469,11 @@ struct StemRowView: View {
                 iconToggle("speaker.slash.fill", on: model.muted.contains(stem)) { model.toggleMute(stem) }
                 iconToggle("headphones", on: model.soloed.contains(stem)) { model.toggleSolo(stem) }
             }
-            // Spectrogram lane (the slider below each stem) with tap-to-seek.
-            SpectrogramLane(image: laneImage, progress: model.progress, grid: model.measureGrid) { p in
+            // Spectrogram / waveform lane with tap-to-seek and scrolling window.
+            SpectrogramLane(image: laneImage,
+                            envelope: model.stemEnvelopes[stem] ?? [],
+                            progress: model.progress, duration: model.duration,
+                            grid: model.measureGrid) { p in
                 model.seek(toProgress: p)
             }
             Slider(

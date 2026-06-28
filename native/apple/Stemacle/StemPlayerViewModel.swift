@@ -67,6 +67,8 @@ final class StemPlayerViewModel: ObservableObject {
 
     /// Per-stem spectrogram grids: `spectrograms[stem][col][row]`, 0...1.
     @Published var spectrograms: [String: [[Float]]] = [:]
+    /// Per-stem waveform envelopes for iOS (O(n), avoids STFT OOM on long tracks).
+    @Published var stemEnvelopes: [String: [Float]] = [:]
     /// Master (mix) spectrogram for the radial player visualizer.
     @Published var masterSpectrogram: [[Float]] = []
     /// Bumped each load so views can rebuild cached spectrogram images.
@@ -141,15 +143,34 @@ final class StemPlayerViewModel: ObservableObject {
                          bpm: bpm, measureOffset: measureOffset, beatOffset: beatOffset,
                          duration: self.duration, quality: quality)
         }
-        // Compute per-stem spectrograms for the lanes.
-        var specs: [String: [[Float]]] = [:]
+        // Compute per-stem visualization.
+        // iOS uses a peak waveform envelope (O(n), O(cols) space) to avoid the
+        // ~200 MB STFT allocation that each spectrogram call requires on long tracks.
+        // macOS has sufficient RAM for the full log-magnitude spectrogram.
         var mixLen = 0
+        for samples in dict.values { mixLen = max(mixLen, samples.count) }
+        #if os(iOS)
+        var envs: [String: [Float]] = [:]
+        for (name, samples) in dict {
+            envs[name] = Stemacle.waveformEnvelope(samples, cols: Self.specCols)
+        }
+        stemEnvelopes = envs
+        spectrograms = [:]
+        // Low-res master spectrogram (64×16) for the radial visualizer — tiny allocation.
+        if mixLen > 0 {
+            var mix = [Float](repeating: 0, count: mixLen)
+            for samples in dict.values {
+                for i in 0..<samples.count { mix[i] += samples[i] }
+            }
+            masterSpectrogram = Stemacle.spectrogram(mix, cols: 64, rows: 16)
+        }
+        #else
+        var specs: [String: [[Float]]] = [:]
         for (name, samples) in dict {
             specs[name] = Stemacle.spectrogram(samples, cols: Self.specCols, rows: Self.specRows)
-            mixLen = max(mixLen, samples.count)
         }
         spectrograms = specs
-        // Master spectrogram from the summed mix for the radial visualizer.
+        stemEnvelopes = [:]
         if mixLen > 0 {
             var mix = [Float](repeating: 0, count: mixLen)
             for samples in dict.values {
@@ -157,6 +178,7 @@ final class StemPlayerViewModel: ObservableObject {
             }
             masterSpectrogram = Stemacle.spectrogram(mix, cols: Self.specCols, rows: Self.specRows)
         }
+        #endif
         position = 0
         loadGeneration += 1
         isReady = true
@@ -181,7 +203,9 @@ final class StemPlayerViewModel: ObservableObject {
     /// radial visualizer. Falls back to an empty spectrum.
     var currentSpectrum: [Float] {
         guard !masterSpectrogram.isEmpty else { return [] }
-        return masterSpectrogram[min(playColumn, masterSpectrogram.count - 1)]
+        // masterSpectrogram is 64 cols on iOS, specCols cols on macOS
+        let col = min(Int(progress * Double(masterSpectrogram.count)), masterSpectrogram.count - 1)
+        return masterSpectrogram[col]
     }
 
     /// Decode `url` to 44.1 kHz stereo, separate using the best available *local*
