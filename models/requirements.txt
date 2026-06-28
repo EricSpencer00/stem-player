@@ -1,0 +1,14 @@
+# Stemacle separation runtime (Python 3.11 — torch has no 3.14 wheels).
+#   python3.11 -m venv models/.venv-models
+#   models/.venv-models/bin/pip install -r models/requirements.txt
+torch
+demucs
+soundfile
+# server
+fastapi
+uvicorn[standard]
+python-multipart
+# model conversion (optional; htdemucs export is unsupported — see README)
+coremltools
+onnx
+onnxscript

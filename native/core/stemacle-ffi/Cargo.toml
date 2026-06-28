@@ -1,0 +1,15 @@
+[package]
+name = "stemacle-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Stable C ABI over stemacle-dsp for Swift (Apple) and other native shells."
+
+[lib]
+name = "stemacle_ffi"
+# staticlib → link into iOS/macOS apps; cdylib → load from Slint/desktop; rlib → cargo test.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+stemacle-dsp = { path = "../stemacle-dsp" }

@@ -27,3 +27,29 @@ native/macos/.build/
 *.cert
 credentials.json
 secrets.json
+
+# Rust core build output
+native/core/target/
+target/
+
+# Apple build artifacts (regenerate via scripts/build-apple-xcframework.sh)
+native/apple/StemacleCore.xcframework/
+native/apple/build/
+native/apple/**/.build/
+*.xcuserstate
+native/apple/Stemacle.xcodeproj/
+native/apple/**/*.xcodeproj/
+native/apple/Stemacle/Resources/Info-*.plist
+native/desktop/target/
+models/build/
+models/.venv-models/
+
+# python
+__pycache__/
+*.pyc
+
+# Per-user Xcode/SwiftPM IDE state
+native/apple/**/.swiftpm/
+
+# Agent-mode scratch outputs
+outputs/

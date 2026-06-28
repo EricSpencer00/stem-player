@@ -1,0 +1,19 @@
+[package]
+name = "stemacle-desktop"
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+description = "Stemacle native desktop app (Windows/Linux) — Slint UI over the shared Rust core."
+
+[[bin]]
+name = "stemacle-desktop"
+path = "src/main.rs"
+
+[dependencies]
+stemacle-dsp = { path = "../core/stemacle-dsp" }
+slint = "=1.8.0"
+rfd = "0.15"
+cpal = "0.15"
+
+[build-dependencies]
+slint-build = "=1.8.0"

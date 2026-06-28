@@ -12,8 +12,9 @@ test('stem shuffle is now a neutral compatibility handoff page', () => {
   const html = loadHtml();
 
   assert.match(html, /Stem Shuffle has moved\./);
-  assert.match(html, /Open desktop shell/);
+  assert.match(html, /Get native apps/);
   assert.match(html, /Open Stem Splitter/);
+  assert.doesNotMatch(html, /Open desktop shell/);
   assert.doesNotMatch(html, /id="libraryList"/);
   assert.doesNotMatch(html, /id="crossfader"/);
   assert.doesNotMatch(html, /id="youtubePlaylistUrl"/);

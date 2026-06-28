@@ -15,6 +15,11 @@ and loopable. No accounts, no uploads, no server.
 
 ## Canonical Surface Contract
 
+Web app, native desktop macOS app, and native iOS app are three distinct product
+surfaces. The web app is not the macOS app. Native desktop means the SwiftUI
+`StemacleMac` target in `native/apple`; native iOS means the SwiftUI
+`StemacleiOS` target in `native/apple`.
+
 `https://stemacle.com/app/` is the perfect canonical Stemacle web app. Treat it as
 the gold master for playback behavior, visual hierarchy, stem controls, loop
 semantics, and tactile feel. Do not redesign or "polish" the web app unless Eric
