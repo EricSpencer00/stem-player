@@ -82,6 +82,72 @@ pub fn hpss(input: &Spectrogram) -> HpssResult {
     }
 }
 
+/// Two-pass HPSS with wider kernels and a second cleanup pass on the harmonic
+/// residual to pull stray transients back into the percussive stem.
+///
+/// Pass 1: 31-tap horizontal (better harmonic tracking) + 7-tap vertical
+/// (sharper drum onset detection).
+/// Pass 2: re-HPSS on the harmonic output; any frame-bin cell where the
+/// percussive fraction exceeds 60% is reclassified as drums.
+pub fn hpss_refined(input: &Spectrogram) -> HpssResult {
+    let frames = input.frames;
+    let bins = TOT_BINS;
+
+    let mut mag = vec![0.0f32; frames * bins];
+    for f in 0..frames {
+        for b in 0..bins {
+            mag[f * bins + b] = input.re[f][b].powi(2) + input.im[f][b].powi(2);
+        }
+    }
+
+    // Pass 1: wider horizontal = cleaner sustained harmonic;
+    // narrower vertical = crisper drum onset detection.
+    let h1 = med_filter(&mag, frames, bins, 31, 'h');
+    let p1 = med_filter(&mag, frames, bins, 7,  'v');
+
+    let mut harmonic   = Spectrogram::zeros(frames);
+    let mut percussive = Spectrogram::zeros(frames);
+    let mut h_mag = vec![0.0f32; frames * bins];
+
+    for f in 0..frames {
+        for b in 0..bins {
+            let hh = h1[f * bins + b];
+            let pp = p1[f * bins + b];
+            let d  = hh + pp + 1e-8;
+            let hm = hh / d;
+            let pm = pp / d;
+            harmonic.re[f][b]   = input.re[f][b] * hm;
+            harmonic.im[f][b]   = input.im[f][b] * hm;
+            percussive.re[f][b] = input.re[f][b] * pm;
+            percussive.im[f][b] = input.im[f][b] * pm;
+            h_mag[f * bins + b] =
+                (harmonic.re[f][b].powi(2) + harmonic.im[f][b].powi(2)).sqrt();
+        }
+    }
+
+    // Pass 2: re-HPSS on harmonic to catch transient leakage.
+    let h2 = med_filter(&h_mag, frames, bins, 31, 'h');
+    let p2 = med_filter(&h_mag, frames, bins, 7,  'v');
+
+    for f in 0..frames {
+        for b in 0..bins {
+            let hh = h2[f * bins + b];
+            let pp = p2[f * bins + b];
+            let d  = hh + pp + 1e-8;
+            if pp / d > 0.60 {
+                let pm = pp / d;
+                let hm = hh / d;
+                percussive.re[f][b] += harmonic.re[f][b] * pm;
+                percussive.im[f][b] += harmonic.im[f][b] * pm;
+                harmonic.re[f][b]   *= hm;
+                harmonic.im[f][b]   *= hm;
+            }
+        }
+    }
+
+    HpssResult { harmonic, percussive }
+}
+
 /// Low-pass split at `hz`. Port of `lowPass`: returns (low, high) spectrograms
 /// where the cutoff bin is `round(hz / (SR / FFT_SIZE))`.
 pub fn low_pass(input: &Spectrogram, hz: f32) -> (Spectrogram, Spectrogram) {

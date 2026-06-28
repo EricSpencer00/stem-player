@@ -264,20 +264,46 @@ final class StemPlayerViewModel: ObservableObject {
             #endif
 
             // --- Tier 2: on-device DSP (CoherenceSeparator, always available) ---
+            // iOS memory budget: the Rust STFT allocates ~200 MB per stereo
+            // spectrogram; a 3-minute track peaks at ~1 GB and crashes.
+            // Cap the separation input to 90 seconds; silence-pad stems back
+            // to the full duration so playback length is always correct.
+            #if os(iOS)
+            let maxSepSamples = Int(StemAudioEngine.sampleRate * 90)
+            let wasTrimmed = left.count > maxSepSamples
+            let sepLeft  = wasTrimmed ? Array(left.prefix(maxSepSamples))  : left
+            let sepRight = wasTrimmed ? Array(right.prefix(maxSepSamples)) : right
+            if wasTrimmed { status = "Separating first 90s (on-device)…" } else {
+                status = "Separating (on-device)…"
+            }
+            #else
+            let sepLeft = left; let sepRight = right; let wasTrimmed = false
             status = "Separating (on-device)…"
+            #endif
+
             let result = try await Self.separationQueue.separate(
-                left: left, right: right, sampleRate: 44100)
+                left: sepLeft, right: sepRight, sampleRate: 44100)
             guard let result else {
                 status = "Could not separate this file"
                 return
             }
             split = result
             var dict: [String: [Float]] = [:]
-            for (name, samples) in result.ordered { dict[name] = samples }
+            let fullLen = left.count
+            for (name, samples) in result.ordered {
+                if wasTrimmed && samples.count < fullLen {
+                    var padded = samples
+                    padded.append(contentsOf: [Float](repeating: 0, count: fullLen - samples.count))
+                    dict[name] = padded
+                } else {
+                    dict[name] = samples
+                }
+            }
+            let quality = wasTrimmed ? "on-device (90s)" : "on-device"
             finishLoading(dict, bpm: result.bpm,
                           measureOffset: result.measureOffset, beatOffset: result.beatOffset,
                           duration: decoded.duration,
-                          quality: "on-device")
+                          quality: quality)
         } catch {
             status = "Load failed: \(error.localizedDescription)"
         }

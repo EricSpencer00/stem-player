@@ -15,6 +15,7 @@ Environment overrides:
   IOS_EXPORT_PATH
   IOS_EXPORT_OPTIONS_PLIST
   IOS_UPLOAD_OPTIONS_PLIST
+  APPLE_DEVELOPMENT_TEAM
   APP_STORE_CONNECT_API_KEY_PATH
   APP_STORE_CONNECT_API_KEY_ID
   APP_STORE_CONNECT_ISSUER_ID
@@ -28,15 +29,40 @@ fi
 
 MODE="$1"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_PATH="$ROOT_DIR/native/ios/App/App.xcodeproj"
-SCHEME="Stemacle"
+PROJECT_PATH="$ROOT_DIR/native/apple/Stemacle.xcodeproj"
+SCHEME="StemacleiOS"
 ARCHIVE_PATH="${IOS_ARCHIVE_PATH:-$ROOT_DIR/release/ios/Stemacle.xcarchive}"
 EXPORT_PATH="${IOS_EXPORT_PATH:-$ROOT_DIR/release/ios/testflight-export}"
-EXPORT_OPTIONS_PLIST="${IOS_EXPORT_OPTIONS_PLIST:-$ROOT_DIR/native/ios/testflight-export-options.plist}"
-UPLOAD_OPTIONS_PLIST="${IOS_UPLOAD_OPTIONS_PLIST:-$ROOT_DIR/native/ios/appstore-upload-options.plist}"
+EXPORT_OPTIONS_PLIST="${IOS_EXPORT_OPTIONS_PLIST:-$ROOT_DIR/native/apple/ExportOptions/testflight-export-options.plist}"
+UPLOAD_OPTIONS_PLIST="${IOS_UPLOAD_OPTIONS_PLIST:-$ROOT_DIR/native/apple/ExportOptions/appstore-upload-options.plist}"
+APPLE_DEVELOPMENT_TEAM="${APPLE_DEVELOPMENT_TEAM:-${DEVELOPMENT_TEAM:-QAWD9U9CF6}}"
+
+prepare_apple_project() {
+  npm run apple:project
+  npm run apple:xcframework
+}
+
+validate_signing_identity() {
+  local identities
+  identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+
+  if ! grep -q "($APPLE_DEVELOPMENT_TEAM)" <<<"$identities"; then
+    echo "No local Apple code signing identity found for team $APPLE_DEVELOPMENT_TEAM." >&2
+    echo "Install/archive needs an Apple Development or Apple Distribution certificate for that team in this keychain." >&2
+    echo "Open Xcode Settings > Accounts to download certificates, or set APPLE_DEVELOPMENT_TEAM to another team ID." >&2
+    exit 1
+  fi
+}
 
 validate_release_inputs() {
   npm run appstore:verify
+  prepare_apple_project
+  validate_signing_identity
+
+  if [[ ! -f "$PROJECT_PATH/project.pbxproj" ]]; then
+    echo "Missing generated Xcode project: $PROJECT_PATH" >&2
+    exit 1
+  fi
 
   if [[ ! -f "$EXPORT_OPTIONS_PLIST" ]]; then
     echo "Missing export options plist: $EXPORT_OPTIONS_PLIST" >&2
@@ -95,18 +121,24 @@ run_xcodebuild() {
       -scheme "$SCHEME" \
       -packageAuthorizationProvider netrc \
       "${AUTH_ARGS[@]}" \
+      DEVELOPMENT_TEAM="$APPLE_DEVELOPMENT_TEAM" \
+      CODE_SIGN_STYLE=Automatic \
       "$@"
   else
     xcodebuild \
       -project "$PROJECT_PATH" \
       -scheme "$SCHEME" \
       -packageAuthorizationProvider netrc \
+      DEVELOPMENT_TEAM="$APPLE_DEVELOPMENT_TEAM" \
+      CODE_SIGN_STYLE=Automatic \
       "$@"
   fi
 }
 
 archive_app() {
-  npm run ios:sync
+  npm run appstore:verify
+  prepare_apple_project
+  validate_signing_identity
   mkdir -p "$(dirname "$ARCHIVE_PATH")"
   rm -rf "$ARCHIVE_PATH"
 
@@ -131,13 +163,15 @@ upload_testflight() {
       -exportArchive \
       -archivePath "$ARCHIVE_PATH" \
       -exportPath "$EXPORT_PATH" \
-      -exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
+      -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
+      -allowProvisioningUpdates
   else
     xcodebuild \
       -exportArchive \
       -archivePath "$ARCHIVE_PATH" \
       -exportPath "$EXPORT_PATH" \
-      -exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
+      -exportOptionsPlist "$EXPORT_OPTIONS_PLIST" \
+      -allowProvisioningUpdates
   fi
 }
 

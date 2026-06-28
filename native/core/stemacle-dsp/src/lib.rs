@@ -88,17 +88,54 @@ fn transient_weights(mag_l: &[Vec<f32>], mag_r: &[Vec<f32>], frames: usize) -> V
 }
 
 impl Separator for CoherenceSeparator {
+    /// Three-pass vocal mask: coherence estimate → temporal median smoothing →
+    /// Wiener soft mask. Substantially reduces musical-noise artifacts and
+    /// bleed compared to the original single-pass binary coherence.
     fn vocal_mask(&self, mag_l: &[Vec<f32>], mag_r: &[Vec<f32>], frames: usize) -> Vec<f32> {
-        let mut mask = vec![0.0f32; frames * MODEL_BINS];
         let transient = transient_weights(mag_l, mag_r, frames);
+
+        // Pass 1: raw per-frame stereo-coherence estimate.
+        let mut raw = vec![0.0f32; frames * MODEL_BINS];
         for f in 0..frames {
+            let attack_duck = 1.0 - 0.9 * transient[f];
             for b in 0..MODEL_BINS {
                 let l = mag_l[f][b];
                 let r = mag_r[f][b];
-                let centered = l.min(r) / (0.5 * (l + r) + 1e-8);
-                let attack_duck = 1.0 - 0.9 * transient[f];
-                mask[f * MODEL_BINS + b] = centered * vocal_mask_weight_for_bin(b) * attack_duck;
+                let avg = 0.5 * (l + r) + 1e-8;
+                let centered = l.min(r) / avg;
+                raw[f * MODEL_BINS + b] =
+                    centered * vocal_mask_weight_for_bin(b) * attack_duck;
             }
+        }
+
+        // Pass 2: 5-frame temporal median per bin — eliminates single-frame
+        // mask spikes that produce "musical noise" in the vocal stem.
+        const HALF: isize = 2;
+        let win_len = (HALF * 2 + 1) as usize;
+        let mut smoothed = vec![0.0f32; frames * MODEL_BINS];
+        let mut window = vec![0.0f32; win_len];
+        for b in 0..MODEL_BINS {
+            for f in 0..frames {
+                for k in 0..win_len {
+                    let fi = f as isize - HALF + k as isize;
+                    window[k] = if fi >= 0 && (fi as usize) < frames {
+                        raw[fi as usize * MODEL_BINS + b]
+                    } else {
+                        0.0
+                    };
+                }
+                window.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+                smoothed[f * MODEL_BINS + b] = window[HALF as usize];
+            }
+        }
+
+        // Pass 3: Wiener-inspired soft mask (p=2).
+        // v^2 / (v^2 + (1-v)^2 + ε) → smoother boundary than hard coherence.
+        let mut mask = vec![0.0f32; frames * MODEL_BINS];
+        for i in 0..frames * MODEL_BINS {
+            let v = smoothed[i];
+            let a = 1.0 - v;
+            mask[i] = (v * v) / (v * v + a * a + 1e-8);
         }
         mask
     }
@@ -151,8 +188,9 @@ pub fn separate(
         }
     }
 
-    // Accompaniment → HPSS → percussive = drums, harmonic → low-pass split.
-    let split = hpss::hpss(&accomp);
+    // Accompaniment → HPSS (two-pass, wider kernels) → percussive = drums,
+    // harmonic → low-pass split.
+    let split = hpss::hpss_refined(&accomp);
     let (bass_spec, melody_spec) = hpss::soft_low_pass(&split.harmonic, 220.0, 380.0);
 
     StemSplit {

@@ -1,0 +1,16 @@
+name = "stemacle-api"
+main = "cloudflare/stemacle-api-worker.js"
+compatibility_date = "2026-06-20"
+workers_dev = true
+
+[[queues.producers]]
+queue = "stemacle-separation-jobs"
+binding = "SEPARATION_QUEUE"
+
+[[r2_buckets]]
+bucket_name = "stemacle-jobs"
+binding = "JOBS_BUCKET"
+
+[[r2_buckets]]
+bucket_name = "stemacle-stems"
+binding = "STEMS_BUCKET"
