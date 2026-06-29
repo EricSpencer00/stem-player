@@ -221,6 +221,18 @@ struct SplitterView: View {
                     .animation(.easeOut(duration: 0.15), value: model.isReady)
                     .accessibilityIdentifier("splitter.header")
 
+                    // Status message (e.g., loop too long error) in ready state.
+                    if model.isReady && !model.status.isEmpty && model.status != "Ready" {
+                        Text(model.status)
+                            .font(.caption).foregroundStyle(Stem.inkSoft)
+                            .multilineTextAlignment(.center)
+                            .padding(8)
+                            .frame(maxWidth: .infinity)
+                            .background(Stem.creamDeep.opacity(0.3))
+                            .cornerRadius(6)
+                            .padding(.horizontal, 8)
+                    }
+
                     // Master spectrogram overview.
                     if model.isReady {
                         VStack(spacing: 4) {

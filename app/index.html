@@ -1501,7 +1501,7 @@ function setStemLoop(stem, idx, options={}){
   const {start, end} = loopRangeFor(transportOffset, loopLength);
 
   if(end > state.duration + 1e-6){
-    alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
+    document.getElementById('hint').textContent = '⚠️ Loop too long. Try a smaller length or stay away from end of track.';
     clearLoopFromStem(stem, transportOffset);
     if(!options.keepAllIndicator) clearAllLoopIndicator();
     clearLoopAuditionStem(stem);
@@ -1529,7 +1529,7 @@ function setAllLoop(idx){
   const {start, end} = loopRangeFor(transportOffset, loopLength);
 
   if(end > state.duration + 1e-6){
-    alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
+    document.getElementById('hint').textContent = '⚠️ Loop too long. Try a smaller length or stay away from end of track.';
     clearStemLoop('all');
     STEMS.forEach((stem)=>clearLoopFromStem(stem, transportOffset));
     clearLoopAuditionStem();
@@ -2810,7 +2810,11 @@ async function handleFile(file){
     document.getElementById('playbar').classList.add('active');
     document.getElementById('stems-panel').classList.add('active');
     setGlyph('play');document.getElementById('centerHint').textContent='play';
-    document.getElementById('hint').textContent=READY_HINT;
+    if(state.tempoConfidence < TEMPO_MIN_CONFIDENCE) {
+      document.getElementById('hint').textContent = '⚠️ Tempo detected with low confidence ('+Math.round(state.tempoConfidence*100)+'%). Loops may not snap correctly.';
+    } else {
+      document.getElementById('hint').textContent=READY_HINT;
+    }
     updateMuteAllControls();
     updateSampleRowsVisibility();
     updateUI(0);
