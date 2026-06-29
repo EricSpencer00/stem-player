@@ -1501,7 +1501,7 @@ function setStemLoop(stem, idx, options={}){
   const {start, end} = loopRangeFor(transportOffset, loopLength);
 
   if(end > state.duration + 1e-6){
-    document.getElementById('hint').textContent = '⚠️ Loop too long. Try a smaller length or stay away from end of track.';
+    alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
     clearLoopFromStem(stem, transportOffset);
     if(!options.keepAllIndicator) clearAllLoopIndicator();
     clearLoopAuditionStem(stem);
@@ -1529,7 +1529,7 @@ function setAllLoop(idx){
   const {start, end} = loopRangeFor(transportOffset, loopLength);
 
   if(end > state.duration + 1e-6){
-    document.getElementById('hint').textContent = '⚠️ Loop too long. Try a smaller length or stay away from end of track.';
+    alert(`Loop too long for current selection. Try a smaller length or stay away from end of track.`);
     clearStemLoop('all');
     STEMS.forEach((stem)=>clearLoopFromStem(stem, transportOffset));
     clearLoopAuditionStem();
