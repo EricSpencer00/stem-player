@@ -304,6 +304,9 @@ final class StemPlayerViewModel: ObservableObject {
                           measureOffset: result.measureOffset, beatOffset: result.beatOffset,
                           duration: decoded.duration,
                           quality: quality)
+            if wasTrimmed {
+                status = "⚠️ Only first 90 seconds separated (device limit). Rest is padded with silence."
+            }
         } catch {
             status = "Load failed: \(error.localizedDescription)"
         }
@@ -400,6 +403,8 @@ final class StemPlayerViewModel: ObservableObject {
 
     func setLoopMonitoring(solo: Bool) {
         guard controlsEnabled else { return }
+        let hasLoop = !loopBars.values.compactMap { $0 }.isEmpty || allLoopBars != nil
+        if solo && !hasLoop { return }
         loopAuditionSolo = solo
         applyMixing()
     }
@@ -441,7 +446,9 @@ final class StemPlayerViewModel: ObservableObject {
         guard controlsEnabled else { return }
         guard let bars else {
             allLoopBars = nil
-            for stem in stems { loopBars[stem] = nil; engine.setLoop(stem, range: nil) }
+            var updated = loopBars
+            for stem in stems { updated[stem] = nil; engine.setLoop(stem, range: nil) }
+            loopBars = updated
             applyMixing()
             return
         }
@@ -450,7 +457,9 @@ final class StemPlayerViewModel: ObservableObject {
             return
         }
         allLoopBars = bars
-        for stem in stems { loopBars[stem] = bars; engine.setLoop(stem, range: win) }
+        var updated = loopBars
+        for stem in stems { updated[stem] = bars; engine.setLoop(stem, range: win) }
+        loopBars = updated
         applyMixing()
     }
 

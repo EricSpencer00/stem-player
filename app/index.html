@@ -2482,7 +2482,12 @@ function updateLoopAuditionUI(){
   const mix=document.getElementById('loopAuditionMix');
   const solo=document.getElementById('loopAuditionSolo');
   if(mix) mix.setAttribute('aria-pressed', String(state.loopAuditionMode==='mix'));
-  if(solo) solo.setAttribute('aria-pressed', String(state.loopAuditionMode==='solo'));
+  if(solo){
+    const hasLoop = Object.values(state.loopStart).some((s,i)=>s < state.loopEnd[Object.keys(state.loopStart)[i]]);
+    solo.setAttribute('aria-pressed', String(state.loopAuditionMode==='solo'));
+    solo.setAttribute('aria-disabled', String(!hasLoop));
+    solo.style.opacity = hasLoop ? '1' : '0.5';
+  }
 }
 function clearLoopAuditionStem(stem){
   if(stem && state.loopAuditionStem !== stem) return;
@@ -2572,7 +2577,12 @@ document.getElementById('timeline').addEventListener('keydown',e=>{
 document.querySelectorAll('.stem-spec-lane[data-stem]').forEach(lane=>{
   lane.addEventListener('click',e=>{
     if(!state.ready)return;
-    seekTo(spectralTimeFromClientX(e.clientX, lane.getBoundingClientRect()));
+    let t = spectralTimeFromClientX(e.clientX, lane.getBoundingClientRect());
+    const stem = lane.getAttribute('data-stem');
+    if(stem && state.loopStart[stem] < state.loopEnd[stem]){
+      t = snapLoopEnd(t, state.loopEnd[stem] - state.loopStart[stem]);
+    }
+    seekTo(t);
   });
 });
 document.getElementById('center').addEventListener('click',()=>{if(state.ready)document.getElementById('btnPlay').click();else document.getElementById('fileInput').click();});
@@ -2822,8 +2832,23 @@ document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.f
 
 // drag & drop
 const center=document.getElementById('center'), device=document.getElementById('device');
-['dragenter','dragover'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.add('drag-over');device.classList.add('drag-active');}));
-['dragleave','drop'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();center.classList.remove('drag-over');device.classList.remove('drag-active');if(ev==='drop'&&e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);}));
+let dragDepth=0;
+['dragenter','dragover'].forEach(ev=>document.body.addEventListener(ev,e=>{
+  e.preventDefault();
+  dragDepth++;
+  center.classList.add('drag-over');
+  device.classList.add('drag-active');
+}));
+['dragleave','drop'].forEach(ev=>document.body.addEventListener(ev,e=>{
+  e.preventDefault();
+  if(ev==='dragleave') dragDepth--;
+  else dragDepth=0;
+  if(dragDepth<=0){
+    center.classList.remove('drag-over');
+    device.classList.remove('drag-active');
+  }
+  if(ev==='drop'&&e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);
+}));
 
 // init
 buildDevice();  // arcs are viewBox SVG; build once, they scale automatically

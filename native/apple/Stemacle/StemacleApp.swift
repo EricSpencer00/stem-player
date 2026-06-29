@@ -320,7 +320,7 @@ struct SplitterView: View {
                     url = item as? URL
                 }
                 guard let url else { return }
-                Task { @MainActor in await model.loadFile(url) }
+                Task { await model.loadFile(url) }
             }
             return true
         }
