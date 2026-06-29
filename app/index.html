@@ -1877,6 +1877,10 @@ async function separateAudio(arrayBuf,onProg){
   state.measureOffset = clamp(tempo.measureOffset || tempo.offset || state.beatOffset || 0, 0, Math.max(0, measureLength() - 1e-6));
 
   await step(8,'Audio decoded. Tempo mapped.');
+  const maxSpectrogramLength = SR * 900;
+  if(sigL.length > maxSpectrogramLength){
+    throw new Error(`Track too long (>${Math.round(sigL.length/SR/60)} min). Please use a file under 15 minutes.`);
+  }
   const win=hann(FFT_SIZE);
   const stL=await stft(sigL,win,p=>step(10+12*p,'Computing left spectrogram…'));
   const stR=await stft(sigR,win,p=>step(22+12*p,'Computing right spectrogram…'));
