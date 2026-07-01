@@ -69,6 +69,33 @@ void stemacle_spectrogram(const float *samples, size_t len, size_t cols,
 void stemacle_waveform_envelope(const float *samples, size_t len, size_t cols,
                                 float *out);
 
+/* Compute a cols-bucket peak+RMS waveform envelope into `out`, interleaved as
+ * [peak_0, rms_0, peak_1, rms_1, …] (length cols*2). Drives the native
+ * two-tone stem lane (RMS body + peak tips) at full scroll-window resolution. */
+void stemacle_waveform_peaks_rms(const float *samples, size_t len, size_t cols,
+                                 float *out);
+
+/* Number of STFT frames for a signal of `len` samples — the row count to
+ * allocate for stemacle_magnitudes and the vocal mask. */
+size_t stemacle_frame_count(size_t len);
+
+/* Vocal-mask frequency weight for a bin (0..1). Pure. */
+float stemacle_vocal_mask_weight_for_bin(size_t bin);
+
+/* Per-frame magnitude spectra over the first MODEL_BINS (=1024) bins for L and R,
+ * row-major (out[f*1024 + b]). Each output buffer must hold
+ * stemacle_frame_count(len)*1024 floats. Feeds the iOS Spleeter ONNX model. */
+void stemacle_magnitudes(const float *left, const float *right, size_t len,
+                         float *out_mag_l, float *out_mag_r);
+
+/* Separate stereo PCM using a caller-supplied vocal mask (mask_len must equal
+ * frame_count(len)*1024, row-major, values 0..1). The neural path: mask from the
+ * Spleeter ONNX model → identical DSP pipeline → stems. Free via
+ * stemacle_stems_free; null on invalid input. */
+StemacleStems *stemacle_separate_with_mask(const float *left, const float *right,
+                                           size_t len, unsigned int sample_rate,
+                                           const float *mask, size_t mask_len);
+
 #ifdef __cplusplus
 }
 #endif

@@ -52,6 +52,75 @@ public enum Stemacle {
         )
     }
 
+    /// Model-facing frequency bins (matches `MODEL_BINS` in the core / the
+    /// Spleeter ONNX model's frequency dimension).
+    public static let modelBins = 1024
+
+    /// STFT frame count for a signal length — the row count for `magnitudes` and
+    /// the vocal mask handed to / from the neural model.
+    public static func frameCount(_ length: Int) -> Int {
+        length <= 0 ? 0 : stemacle_frame_count(length)
+    }
+
+    /// Vocal-mask frequency weight for a bin (0…1). Keeps sub-bass / high air out
+    /// of the vocal stem; mirrors the web `vocalMaskWeightForBin`.
+    public static func vocalMaskWeight(bin: Int) -> Float {
+        stemacle_vocal_mask_weight_for_bin(bin)
+    }
+
+    /// Per-frame magnitude spectra over the first `modelBins` bins for L and R,
+    /// row-major (`[f*modelBins + b]`). Feeds the Spleeter ONNX model on iOS.
+    /// Returns `nil` on invalid input.
+    public static func magnitudes(left: [Float], right: [Float])
+        -> (magL: [Float], magR: [Float], frames: Int)? {
+        guard !left.isEmpty, left.count == right.count else { return nil }
+        let frames = frameCount(left.count)
+        guard frames > 0 else { return nil }
+        var magL = [Float](repeating: 0, count: frames * modelBins)
+        var magR = [Float](repeating: 0, count: frames * modelBins)
+        left.withUnsafeBufferPointer { l in
+            right.withUnsafeBufferPointer { r in
+                magL.withUnsafeMutableBufferPointer { ml in
+                    magR.withUnsafeMutableBufferPointer { mr in
+                        stemacle_magnitudes(l.baseAddress, r.baseAddress, left.count,
+                                            ml.baseAddress, mr.baseAddress)
+                    }
+                }
+            }
+        }
+        return (magL, magR, frames)
+    }
+
+    /// Separate stereo PCM using a neural vocal `mask` (`frameCount(len)*modelBins`
+    /// values, 0…1). The mask comes from the Spleeter ONNX model; the rest of the
+    /// pipeline is the shared DSP core. Returns `nil` on invalid input.
+    public static func separate(left: [Float], right: [Float], sampleRate: UInt32,
+                                mask: [Float]) -> StemSplit? {
+        guard !left.isEmpty, left.count == right.count else { return nil }
+        let raw: UnsafeMutablePointer<StemacleStems>? = left.withUnsafeBufferPointer { l in
+            right.withUnsafeBufferPointer { r in
+                mask.withUnsafeBufferPointer { m in
+                    stemacle_separate_with_mask(l.baseAddress, r.baseAddress, left.count,
+                                                sampleRate, m.baseAddress, mask.count)
+                }
+            }
+        }
+        guard let raw else { return nil }
+        defer { stemacle_stems_free(raw) }
+        let s = raw.pointee
+        let n = s.len
+        func copy(_ ptr: UnsafeMutablePointer<Float>?) -> [Float] {
+            guard let ptr, n > 0 else { return [] }
+            return Array(UnsafeBufferPointer(start: ptr, count: n))
+        }
+        return StemSplit(
+            drums: copy(s.drums_ptr), vocals: copy(s.vocals_ptr),
+            bass: copy(s.bass_ptr), melody: copy(s.melody_ptr),
+            sampleRate: s.sample_rate, bpm: s.bpm,
+            measureOffset: s.measure_offset, beatOffset: s.beat_offset,
+            tempoConfidence: s.tempo_confidence)
+    }
+
     // MARK: Loop contract (pure helpers, mirror the core)
 
     public static func measureLength(bpm: Float) -> Float {
@@ -111,5 +180,20 @@ public enum Stemacle {
             }
         }
         return out
+    }
+
+    /// A `cols`-bucket peak+RMS envelope as `(peak, rms)` pairs, each 0…1, with
+    /// `rms <= peak`. The native equivalent of the web `drawWave` (faint RMS body
+    /// + darker peak tips); render both layers for a lane that matches the web.
+    /// Precompute at a high `cols` so a zoomed scroll window stays smooth.
+    public static func waveformPeaksRMS(_ samples: [Float], cols: Int) -> [(peak: Float, rms: Float)] {
+        guard cols > 0, !samples.isEmpty else { return [] }
+        var flat = [Float](repeating: 0, count: cols * 2)
+        samples.withUnsafeBufferPointer { src in
+            flat.withUnsafeMutableBufferPointer { dst in
+                stemacle_waveform_peaks_rms(src.baseAddress, samples.count, cols, dst.baseAddress)
+            }
+        }
+        return (0..<cols).map { (peak: flat[$0 * 2], rms: flat[$0 * 2 + 1]) }
     }
 }

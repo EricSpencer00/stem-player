@@ -236,7 +236,7 @@ struct SplitterView: View {
                     // Master spectrogram overview.
                     if model.isReady {
                         VStack(spacing: 4) {
-                            SpectrogramLane(image: masterImage, envelope: [],
+                            SpectrogramLane(image: masterImage, waveform: model.masterWaveform,
                                             progress: model.masterProgress, duration: model.duration,
                                             grid: model.measureGrid,
                                             height: PlayerHeaderMetrics.masterLaneHeight) { p in
@@ -345,10 +345,17 @@ struct PlayerHeaderView: View {
     @ObservedObject var model: StemPlayerViewModel
 
     var body: some View {
-        ZStack {
-            RadialSpectrumView(spectrum: model.currentSpectrum, playing: model.isPlaying)
-            SpinningDiscView(playing: model.isPlaying) { model.togglePlay() }
-                .padding(46)
+        GeometryReader { geo in
+            let d = min(geo.size.width, geo.size.height)
+            ZStack {
+                RadialSpectrumView(spectrum: model.currentSpectrum, playing: model.isPlaying)
+                // Inset proportionally so the disc always sits inside the radial
+                // ticks (which reach ~0.49·size) instead of a fixed 46pt inset
+                // that swallowed most of the compact iOS header.
+                SpinningDiscView(playing: model.isPlaying) { model.togglePlay() }
+                    .padding(d * 0.16)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .aspectRatio(1, contentMode: .fit)
     }
@@ -507,7 +514,7 @@ struct StemRowView: View {
             }
             // Spectrogram / waveform lane with tap-to-seek and scrolling window.
             SpectrogramLane(image: laneImage,
-                            envelope: model.stemEnvelopes[stem] ?? [],
+                            waveform: model.stemWaveforms[stem] ?? [],
                             progress: model.laneProgress(for: stem), duration: model.duration,
                             grid: model.measureGrid) { p in
                 model.seek(toProgress: p)

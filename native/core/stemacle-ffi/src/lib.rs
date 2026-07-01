@@ -13,7 +13,8 @@ use std::os::raw::c_uint;
 use std::slice;
 
 use stemacle_dsp::loops::{audible_stem_time, LoopGrid};
-use stemacle_dsp::{separate, CoherenceSeparator};
+use stemacle_dsp::stft::{build_magnitude, frame_count, hann, stft, MODEL_BINS};
+use stemacle_dsp::{separate, vocal_mask_weight_for_bin, CoherenceSeparator, PrecomputedMask, StemSplit};
 
 /// Four mono PCM stems plus the detected tempo grid. `*_ptr` buffers each hold
 /// `len` `f32` samples at `sample_rate`. Layout is `#[repr(C)]` and matches
@@ -39,6 +40,23 @@ fn into_raw_buf(mut v: Vec<f32>) -> *mut f32 {
     ptr
 }
 
+fn box_stems(split: StemSplit, sample_rate: c_uint) -> *mut StemacleStems {
+    let out_len = split.drums.len();
+    let boxed = Box::new(StemacleStems {
+        drums_ptr: into_raw_buf(split.drums),
+        vocals_ptr: into_raw_buf(split.vocals),
+        bass_ptr: into_raw_buf(split.bass),
+        melody_ptr: into_raw_buf(split.melody),
+        len: out_len,
+        sample_rate,
+        bpm: split.tempo.bpm,
+        measure_offset: split.tempo.measure_offset,
+        beat_offset: split.tempo.beat_offset,
+        tempo_confidence: split.tempo.confidence,
+    });
+    Box::into_raw(boxed)
+}
+
 /// # Safety
 /// `left`/`right` must each point to `len` valid `f32`s (or be equal for mono).
 /// Returns a heap pointer the caller frees via `stemacle_stems_free`; null on
@@ -56,20 +74,85 @@ pub unsafe extern "C" fn stemacle_separate(
     let l = slice::from_raw_parts(left, len);
     let r = slice::from_raw_parts(right, len);
     let split = separate(l, r, sample_rate as usize, &CoherenceSeparator);
-    let out_len = split.drums.len();
-    let boxed = Box::new(StemacleStems {
-        drums_ptr: into_raw_buf(split.drums),
-        vocals_ptr: into_raw_buf(split.vocals),
-        bass_ptr: into_raw_buf(split.bass),
-        melody_ptr: into_raw_buf(split.melody),
-        len: out_len,
-        sample_rate,
-        bpm: split.tempo.bpm,
-        measure_offset: split.tempo.measure_offset,
-        beat_offset: split.tempo.beat_offset,
-        tempo_confidence: split.tempo.confidence,
-    });
-    Box::into_raw(boxed)
+    box_stems(split, sample_rate)
+}
+
+/// Number of STFT frames for a signal of `len` samples — the row count the
+/// caller must allocate for [`stemacle_magnitudes`] and the vocal mask.
+#[no_mangle]
+pub extern "C" fn stemacle_frame_count(len: usize) -> usize {
+    frame_count(len)
+}
+
+/// The vocal-mask frequency weight for a bin (keeps sub-bass / high-air out of
+/// the vocal stem). Pure; mirrors `vocalMaskWeightForBin` in the web gold master.
+#[no_mangle]
+pub extern "C" fn stemacle_vocal_mask_weight_for_bin(bin: usize) -> f32 {
+    vocal_mask_weight_for_bin(bin)
+}
+
+/// Compute per-frame magnitude spectra over the first `MODEL_BINS` bins for the
+/// left and right channels, row-major (`out[f*MODEL_BINS + b]`). Each output
+/// buffer must hold `stemacle_frame_count(len) * MODEL_BINS` `f32`s. This feeds
+/// the neural (Spleeter) mask model on iOS; the mask it produces is then handed
+/// back to [`stemacle_separate_with_mask`].
+///
+/// # Safety
+/// `left`/`right` point to `len` `f32`s; `out_mag_l`/`out_mag_r` to
+/// `frame_count(len)*MODEL_BINS` writable `f32`s.
+#[no_mangle]
+pub unsafe extern "C" fn stemacle_magnitudes(
+    left: *const f32,
+    right: *const f32,
+    len: usize,
+    out_mag_l: *mut f32,
+    out_mag_r: *mut f32,
+) {
+    if left.is_null() || right.is_null() || out_mag_l.is_null() || out_mag_r.is_null() {
+        return;
+    }
+    let l = slice::from_raw_parts(left, len);
+    let r = slice::from_raw_parts(right, len);
+    let frames = frame_count(len);
+    if frames == 0 {
+        return;
+    }
+    let win = hann(stemacle_dsp::stft::FFT_SIZE);
+    let mag_l = build_magnitude(&stft(l, &win));
+    let mag_r = build_magnitude(&stft(r, &win));
+    let dst_l = slice::from_raw_parts_mut(out_mag_l, frames * MODEL_BINS);
+    let dst_r = slice::from_raw_parts_mut(out_mag_r, frames * MODEL_BINS);
+    for f in 0..frames.min(mag_l.len()) {
+        dst_l[f * MODEL_BINS..(f + 1) * MODEL_BINS].copy_from_slice(&mag_l[f][..MODEL_BINS]);
+        dst_r[f * MODEL_BINS..(f + 1) * MODEL_BINS].copy_from_slice(&mag_r[f][..MODEL_BINS]);
+    }
+}
+
+/// Separate stereo PCM using a caller-supplied vocal mask (`mask_len` must equal
+/// `frame_count(len) * MODEL_BINS`, row-major, values in `[0,1]`). This is the
+/// neural path: the mask comes from the Spleeter ONNX model on iOS, then the
+/// identical DSP pipeline (mask → HPSS → low-pass → ISTFT) produces the stems.
+/// Returns a heap pointer freed via `stemacle_stems_free`; null on invalid input.
+///
+/// # Safety
+/// `left`/`right` point to `len` `f32`s; `mask` to `mask_len` `f32`s.
+#[no_mangle]
+pub unsafe extern "C" fn stemacle_separate_with_mask(
+    left: *const f32,
+    right: *const f32,
+    len: usize,
+    sample_rate: c_uint,
+    mask: *const f32,
+    mask_len: usize,
+) -> *mut StemacleStems {
+    if left.is_null() || right.is_null() || mask.is_null() || len == 0 || sample_rate == 0 {
+        return std::ptr::null_mut();
+    }
+    let l = slice::from_raw_parts(left, len);
+    let r = slice::from_raw_parts(right, len);
+    let mask_vec = slice::from_raw_parts(mask, mask_len).to_vec();
+    let split = separate(l, r, sample_rate as usize, &PrecomputedMask { mask: mask_vec });
+    box_stems(split, sample_rate)
 }
 
 /// # Safety
@@ -186,6 +269,28 @@ pub unsafe extern "C" fn stemacle_waveform_envelope(
     dst.copy_from_slice(&env[..dst.len().min(env.len())]);
 }
 
+/// Compute a `cols`-bucket peak+RMS waveform envelope into `out`, interleaved as
+/// `[peak_0, rms_0, peak_1, rms_1, …]` (length `cols*2`). Drives the native
+/// two-tone stem lane (RMS body + peak tips) at full scroll-window resolution.
+///
+/// # Safety
+/// `samples` must point to `len` valid `f32`s; `out` to `cols*2` writable `f32`s.
+#[no_mangle]
+pub unsafe extern "C" fn stemacle_waveform_peaks_rms(
+    samples: *const f32,
+    len: usize,
+    cols: usize,
+    out: *mut f32,
+) {
+    if samples.is_null() || out.is_null() || cols == 0 {
+        return;
+    }
+    let s = slice::from_raw_parts(samples, len);
+    let env = stemacle_dsp::viz::waveform_peaks_rms(s, cols);
+    let dst = slice::from_raw_parts_mut(out, cols * 2);
+    dst.copy_from_slice(&env[..dst.len().min(env.len())]);
+}
+
 /// Fold a transport position into an active loop window (`active != 0`). Pure.
 #[no_mangle]
 pub extern "C" fn stemacle_audible_stem_time(
@@ -219,6 +324,36 @@ mod tests {
             let _ = slice::from_raw_parts(s.drums_ptr, s.len).iter().sum::<f32>();
             stemacle_stems_free(stems);
         }
+    }
+
+    #[test]
+    fn magnitudes_and_mask_round_trip() {
+        let len = FFT_SIZE + 40 * HOP_SIZE;
+        let l: Vec<f32> = (0..len).map(|i| (0.05 * i as f32).sin() * 0.4).collect();
+        let r = l.clone();
+        let frames = stemacle_frame_count(len);
+        assert!(frames > 0);
+
+        // Magnitudes fill the requested shape with finite, non-negative values.
+        let mut mag_l = vec![0.0f32; frames * MODEL_BINS];
+        let mut mag_r = vec![0.0f32; frames * MODEL_BINS];
+        unsafe {
+            stemacle_magnitudes(l.as_ptr(), r.as_ptr(), len, mag_l.as_mut_ptr(), mag_r.as_mut_ptr());
+        }
+        assert!(mag_l.iter().all(|v| v.is_finite() && *v >= 0.0));
+
+        // A supplied mask drives separation and frees cleanly.
+        let mask = vec![0.5f32; frames * MODEL_BINS];
+        unsafe {
+            let stems = stemacle_separate_with_mask(
+                l.as_ptr(), r.as_ptr(), len, SR as c_uint, mask.as_ptr(), mask.len());
+            assert!(!stems.is_null());
+            assert!((*stems).len > 0);
+            stemacle_stems_free(stems);
+        }
+        // Weight helper matches the core.
+        assert_eq!(stemacle_vocal_mask_weight_for_bin(0), 0.0);
+        assert!(stemacle_vocal_mask_weight_for_bin(80) > 0.9);
     }
 
     #[test]

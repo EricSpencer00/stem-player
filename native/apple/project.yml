@@ -9,6 +9,11 @@ options:
 packages:
   StemacleKit:
     path: StemacleKit
+  # ONNX Runtime for on-device neural (Spleeter) separation on iOS — the same
+  # models the web gold master runs via onnxruntime-web. iOS target only.
+  onnxruntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    from: "1.20.0"
 
 settings:
   base:
@@ -56,6 +61,8 @@ targets:
     dependencies:
       - package: StemacleKit
         product: StemacleKit
+      - package: onnxruntime
+        product: onnxruntime
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stemacle.ios
