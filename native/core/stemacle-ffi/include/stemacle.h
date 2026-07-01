@@ -79,6 +79,12 @@ void stemacle_waveform_peaks_rms(const float *samples, size_t len, size_t cols,
  * allocate for stemacle_magnitudes and the vocal mask. */
 size_t stemacle_frame_count(size_t len);
 
+/* Estimate tempo (bpm + measure/beat grid) from a mono signal. Used by the
+ * Demucs path, which yields stems directly and needs the loop grid separately. */
+void stemacle_estimate_tempo(const float *mono, size_t len, unsigned int sample_rate,
+                             float *out_bpm, float *out_measure_offset,
+                             float *out_beat_offset, float *out_confidence);
+
 /* Vocal-mask frequency weight for a bin (0..1). Pure. */
 float stemacle_vocal_mask_weight_for_bin(size_t bin);
 

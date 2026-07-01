@@ -68,6 +68,19 @@ public enum Stemacle {
         stemacle_vocal_mask_weight_for_bin(bin)
     }
 
+    /// Estimate tempo (bpm + measure/beat grid) from a mono signal. Used by the
+    /// Demucs path, which produces stems directly and so needs the loop grid
+    /// computed separately.
+    public static func estimateTempo(mono: [Float], sampleRate: UInt32)
+        -> (bpm: Float, measureOffset: Float, beatOffset: Float, confidence: Float) {
+        guard !mono.isEmpty else { return (120, 0, 0, 0) }
+        var bpm: Float = 120, mo: Float = 0, bo: Float = 0, conf: Float = 0
+        mono.withUnsafeBufferPointer { m in
+            stemacle_estimate_tempo(m.baseAddress, mono.count, sampleRate, &bpm, &mo, &bo, &conf)
+        }
+        return (bpm, mo, bo, conf)
+    }
+
     /// Per-frame magnitude spectra over the first `modelBins` bins for L and R,
     /// row-major (`[f*modelBins + b]`). Feeds the Spleeter ONNX model on iOS.
     /// Returns `nil` on invalid input.
