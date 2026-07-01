@@ -84,6 +84,33 @@ pub extern "C" fn stemacle_frame_count(len: usize) -> usize {
     frame_count(len)
 }
 
+/// Estimate tempo (bpm + measure/beat grid) from a mono signal. Used by the
+/// Demucs path, which produces stems directly and so needs the tempo/loop grid
+/// computed separately (the DSP/Spleeter paths get it from `separate`).
+///
+/// # Safety
+/// `mono` must point to `len` valid `f32`s; the four out pointers must be writable.
+#[no_mangle]
+pub unsafe extern "C" fn stemacle_estimate_tempo(
+    mono: *const f32,
+    len: usize,
+    sample_rate: c_uint,
+    out_bpm: *mut f32,
+    out_measure_offset: *mut f32,
+    out_beat_offset: *mut f32,
+    out_confidence: *mut f32,
+) {
+    if mono.is_null() || len == 0 || sample_rate == 0 {
+        return;
+    }
+    let s = slice::from_raw_parts(mono, len);
+    let t = stemacle_dsp::estimate_tempo(s, sample_rate as f32);
+    if !out_bpm.is_null() { *out_bpm = t.bpm; }
+    if !out_measure_offset.is_null() { *out_measure_offset = t.measure_offset; }
+    if !out_beat_offset.is_null() { *out_beat_offset = t.beat_offset; }
+    if !out_confidence.is_null() { *out_confidence = t.confidence; }
+}
+
 /// The vocal-mask frequency weight for a bin (keeps sub-bass / high-air out of
 /// the vocal stem). Pure; mirrors `vocalMaskWeightForBin` in the web gold master.
 #[no_mangle]
@@ -354,6 +381,23 @@ mod tests {
         // Weight helper matches the core.
         assert_eq!(stemacle_vocal_mask_weight_for_bin(0), 0.0);
         assert!(stemacle_vocal_mask_weight_for_bin(80) > 0.9);
+    }
+
+    #[test]
+    fn estimate_tempo_ffi_writes_plausible_bpm() {
+        // A 2 Hz click train → 120 BPM-ish; just assert the out-params get a
+        // finite, in-range bpm and the grid offsets are written.
+        let sr = SR;
+        let len = sr * 4;
+        let mut sig = vec![0.0f32; len];
+        for i in (0..len).step_by(sr / 2) { sig[i] = 1.0; } // 2 Hz
+        let (mut bpm, mut mo, mut bo, mut conf) = (0.0f32, -1.0f32, -1.0f32, -1.0f32);
+        unsafe {
+            stemacle_estimate_tempo(sig.as_ptr(), len, sr as c_uint,
+                                    &mut bpm, &mut mo, &mut bo, &mut conf);
+        }
+        assert!(bpm >= 60.0 && bpm <= 240.0, "bpm out of range: {bpm}");
+        assert!(mo >= 0.0 && bo >= 0.0 && conf >= 0.0, "grid offsets not written");
     }
 
     #[test]

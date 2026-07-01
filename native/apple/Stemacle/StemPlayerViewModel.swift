@@ -89,10 +89,22 @@ final class StemPlayerViewModel: ObservableObject {
     private var ticker: Timer?
 
     #if os(iOS)
-    /// Neural (Spleeter ONNX) separator, or nil when the models aren't bundled —
-    /// in which case iOS falls back to the on-device DSP separator. Created lazily
-    /// so model loading only happens when a track is actually separated.
+    /// On-device separators, best-first: HT-Demucs (direct 4-stem waveforms) →
+    /// Spleeter (neural mask) → DSP. Each is nil when its model isn't bundled, so
+    /// the app degrades gracefully. Created lazily so model loading only happens
+    /// when a track is actually separated.
+    private lazy var demucs: DemucsSeparator? = DemucsSeparator()
     private lazy var spleeter: SpleeterSeparator? = SpleeterSeparator()
+
+    /// Tempo/loop grid for a window's stereo mix — the Demucs path needs it
+    /// computed separately (it outputs stems directly, not via `separate`).
+    private static func windowTempo(_ l: [Float], _ r: [Float]) -> (Float, Float, Float) {
+        let n = min(l.count, r.count)
+        var mono = [Float](repeating: 0, count: n)
+        for k in 0..<n { mono[k] = 0.5 * (l[k] + r[k]) }
+        let t = Stemacle.estimateTempo(mono: mono, sampleRate: 44100)
+        return (t.bpm, t.measureOffset, t.beatOffset)
+    }
     #endif
 
     /// Set by the app so fresh splits are saved to the Library / stem cache.
@@ -240,11 +252,11 @@ final class StemPlayerViewModel: ObservableObject {
             return
         }
 
-        // Neural (Spleeter) when the models are bundled; otherwise DSP fallback.
-        // `quality` is finalized from window 0's *actual* result so it never
-        // claims "neural" if inference silently fell back to DSP.
+        // On-device separators, captured best-first. `quality` is finalized from
+        // window 0's *actual* engine so the label never overstates what ran.
+        let demucs = self.demucs
         let neural = spleeter
-        var quality = neural != nil ? "neural" : "on-device"
+        var quality = "on-device"
 
         // One limiter gain for the whole track, from the decoded input mix (known
         // upfront). Stems partition the mix, so this bounds the stem sum — and
@@ -255,27 +267,32 @@ final class StemPlayerViewModel: ObservableObject {
         for i in 0..<mixN { inputPeak = max(inputPeak, abs(0.5 * (left[i] + right[i]))) }
         let limiterGain = StemAudioEngine.limiterGain(forMixPeak: inputPeak)
 
-        // Separate one window [s,e); `neuralUsed` reports whether the ONNX path
-        // actually produced this window (false = fell back to DSP).
-        func separateWindow(_ i: Int) async throws
-            -> (dict: [String: [Float]], split: StemSplit, neuralUsed: Bool)? {
+        // Separate one window [s,e), trying engines best-first: Demucs (direct
+        // 4-stem waveforms) → Spleeter (neural mask) → DSP. `needsTempo` (window 0
+        // only) computes the loop grid for the Demucs path, which — unlike the
+        // DSP/Spleeter split — doesn't return tempo. Returns the engine used.
+        func separateWindow(_ i: Int, needsTempo: Bool) async throws
+            -> (dict: [String: [Float]], bpm: Float, measureOffset: Float, beatOffset: Float, engine: String)? {
             let (s, e) = chunker.windowRange(i)
             let wl = Array(left[s..<e]); let wr = Array(right[s..<e])
-            let outcome: (split: StemSplit?, neural: Bool)
-            if let neural {
-                outcome = try await Self.separationQueue.perform {
-                    if let n = neural.separate(left: wl, right: wr, sampleRate: 44100) {
-                        return (n, true)
-                    }
-                    return (Stemacle.separate(left: wl, right: wr, sampleRate: 44100), false)
+            return try await Self.separationQueue.perform {
+                if let demucs, let d = demucs.separate(left: wl, right: wr) {
+                    let t = needsTempo ? Self.windowTempo(wl, wr) : (Float(120), Float(0), Float(0))
+                    return (d, t.0, t.1, t.2, "demucs")
                 }
-            } else {
-                outcome = (try await Self.separationQueue.separate(left: wl, right: wr, sampleRate: 44100), false)
+                let split: StemSplit?
+                let engine: String
+                if let neural, let n = neural.separate(left: wl, right: wr, sampleRate: 44100) {
+                    split = n; engine = "neural"
+                } else {
+                    split = Stemacle.separate(left: wl, right: wr, sampleRate: 44100)
+                    engine = "on-device"
+                }
+                guard let r = split else { return nil }
+                var d: [String: [Float]] = [:]
+                for (name, samples) in r.ordered { d[name] = samples }
+                return (d, r.bpm, r.measureOffset, r.beatOffset, engine)
             }
-            guard let r = outcome.split else { return nil }
-            var d: [String: [Float]] = [:]
-            for (name, samples) in r.ordered { d[name] = samples }
-            return (d, r, outcome.neural)
         }
 
         // Full-length accumulators; each window adds its crossfaded contribution.
@@ -284,20 +301,19 @@ final class StemPlayerViewModel: ObservableObject {
 
         // --- Window 0: separate, place, load → immediate playback. ---
         status = "Separating (on-device)…"
-        guard let first = try await separateWindow(0) else {
+        guard let first = try await separateWindow(0, needsTempo: true) else {
             status = "Could not separate this file"
             return
         }
-        if neural != nil && !first.neuralUsed { quality = "on-device" }  // don't claim neural on fallback
-        split = first.split
+        quality = first.engine
         for stem in stems {
             var buf = acc[stem]!
             chunker.accumulate(into: &buf, windowStem: first.dict[stem] ?? [], window: 0)
             acc[stem] = buf
         }
         // Persist only the *completed* full track (persist:false for window 0).
-        finishLoading(acc, bpm: first.split.bpm,
-                      measureOffset: first.split.measureOffset, beatOffset: first.split.beatOffset,
+        finishLoading(acc, bpm: first.bpm,
+                      measureOffset: first.measureOffset, beatOffset: first.beatOffset,
                       duration: duration, quality: quality, persist: false, limiterGain: limiterGain)
 
         if chunker.windowCount == 1 {
@@ -317,7 +333,7 @@ final class StemPlayerViewModel: ObservableObject {
             guard let self else { return }
             for i in 1..<chunker.windowCount {
                 if self.loadGeneration != gen { return }
-                guard let w = try? await separateWindow(i) else { continue }
+                guard let w = try? await separateWindow(i, needsTempo: false) else { continue }
                 if self.loadGeneration != gen { return }
                 for stem in self.stems {
                     var buf = acc[stem]!
