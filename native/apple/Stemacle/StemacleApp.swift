@@ -221,11 +221,23 @@ struct SplitterView: View {
                     .animation(.easeOut(duration: 0.15), value: model.isReady)
                     .accessibilityIdentifier("splitter.header")
 
+                    // Status message (e.g., loop too long error) in ready state.
+                    if model.isReady && !model.status.isEmpty && model.status != "Ready" {
+                        Text(model.status)
+                            .font(.caption).foregroundStyle(Stem.inkSoft)
+                            .multilineTextAlignment(.center)
+                            .padding(8)
+                            .frame(maxWidth: .infinity)
+                            .background(Stem.creamDeep.opacity(0.3))
+                            .cornerRadius(6)
+                            .padding(.horizontal, 8)
+                    }
+
                     // Master spectrogram overview.
                     if model.isReady {
                         VStack(spacing: 4) {
                             SpectrogramLane(image: masterImage, envelope: [],
-                                            progress: model.progress, duration: model.duration,
+                                            progress: model.masterProgress, duration: model.duration,
                                             grid: model.measureGrid,
                                             height: PlayerHeaderMetrics.masterLaneHeight) { p in
                                 model.seek(toProgress: p)
@@ -320,7 +332,7 @@ struct SplitterView: View {
                     url = item as? URL
                 }
                 guard let url else { return }
-                Task { @MainActor in await model.loadFile(url) }
+                Task { await model.loadFile(url) }
             }
             return true
         }
@@ -496,7 +508,7 @@ struct StemRowView: View {
             // Spectrogram / waveform lane with tap-to-seek and scrolling window.
             SpectrogramLane(image: laneImage,
                             envelope: model.stemEnvelopes[stem] ?? [],
-                            progress: model.progress, duration: model.duration,
+                            progress: model.laneProgress(for: stem), duration: model.duration,
                             grid: model.measureGrid) { p in
                 model.seek(toProgress: p)
             }

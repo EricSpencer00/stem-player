@@ -141,6 +141,25 @@ impl Separator for CoherenceSeparator {
     }
 }
 
+/// Fade the first and last `FFT_SIZE` samples of a stem with a raised-cosine
+/// ramp. The ISTFT edges are inherently under-normalized (only one Hann window
+/// covers them, see [`stft::istft`]), leaving a residual onset/offset transient
+/// even after the divisor is floored. Fading that ~93 ms region removes the
+/// start-of-playback click (and de-clicks loop boundaries that begin at 0)
+/// without touching the fully-overlapped interior. No-op below `2*FFT_SIZE`.
+fn declick_edges(stem: &mut [f32]) {
+    let n = stem.len();
+    let fade = FFT_SIZE.min(n / 2);
+    if fade == 0 {
+        return;
+    }
+    for i in 0..fade {
+        let g = 0.5 - 0.5 * (std::f32::consts::PI * i as f32 / fade as f32).cos();
+        stem[i] *= g;
+        stem[n - 1 - i] *= g;
+    }
+}
+
 /// Run the full Stemacle separation pipeline on stereo PCM, mirroring
 /// `separateAudio` end-to-end with a pluggable vocal [`Separator`].
 ///
@@ -193,11 +212,21 @@ pub fn separate(
     let split = hpss::hpss_refined(&accomp);
     let (bass_spec, melody_spec) = hpss::soft_low_pass(&split.harmonic, 220.0, 380.0);
 
+    let mut drums = stft::istft(&split.percussive, &win);
+    let mut vocals = stft::istft(&vocal, &win);
+    let mut bass = stft::istft(&bass_spec, &win);
+    let mut melody = stft::istft(&melody_spec, &win);
+    // De-click the unreliable ISTFT edges so playback never starts (or loops) on
+    // a transient spike — the native-only "blows out the speakers" bug.
+    for stem in [&mut drums, &mut vocals, &mut bass, &mut melody] {
+        declick_edges(stem);
+    }
+
     StemSplit {
-        drums: stft::istft(&split.percussive, &win),
-        vocals: stft::istft(&vocal, &win),
-        bass: stft::istft(&bass_spec, &win),
-        melody: stft::istft(&melody_spec, &win),
+        drums,
+        vocals,
+        bass,
+        melody,
         sample_rate,
         tempo,
     }
@@ -404,6 +433,79 @@ mod tests {
             vocal_rms > melody_rms * 3.0,
             "1 kHz mono should dominate vocals over melody: vocal={vocal_rms}, melody={melody_rms}"
         );
+    }
+
+    /// No stem may start or end with a loud transient. The ISTFT overlap-add is
+    /// under-normalized at the first/last frame (Hann → 0 there); before the
+    /// `NRM_FLOOR` fix that amplified masked edge content into a speaker-blowing
+    /// spike at the very start of native playback (web sidesteps it via ONNX).
+    /// Every stem's edge peak must stay within its own interior peak.
+    #[test]
+    fn separated_stems_have_no_edge_spike() {
+        let len = FFT_SIZE + 120 * HOP_SIZE;
+        // Loud broadband-ish stereo content (the realistic worst case).
+        let sig_l: Vec<f32> = (0..len)
+            .map(|i| {
+                (0.03 * i as f32).sin() * 0.6
+                    + (0.19 * i as f32).sin() * 0.3
+                    + (0.7 * i as f32).sin() * 0.1
+            })
+            .collect();
+        let sig_r: Vec<f32> = (0..len)
+            .map(|i| (0.03 * i as f32).sin() * 0.6 - (0.19 * i as f32).sin() * 0.3)
+            .collect();
+
+        let split = separate(&sig_l, &sig_r, SR, &CoherenceSeparator);
+        let pk = |s: &[f32]| s.iter().fold(0.0f32, |a, v| a.max(v.abs()));
+        let in_peak = pk(&sig_l).max(pk(&sig_r));
+
+        for (name, stem) in [
+            ("drums", &split.drums),
+            ("vocals", &split.vocals),
+            ("bass", &split.bass),
+            ("melody", &split.melody),
+        ] {
+            let n = stem.len();
+            assert!(stem.iter().all(|v| v.is_finite()), "{name} has non-finite samples");
+            // No sample anywhere may blow past the input scale (the old edge
+            // explosion produced spikes many times the input — a speaker blowout).
+            let overall = pk(stem);
+            assert!(
+                overall <= in_peak * 1.5,
+                "{name} blowout: peak {overall} vs input {in_peak}"
+            );
+            // The very start/end must fade in/out cleanly — the first and last
+            // 128 samples stay far below the input scale (de-click envelope).
+            let head = pk(&stem[..128]);
+            let tail = pk(&stem[n - 128..]);
+            assert!(head <= in_peak * 0.05, "{name} start not de-clicked: head {head}");
+            assert!(tail <= in_peak * 0.05, "{name} end not de-clicked: tail {tail}");
+        }
+    }
+
+    /// `declick_edges` zeros the very first/last sample, ramps monotonically,
+    /// leaves the fully-overlapped interior untouched, and never panics on a
+    /// short buffer.
+    #[test]
+    fn declick_edges_ramps_and_preserves_interior() {
+        let len = FFT_SIZE + 20 * HOP_SIZE;
+        let mut buf = vec![1.0f32; len];
+        declick_edges(&mut buf);
+        assert!(buf[0].abs() < 1e-6, "first sample not faded to zero: {}", buf[0]);
+        assert!(buf[len - 1].abs() < 1e-6, "last sample not faded to zero");
+        // Monotonic non-decreasing ramp across the fade-in region.
+        for i in 1..FFT_SIZE {
+            assert!(buf[i] >= buf[i - 1] - 1e-6, "fade-in not monotonic at {i}");
+        }
+        // Interior (beyond both fade regions) is untouched.
+        for i in FFT_SIZE..len - FFT_SIZE {
+            assert!((buf[i] - 1.0).abs() < 1e-6, "interior changed at {i}: {}", buf[i]);
+        }
+        // Degenerate lengths must not panic.
+        let mut tiny = vec![1.0f32; 3];
+        declick_edges(&mut tiny);
+        let mut empty: Vec<f32> = vec![];
+        declick_edges(&mut empty);
     }
 
     /// Stem count and sample-rate are preserved through the pipeline.

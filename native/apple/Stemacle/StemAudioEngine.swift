@@ -79,7 +79,7 @@ final class StemAudioEngine {
     func pause() {
         startOffset = currentTime
         startDate = nil
-        for node in players.values { node.pause() }
+        for node in players.values { node.stop() }
         isPlaying = false
     }
 
