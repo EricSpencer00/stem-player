@@ -53,3 +53,8 @@ native/apple/**/.swiftpm/
 
 # Agent-mode scratch outputs
 outputs/
+
+# TLC model-checker output
+specs/*_TTrace_*.tla
+specs/*_TTrace_*.bin
+specs/states/

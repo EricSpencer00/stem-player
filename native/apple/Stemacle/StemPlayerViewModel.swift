@@ -98,6 +98,33 @@ final class StemPlayerViewModel: ObservableObject {
     /// Normalized progress 0...1 for the visualizer/cursor.
     var progress: Double { duration > 0 ? position / duration : 0 }
 
+    /// Per-stem lane cursor progress (0...1). When a stem has an active loop, the
+    /// transport position is folded into the loop window (via `audibleStemTime`,
+    /// the same helper the web gold master uses) so the playhead oscillates inside
+    /// the loop instead of drifting to the end of the track with global transport.
+    func laneProgress(for stem: String) -> Double {
+        guard duration > 0 else { return 0 }
+        guard let win = engine.loopWindow(stem) else { return progress }
+        let audible = Stemacle.audibleStemTime(
+            transportSec: Float(position),
+            loopStart: Float(win.start), loopEnd: Float(win.end),
+            active: true, duration: Float(duration)
+        )
+        return min(1, max(0, Double(audible) / duration))
+    }
+
+    /// Master overview cursor progress (0...1). When an All-row linked loop is
+    /// active every stem shares one window, so the overview playhead folds into it
+    /// (like `laneProgress`) instead of drifting to the end of the track while the
+    /// audio loops — otherwise the visible cursor contradicts what you hear.
+    var masterProgress: Double {
+        guard duration > 0, allLoopBars != nil else { return progress }
+        for stem in stems where engine.loopWindow(stem) != nil {
+            return laneProgress(for: stem)
+        }
+        return progress
+    }
+
     /// Normalized x positions (0...1) of 4/4 measure boundaries for lane grid markers.
     var measureGrid: [Double] {
         guard duration > 0, bpm > 0 else { return [] }
@@ -118,8 +145,10 @@ final class StemPlayerViewModel: ObservableObject {
         return min(Self.specCols - 1, Int(progress * Double(Self.specCols)))
     }
 
-    /// Elapsed / total time, formatted m:ss.
-    var elapsedString: String { Self.clock(position) }
+    /// Elapsed / total time, formatted m:ss. Folds into the loop during an
+    /// All-row loop so the readout tracks the audible position (matches the
+    /// overview cursor) instead of the transport drifting to the track end.
+    var elapsedString: String { Self.clock(masterProgress * duration) }
     var totalString: String { Self.clock(duration) }
     private static func clock(_ s: Double) -> String {
         let t = Int(s.rounded(.down))
@@ -203,8 +232,9 @@ final class StemPlayerViewModel: ObservableObject {
     /// radial visualizer. Falls back to an empty spectrum.
     var currentSpectrum: [Float] {
         guard !masterSpectrogram.isEmpty else { return [] }
-        // masterSpectrogram is 64 cols on iOS, specCols cols on macOS
-        let col = min(Int(progress * Double(masterSpectrogram.count)), masterSpectrogram.count - 1)
+        // masterSpectrogram is 64 cols on iOS, specCols cols on macOS. Uses the
+        // folded master position so the radial visualizer tracks an active loop.
+        let col = min(Int(masterProgress * Double(masterSpectrogram.count)), masterSpectrogram.count - 1)
         return masterSpectrogram[col]
     }
 
@@ -426,6 +456,12 @@ final class StemPlayerViewModel: ObservableObject {
     /// Toggle a per-stem loop of `bars` length (nil arg clears).
     func setLoop(_ stem: String, bars: Float?) {
         guard controlsEnabled else { return }
+        // Any individual stem edit breaks the All-row linked state, so drop that
+        // indicator (mirrors the web `setStemLoop` → `clearAllLoopIndicator`
+        // contract). Without this, `allLoopBars` goes stale and the All row
+        // claims a linked loop the stems no longer share — verified reachable by
+        // tests/loop-state-model.test.mjs.
+        allLoopBars = nil
         guard let bars else {
             loopBars[stem] = nil
             engine.setLoop(stem, range: nil)

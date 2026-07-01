@@ -91,10 +91,18 @@ pub fn istft(spec: &Spectrogram, win: &[f32]) -> Vec<f32> {
             nrm[s + i] += win[i] * win[i];
         }
     }
+    // Overlap-add window-power normalization. The COLA steady-state sum for the
+    // periodic Hann window at 75% overlap is 1.5, so every fully-overlapped
+    // interior sample has `nrm[i] >= 1.5` and divides by its exact value —
+    // identical to the gold master. Under-covered edge samples (the first/last
+    // frame, where Hann → 0) have a tiny `nrm[i]`; dividing by it amplifies
+    // masked edge content into a loud transient — the start-of-playback spike on
+    // the native DSP path. Flooring the divisor at 1.0 caps edge gain at unity so
+    // those samples fade in/out naturally instead of exploding, while leaving the
+    // interior bit-for-bit unchanged.
+    const NRM_FLOOR: f32 = 1.0;
     for i in 0..len {
-        if nrm[i] > 1e-8 {
-            out[i] /= nrm[i];
-        }
+        out[i] /= nrm[i].max(NRM_FLOOR);
     }
     out
 }
@@ -149,6 +157,37 @@ mod tests {
             max_err = max_err.max((recon[i] - orig[i]).abs());
         }
         assert!(max_err < 1e-3, "interior reconstruction error {max_err}");
+    }
+
+    /// ISTFT must not explode at the signal edges. Overlap-add divides by the
+    /// summed window power `nrm[i]`, which is ~0 in the first/last frame (Hann is
+    /// 0 at its edge). A naive tiny floor then amplifies masked edge content into
+    /// a loud transient — the start-of-playback spike heard only on the native
+    /// DSP path. Reconstruction of a high-pass-masked signal must stay bounded at
+    /// the edges relative to its own interior.
+    #[test]
+    fn istft_edges_do_not_explode() {
+        let len = FFT_SIZE + 40 * HOP_SIZE;
+        let sig: Vec<f32> = (0..len).map(|i| (0.05 * i as f32).sin() * 0.8).collect();
+        let win = hann(FFT_SIZE);
+        let mut spec = stft(&sig, &win);
+        // Simulate a separation mask: hard high-pass (zero the low bins). This
+        // breaks the window-factor cancellation that keeps unmasked edges safe.
+        for f in 0..spec.frames {
+            for b in 0..200 {
+                spec.re[f][b] = 0.0;
+                spec.im[f][b] = 0.0;
+            }
+        }
+        let recon = istft(&spec, &win);
+        assert!(recon.iter().all(|v| v.is_finite()), "non-finite istft output");
+        let peak = |s: &[f32]| s.iter().fold(0.0f32, |a, v| a.max(v.abs()));
+        let edge_peak = peak(&recon[..FFT_SIZE]);
+        let interior_peak = peak(&recon[FFT_SIZE..len - FFT_SIZE]);
+        assert!(
+            edge_peak <= interior_peak * 2.0 + 1e-6,
+            "ISTFT edge spike: edge peak {edge_peak} >> interior peak {interior_peak}"
+        );
     }
 
     #[test]

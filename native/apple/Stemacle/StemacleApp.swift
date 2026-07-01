@@ -237,7 +237,7 @@ struct SplitterView: View {
                     if model.isReady {
                         VStack(spacing: 4) {
                             SpectrogramLane(image: masterImage, envelope: [],
-                                            progress: model.progress, duration: model.duration,
+                                            progress: model.masterProgress, duration: model.duration,
                                             grid: model.measureGrid,
                                             height: PlayerHeaderMetrics.masterLaneHeight) { p in
                                 model.seek(toProgress: p)
@@ -508,7 +508,7 @@ struct StemRowView: View {
             // Spectrogram / waveform lane with tap-to-seek and scrolling window.
             SpectrogramLane(image: laneImage,
                             envelope: model.stemEnvelopes[stem] ?? [],
-                            progress: model.progress, duration: model.duration,
+                            progress: model.laneProgress(for: stem), duration: model.duration,
                             grid: model.measureGrid) { p in
                 model.seek(toProgress: p)
             }
