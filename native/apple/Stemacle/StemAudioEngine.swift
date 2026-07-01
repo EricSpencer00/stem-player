@@ -41,9 +41,13 @@ final class StemAudioEngine {
         }
     }
 
-    func load(stems split: [String: [Float]], durationSeconds expectedDuration: Double? = nil) {
+    /// A `limiterGain` (from the full-track input mix) may be supplied so streaming
+    /// window-0 load and the later full-track swap scale identically — otherwise
+    /// the per-call dynamic limiter is used (single-shot loads: macOS, cache).
+    func load(stems split: [String: [Float]], durationSeconds expectedDuration: Double? = nil,
+              limiterGain: Float? = nil) {
         loops.removeAll()  // new file resets loops (invariant)
-        let safeSplit = Self.sanitizedStems(split)
+        let safeSplit = limiterGain.map { Self.cleanedScaled(split, gain: $0) } ?? Self.sanitizedStems(split)
         var maxFrames = 0
         for stem in stems {
             guard let samples = safeSplit[stem], !samples.isEmpty else { continue }
@@ -60,6 +64,33 @@ final class StemAudioEngine {
         startOffset = 0
         startDate = nil
         isPlaying = false
+    }
+
+    /// Swap in new full-length stem PCM while preserving the current transport
+    /// position and play state — used by streaming separation to replace the
+    /// window-0-only audio with the completed track without interrupting
+    /// playback. Duration and loops are unchanged (the track length is fixed at
+    /// initial load). Content already played (the first window) is identical, so
+    /// rescheduling from the current position is seamless.
+    func replaceStems(_ split: [String: [Float]], limiterGain: Float) {
+        let wasPlaying = isPlaying
+        let resumeAt = currentTime
+        // Reuse the same per-track gain as the window-0 load so the swap never
+        // steps the volume (the dynamic limiter would compute a different gain
+        // from the full track than from window 0 alone).
+        let safeSplit = Self.cleanedScaled(split, gain: limiterGain)
+        for stem in stems {
+            guard let samples = safeSplit[stem], !samples.isEmpty else { continue }
+            let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
+            buf.frameLength = AVAudioFrameCount(samples.count)
+            samples.withUnsafeBufferPointer { src in
+                buf.floatChannelData![0].update(from: src.baseAddress!, count: samples.count)
+            }
+            buffers[stem] = buf
+        }
+        if wasPlaying {
+            try? play(from: resumeAt)
+        }
     }
 
     func prepare() throws { if !engine.isRunning { try engine.start() } }
@@ -145,6 +176,24 @@ final class StemAudioEngine {
         out.frameLength = AVAudioFrameCount(count)
         if count > 0 {
             out.floatChannelData![0].update(from: buf.floatChannelData![0] + from, count: count)
+        }
+        return out
+    }
+
+    /// The limiter gain a mix peaking at `peak` needs to stay under the ceiling.
+    /// Stems partition the input mix, so the input-mix peak bounds the stem sum —
+    /// deriving the gain from the (fully-known) input mix lets streaming apply one
+    /// consistent gain across window-0 load and the full-track swap.
+    static func limiterGain(forMixPeak peak: Float) -> Float {
+        peak > outputCeiling ? outputCeiling / peak : 1
+    }
+
+    /// Non-finite cleanup + a fixed limiter gain (no dynamic per-call rescale).
+    static func cleanedScaled(_ split: [String: [Float]], gain: Float) -> [String: [Float]] {
+        let order = ["drums", "vocals", "bass", "melody"]
+        var out: [String: [Float]] = [:]
+        for stem in order {
+            out[stem] = (split[stem] ?? []).map { $0.isFinite ? $0 * gain : 0 }
         }
         return out
     }

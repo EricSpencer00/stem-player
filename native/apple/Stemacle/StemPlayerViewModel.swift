@@ -23,11 +23,16 @@ private final class DeviceSeparationQueue {
     }
 
     func separate(left: [Float], right: [Float], sampleRate: UInt32) async throws -> StemSplit? {
+        try await perform { Stemacle.separate(left: left, right: right, sampleRate: sampleRate) }
+    }
+
+    /// Run arbitrary separation work on the serial background queue (keeps heavy
+    /// DSP / ONNX inference off the main actor, one window at a time).
+    func perform<T>(_ work: @escaping () -> T) async throws -> T {
         try Task.checkCancellation()
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<StemSplit?, Error>) in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
             queue.addOperation {
-                let result = Stemacle.separate(left: left, right: right, sampleRate: sampleRate)
-                continuation.resume(returning: result)
+                continuation.resume(returning: work())
             }
         }
     }
@@ -67,8 +72,11 @@ final class StemPlayerViewModel: ObservableObject {
 
     /// Per-stem spectrogram grids: `spectrograms[stem][col][row]`, 0...1.
     @Published var spectrograms: [String: [[Float]]] = [:]
-    /// Per-stem waveform envelopes for iOS (O(n), avoids STFT OOM on long tracks).
-    @Published var stemEnvelopes: [String: [Float]] = [:]
+    /// Per-stem peak+RMS waveforms for iOS (O(n), avoids STFT OOM on long tracks).
+    /// High column count so a zoomed scroll window matches the web waveform.
+    @Published var stemWaveforms: [String: [(peak: Float, rms: Float)]] = [:]
+    /// Master (mix) peak+RMS waveform for the iOS overview lane.
+    @Published var masterWaveform: [(peak: Float, rms: Float)] = []
     /// Master (mix) spectrogram for the radial player visualizer.
     @Published var masterSpectrogram: [[Float]] = []
     /// Bumped each load so views can rebuild cached spectrogram images.
@@ -80,12 +88,23 @@ final class StemPlayerViewModel: ObservableObject {
     private var split: StemSplit?
     private var ticker: Timer?
 
+    #if os(iOS)
+    /// Neural (Spleeter ONNX) separator, or nil when the models aren't bundled —
+    /// in which case iOS falls back to the on-device DSP separator. Created lazily
+    /// so model loading only happens when a track is actually separated.
+    private lazy var spleeter: SpleeterSeparator? = SpleeterSeparator()
+    #endif
+
     /// Set by the app so fresh splits are saved to the Library / stem cache.
     var library: LibraryStore?
 
     /// Spectrogram resolution for the stem lanes.
     static let specCols = 240
     static let specRows = 48
+    /// Waveform column resolution for the iOS peak+RMS lanes. High enough that a
+    /// 30 s scroll window over a multi-minute track still renders hundreds of
+    /// columns (the web recomputes per-pixel; we precompute dense instead).
+    static let waveformCols = 3000
 
     private static let separationQueue = DeviceSeparationQueue()
 
@@ -159,47 +178,45 @@ final class StemPlayerViewModel: ObservableObject {
     /// Fresh splits are persisted to the Library; cache re-opens pass persist:false.
     private func finishLoading(_ dict: [String: [Float]], bpm: Float,
                               measureOffset: Float, beatOffset: Float, duration: Double, quality: String,
-                              persist: Bool = true) {
+                              persist: Bool = true, limiterGain: Float? = nil) {
         self.bpm = bpm
         self.measureOffset = measureOffset
         self.beatOffset = beatOffset
         // reset loop state on new file (invariant)
         loopBars.removeAll(); allLoopBars = nil
-        engine.load(stems: dict, durationSeconds: duration)
+        engine.load(stems: dict, durationSeconds: duration, limiterGain: limiterGain)
         self.duration = engine.durationSeconds
         if persist {
             library?.add(title: songTitle, stems: dict, sampleRate: Int(StemAudioEngine.sampleRate),
                          bpm: bpm, measureOffset: measureOffset, beatOffset: beatOffset,
                          duration: self.duration, quality: quality)
         }
-        // Compute per-stem visualization.
-        // iOS uses a peak waveform envelope (O(n), O(cols) space) to avoid the
-        // ~200 MB STFT allocation that each spectrogram call requires on long tracks.
-        // macOS has sufficient RAM for the full log-magnitude spectrogram.
+        recomputeVisualization(dict)
+        position = 0
+        loadGeneration += 1
+        isReady = true
+        status = "Ready · \(Int(bpm)) BPM · \(quality)"
+    }
+
+    /// Rebuild the per-stem lane + overview visualization from a stem dict.
+    /// iOS uses a peak+RMS waveform (O(n), O(cols) space) to avoid the ~200 MB
+    /// STFT allocation the full spectrogram needs on long tracks; macOS has the
+    /// RAM for the full log-magnitude spectrogram. Bumps `loadGeneration` so
+    /// cached lane images rebuild (used both by initial load and streaming swap).
+    private func recomputeVisualization(_ dict: [String: [Float]]) {
         var mixLen = 0
         for samples in dict.values { mixLen = max(mixLen, samples.count) }
-        #if os(iOS)
-        var envs: [String: [Float]] = [:]
-        for (name, samples) in dict {
-            envs[name] = Stemacle.waveformEnvelope(samples, cols: Self.specCols)
-        }
-        stemEnvelopes = envs
-        spectrograms = [:]
-        // Low-res master spectrogram (64×16) for the radial visualizer — tiny allocation.
-        if mixLen > 0 {
-            var mix = [Float](repeating: 0, count: mixLen)
-            for samples in dict.values {
-                for i in 0..<samples.count { mix[i] += samples[i] }
-            }
-            masterSpectrogram = Stemacle.spectrogram(mix, cols: 64, rows: 16)
-        }
-        #else
+        // Both platforms render the warm log-magnitude spectrogram. It is safe on
+        // iOS now because `Stemacle.spectrogram` streams frame-by-frame with
+        // bounded memory (it used to materialize the whole STFT and OOM, which is
+        // why iOS previously fell back to a plain waveform).
         var specs: [String: [[Float]]] = [:]
         for (name, samples) in dict {
             specs[name] = Stemacle.spectrogram(samples, cols: Self.specCols, rows: Self.specRows)
         }
         spectrograms = specs
-        stemEnvelopes = [:]
+        stemWaveforms = [:]
+        masterWaveform = []
         if mixLen > 0 {
             var mix = [Float](repeating: 0, count: mixLen)
             for samples in dict.values {
@@ -207,12 +224,123 @@ final class StemPlayerViewModel: ObservableObject {
             }
             masterSpectrogram = Stemacle.spectrogram(mix, cols: Self.specCols, rows: Self.specRows)
         }
-        #endif
-        position = 0
-        loadGeneration += 1
-        isReady = true
-        status = "Ready · \(Int(bpm)) BPM · \(quality)"
     }
+
+    #if os(iOS)
+    /// Suno-style streaming separation. Separates window 0 up front so the user
+    /// can play the first part immediately, then fills the remaining windows in
+    /// the background and swaps in the completed track — all within a per-window
+    /// memory budget (the whole-track STFT would OOM the iOS process). Seams use
+    /// the `StreamingChunker` crossfade so they stay click-free.
+    private func streamingSeparate(left: [Float], right: [Float], duration: Double) async throws {
+        let total = left.count
+        let chunker = StreamingChunker(totalSamples: total, sampleRate: StemAudioEngine.sampleRate)
+        guard chunker.windowCount > 0 else {
+            status = "Could not separate this file"
+            return
+        }
+
+        // Neural (Spleeter) when the models are bundled; otherwise DSP fallback.
+        // `quality` is finalized from window 0's *actual* result so it never
+        // claims "neural" if inference silently fell back to DSP.
+        let neural = spleeter
+        var quality = neural != nil ? "neural" : "on-device"
+
+        // One limiter gain for the whole track, from the decoded input mix (known
+        // upfront). Stems partition the mix, so this bounds the stem sum — and
+        // applying the *same* gain at window-0 load and the full-track swap means
+        // the swap never steps the volume.
+        var inputPeak: Float = 0
+        let mixN = min(left.count, right.count)
+        for i in 0..<mixN { inputPeak = max(inputPeak, abs(0.5 * (left[i] + right[i]))) }
+        let limiterGain = StemAudioEngine.limiterGain(forMixPeak: inputPeak)
+
+        // Separate one window [s,e); `neuralUsed` reports whether the ONNX path
+        // actually produced this window (false = fell back to DSP).
+        func separateWindow(_ i: Int) async throws
+            -> (dict: [String: [Float]], split: StemSplit, neuralUsed: Bool)? {
+            let (s, e) = chunker.windowRange(i)
+            let wl = Array(left[s..<e]); let wr = Array(right[s..<e])
+            let outcome: (split: StemSplit?, neural: Bool)
+            if let neural {
+                outcome = try await Self.separationQueue.perform {
+                    if let n = neural.separate(left: wl, right: wr, sampleRate: 44100) {
+                        return (n, true)
+                    }
+                    return (Stemacle.separate(left: wl, right: wr, sampleRate: 44100), false)
+                }
+            } else {
+                outcome = (try await Self.separationQueue.separate(left: wl, right: wr, sampleRate: 44100), false)
+            }
+            guard let r = outcome.split else { return nil }
+            var d: [String: [Float]] = [:]
+            for (name, samples) in r.ordered { d[name] = samples }
+            return (d, r, outcome.neural)
+        }
+
+        // Full-length accumulators; each window adds its crossfaded contribution.
+        var acc: [String: [Float]] = [:]
+        for stem in stems { acc[stem] = [Float](repeating: 0, count: total) }
+
+        // --- Window 0: separate, place, load → immediate playback. ---
+        status = "Separating (on-device)…"
+        guard let first = try await separateWindow(0) else {
+            status = "Could not separate this file"
+            return
+        }
+        if neural != nil && !first.neuralUsed { quality = "on-device" }  // don't claim neural on fallback
+        split = first.split
+        for stem in stems {
+            var buf = acc[stem]!
+            chunker.accumulate(into: &buf, windowStem: first.dict[stem] ?? [], window: 0)
+            acc[stem] = buf
+        }
+        // Persist only the *completed* full track (persist:false for window 0).
+        finishLoading(acc, bpm: first.split.bpm,
+                      measureOffset: first.split.measureOffset, beatOffset: first.split.beatOffset,
+                      duration: duration, quality: quality, persist: false, limiterGain: limiterGain)
+
+        if chunker.windowCount == 1 {
+            library?.add(title: songTitle, stems: acc, sampleRate: Int(StemAudioEngine.sampleRate),
+                         bpm: bpm, measureOffset: measureOffset, beatOffset: beatOffset,
+                         duration: self.duration, quality: quality)
+            return
+        }
+
+        status = "Playing first part · finishing separation…"
+
+        // --- Remaining windows in the background; swap in the completed track. ---
+        // `loadGeneration` (bumped by every finishLoading) is our cancel token: if
+        // a newer file loads while we're working, it changes and we abandon.
+        let gen = loadGeneration
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for i in 1..<chunker.windowCount {
+                if self.loadGeneration != gen { return }
+                guard let w = try? await separateWindow(i) else { continue }
+                if self.loadGeneration != gen { return }
+                for stem in self.stems {
+                    var buf = acc[stem]!
+                    chunker.accumulate(into: &buf, windowStem: w.dict[stem] ?? [], window: i)
+                    acc[stem] = buf
+                }
+                self.status = "Finishing separation… \(i + 1)/\(chunker.windowCount)"
+            }
+            if self.loadGeneration != gen { return }
+            // Swap the completed full track in without interrupting playback,
+            // reusing the window-0 limiter gain so the volume never steps.
+            self.engine.replaceStems(acc, limiterGain: limiterGain)
+            self.recomputeVisualization(acc)
+            self.loadGeneration += 1
+            self.library?.add(title: self.songTitle, stems: acc,
+                              sampleRate: Int(StemAudioEngine.sampleRate),
+                              bpm: self.bpm, measureOffset: self.measureOffset,
+                              beatOffset: self.beatOffset, duration: self.duration,
+                              quality: quality)
+            self.status = "Ready · \(Int(self.bpm)) BPM · \(quality)"
+        }
+    }
+    #endif
 
     /// Instant re-open from the Library's stem cache — no re-separation.
     func openProject(_ project: Project) {
@@ -294,49 +422,28 @@ final class StemPlayerViewModel: ObservableObject {
             #endif
 
             // --- Tier 2: on-device DSP (CoherenceSeparator, always available) ---
-            // iOS memory budget: the Rust STFT allocates ~200 MB per stereo
-            // spectrogram; a 3-minute track peaks at ~1 GB and crashes.
-            // Cap the separation input to 90 seconds; silence-pad stems back
-            // to the full duration so playback length is always correct.
             #if os(iOS)
-            let maxSepSamples = Int(StemAudioEngine.sampleRate * 90)
-            let wasTrimmed = left.count > maxSepSamples
-            let sepLeft  = wasTrimmed ? Array(left.prefix(maxSepSamples))  : left
-            let sepRight = wasTrimmed ? Array(right.prefix(maxSepSamples)) : right
-            if wasTrimmed { status = "Separating first 90s (on-device)…" } else {
-                status = "Separating (on-device)…"
-            }
+            // iOS memory budget: the whole-track STFT peaks ~1 GB and is
+            // jetsam-killed. Stream the separation instead — separate the first
+            // window immediately so playback can start, then fill the rest in the
+            // background (Suno-style), keeping peak memory bounded to one window.
+            try await streamingSeparate(left: left, right: right, duration: decoded.duration)
             #else
-            let sepLeft = left; let sepRight = right; let wasTrimmed = false
             status = "Separating (on-device)…"
-            #endif
-
             let result = try await Self.separationQueue.separate(
-                left: sepLeft, right: sepRight, sampleRate: 44100)
+                left: left, right: right, sampleRate: 44100)
             guard let result else {
                 status = "Could not separate this file"
                 return
             }
             split = result
             var dict: [String: [Float]] = [:]
-            let fullLen = left.count
-            for (name, samples) in result.ordered {
-                if wasTrimmed && samples.count < fullLen {
-                    var padded = samples
-                    padded.append(contentsOf: [Float](repeating: 0, count: fullLen - samples.count))
-                    dict[name] = padded
-                } else {
-                    dict[name] = samples
-                }
-            }
-            let quality = wasTrimmed ? "on-device (90s)" : "on-device"
+            for (name, samples) in result.ordered { dict[name] = samples }
             finishLoading(dict, bpm: result.bpm,
                           measureOffset: result.measureOffset, beatOffset: result.beatOffset,
                           duration: decoded.duration,
-                          quality: quality)
-            if wasTrimmed {
-                status = "⚠️ Only first 90 seconds separated (device limit). Rest is padded with silence."
-            }
+                          quality: "on-device")
+            #endif
         } catch {
             status = "Load failed: \(error.localizedDescription)"
         }
@@ -587,7 +694,8 @@ final class StemPlayerViewModel: ObservableObject {
             }
         }
 
-        let duration = Double(max(left.count, right.count)) / StemAudioEngine.sampleRate
+        let sampleCount = max(left.count, right.count)
+        let duration = Double(sampleCount) / StemAudioEngine.sampleRate
         return DecodedAudio(left: left, right: right.isEmpty ? left : right, duration: duration)
     }
 }

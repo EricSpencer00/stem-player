@@ -58,3 +58,10 @@ outputs/
 specs/*_TTrace_*.tla
 specs/*_TTrace_*.bin
 specs/states/
+
+# iOS Spleeter ONNX models — large build assets, fetched via scripts/fetch-ios-models.sh
+native/apple/Stemacle/Resources/models/*.onnx
+
+# Isolated SwiftPM dirs used by scripts/build-ios.sh (ORT download workaround)
+native/apple/.spm-clone/
+native/apple/.spm-cache/

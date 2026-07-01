@@ -48,11 +48,11 @@ func makeSpectrogramImage(_ grid: [[Float]]) -> Image? {
 /// A lane that shows a sliding 30-second time window: the play cursor stays at
 /// 25% from the left so the lane scrolls like the web gold master.
 ///
-/// `image` is the full-track spectrogram (macOS). `envelope` is the peak
-/// waveform (iOS, avoids STFT OOM). Pass whichever is non-empty.
+/// `image` is the full-track spectrogram (macOS). `waveform` is the peak+RMS
+/// envelope (iOS, avoids STFT OOM). Pass whichever is non-empty.
 struct SpectrogramLane: View {
     let image: Image?
-    let envelope: [Float]          // iOS waveform fallback; empty on macOS
+    let waveform: [(peak: Float, rms: Float)]   // iOS lane; empty on macOS
     var progress: Double           // global 0..1 play position
     var duration: Double           // total track seconds
     var grid: [Double]             // measure boundaries 0..1 (global)
@@ -93,23 +93,34 @@ struct SpectrogramLane: View {
                         .offset(x: offsetX)
                         .clipped()
 
-                } else if !envelope.isEmpty {
-                    // iOS waveform fallback: render bars for the visible window.
+                } else if !waveform.isEmpty {
+                    // iOS peak+RMS lane: a faint RMS body with darker peak tips,
+                    // both vertically centered — the native port of the web
+                    // `drawWave` (app/index.html). Columns map by their own time
+                    // position so the lane scrolls in lockstep with the window.
                     Canvas { ctx, size in
-                        let cols   = envelope.count
-                        let c0     = Int((wStart / max(duration, 1)) * Double(cols))
-                        let c1     = min(cols, Int((wEnd / max(duration, 1)) * Double(cols)) + 1)
-                        let vis    = max(1, c1 - c0)
-                        let barW   = size.width / CGFloat(vis)
-                        for i in 0..<vis {
-                            let ci = (c0 + i).clamped(to: 0...(cols - 1))
-                            let v  = CGFloat(envelope[ci])
-                            let bH = size.height * v
-                            let y  = (size.height - bH) / 2
-                            let r  = CGRect(x: CGFloat(i) * barW, y: y,
-                                            width: max(1, barW - 0.5), height: bH)
-                            ctx.fill(Path(r),
-                                     with: .color(Stem.purple.opacity(0.4 + 0.35 * v)))
+                        let cols    = waveform.count
+                        let dur     = max(duration, 0.001)
+                        let secPerCol = dur / Double(cols)
+                        let c0      = max(0, Int((wStart / dur) * Double(cols)) - 1)
+                        let c1      = min(cols, Int((wEnd / dur) * Double(cols)) + 2)
+                        guard c1 > c0 else { return }
+                        let colW    = max(1, CGFloat(secPerCol / windowSec) * size.width)
+                        for ci in c0..<c1 {
+                            let colStart = Double(ci) * secPerCol
+                            let x = CGFloat((colStart - wStart) / windowSec) * size.width
+                            let (peak, rms) = waveform[ci]
+                            // Match the web's amplitude scaling (rms×5.8, peak×2.2).
+                            let body = min(size.height, max(0.8, CGFloat(rms) * size.height * 5.8))
+                            let tip  = min(size.height, max(0.6, CGFloat(peak) * size.height * 2.2))
+                            let bodyRect = CGRect(x: x, y: (size.height - body) / 2,
+                                                  width: colW, height: body)
+                            ctx.fill(Path(bodyRect), with: .color(Stem.inkSoft.opacity(0.55)))
+                            if tip > body {
+                                let tipRect = CGRect(x: x, y: (size.height - tip) / 2,
+                                                     width: colW, height: tip)
+                                ctx.fill(Path(tipRect), with: .color(Stem.ink.opacity(0.72)))
+                            }
                         }
                     }
                 }
@@ -192,35 +203,47 @@ struct SpinningDiscView: View {
     var action: () -> Void
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !playing)) { timeline in
-            let angle = playing
-                ? timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 12) / 12 * 360
-                : 0
-            ZStack {
-                Circle().fill(RadialGradient(
-                    colors: [Stem.cream, Stem.creamDeep],
-                    center: .center, startRadius: 6, endRadius: 150))
-                    .overlay(Circle().stroke(Stem.creamDeep, lineWidth: 1))
-                    .shadow(color: .black.opacity(0.10), radius: 16, y: 6)
-                // faint tonal grooves (warm, not white-on-black)
-                ForEach(0..<5) { i in
-                    Circle().stroke(Stem.ink.opacity(0.04), lineWidth: 1).padding(CGFloat(20 + i * 13))
+        // All geometry is derived from the actual rendered diameter so the disc,
+        // its grooves, and the index mark always stay *inside* their frame. The
+        // old fixed values (endRadius 150, offset −120, padding 64) were tuned
+        // for a large desktop disc and overflowed the compact iOS header,
+        // colliding with the pinned title bar above ("clips other elements").
+        GeometryReader { geo in
+            let d = min(geo.size.width, geo.size.height)
+            let r = d / 2
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !playing)) { timeline in
+                let angle = playing
+                    ? timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 12) / 12 * 360
+                    : 0
+                ZStack {
+                    Circle().fill(RadialGradient(
+                        colors: [Stem.cream, Stem.creamDeep],
+                        center: .center, startRadius: r * 0.04, endRadius: r))
+                        .overlay(Circle().stroke(Stem.creamDeep, lineWidth: 1))
+                        .shadow(color: .black.opacity(0.10), radius: r * 0.1, y: r * 0.04)
+                    // faint tonal grooves (warm, not white-on-black), spaced proportionally
+                    ForEach(0..<5) { i in
+                        Circle().stroke(Stem.ink.opacity(0.04), lineWidth: 1)
+                            .padding(r * (0.16 + CGFloat(i) * 0.12))
+                    }
+                    // a single warm index mark near the top edge, inside the rim
+                    Capsule().fill(Stem.amber.opacity(0.55))
+                        .frame(width: max(2, d * 0.02), height: d * 0.1)
+                        .offset(y: -r * 0.82)
+                    Circle().fill(Stem.purple.opacity(0.10)).padding(r * 0.5)
                 }
-                // a single warm index mark so rotation is legible
-                Capsule().fill(Stem.amber.opacity(0.55))
-                    .frame(width: 3, height: 16)
-                    .offset(y: -min(120, 120))
-                    .padding(.top, 6)
-                Circle().fill(Stem.purple.opacity(0.10)).padding(64)
+                .frame(width: d, height: d)
+                .rotationEffect(.degrees(angle))
+                .overlay(
+                    Image(systemName: playing ? "pause.fill" : "play.fill")
+                        .font(.system(size: max(16, d * 0.17), weight: .semibold))
+                        .foregroundStyle(Stem.purple)
+                )
+                .contentShape(Circle())
+                .onTapGesture { action() }
             }
-            .rotationEffect(.degrees(angle))
-            .overlay(
-                Image(systemName: playing ? "pause.fill" : "play.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(Stem.purple)
-            )
-            .contentShape(Circle())
-            .onTapGesture { action() }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
+        .aspectRatio(1, contentMode: .fit)
     }
 }

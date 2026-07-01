@@ -51,6 +51,32 @@ pub trait Separator {
 /// branch in `separateAudio`.
 pub struct CoherenceSeparator;
 
+/// A [`Separator`] that returns a caller-supplied vocal mask verbatim.
+///
+/// This is how a **neural** mask (Spleeter / Demucs) computed *off-core* — e.g.
+/// by ONNX Runtime on iOS — is injected into the otherwise-identical DSP
+/// pipeline, exactly as the web gold master swaps its ONNX mask into the same
+/// mask-application path (`separateAudio`, the `if(vSess&&aSess)` branch). The
+/// mask is `frames * MODEL_BINS`, row-major, each value in `[0, 1]`.
+pub struct PrecomputedMask {
+    pub mask: Vec<f32>,
+}
+
+impl Separator for PrecomputedMask {
+    fn vocal_mask(&self, _mag_l: &[Vec<f32>], _mag_r: &[Vec<f32>], frames: usize) -> Vec<f32> {
+        let need = frames * MODEL_BINS;
+        if self.mask.len() == need {
+            self.mask.clone()
+        } else {
+            // Length mismatch (should not happen if the caller used frame_count):
+            // pad/truncate defensively so the pipeline stays well-formed.
+            let mut m = self.mask.clone();
+            m.resize(need, 0.0);
+            m
+        }
+    }
+}
+
 /// Frequency weighting for the fallback vocal mask. Pure stereo coherence marks
 /// every centered source as "vocal"; this keeps low bass and high air out of the
 /// vocal stem before accompaniment is split into drums/bass/melody.
@@ -506,6 +532,26 @@ mod tests {
         declick_edges(&mut tiny);
         let mut empty: Vec<f32> = vec![];
         declick_edges(&mut empty);
+    }
+
+    /// An injected all-ones mask routes voice-range energy to vocals; an
+    /// all-zeros mask routes it to the accompaniment (drums/bass/melody). This
+    /// verifies the `PrecomputedMask` path (the iOS ONNX injection point) drives
+    /// the same mask-application pipeline as the coherence path.
+    #[test]
+    fn precomputed_mask_routes_energy_by_mask() {
+        let len = FFT_SIZE + 90 * HOP_SIZE;
+        let voice = sine(len, 1000.0, 0.5);
+        let frames = stft::frame_count(len);
+
+        let ones = separate(&voice, &voice, SR, &PrecomputedMask { mask: vec![1.0; frames * MODEL_BINS] });
+        let zeros = separate(&voice, &voice, SR, &PrecomputedMask { mask: vec![0.0; frames * MODEL_BINS] });
+
+        assert!(rms(&ones.vocals) > rms(&zeros.vocals) * 4.0,
+                "all-ones mask should keep the 1 kHz tone in vocals");
+        let zeros_accomp = rms(&zeros.drums) + rms(&zeros.bass) + rms(&zeros.melody);
+        assert!(zeros_accomp > rms(&zeros.vocals) * 4.0,
+                "all-zeros mask should route energy to accompaniment, not vocals");
     }
 
     /// Stem count and sample-rate are preserved through the pipeline.
